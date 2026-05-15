@@ -14,6 +14,7 @@ import '../../../models/app_notification_model.dart';
 import '../property_detail/property_detail_screen.dart';
 import '../favorites/favorites_screen.dart';
 import '../post_property/post_property_screen.dart';
+import '../post_property/edit_property_screen.dart';
 import '../../auth/login_screen.dart';
 
 class PublicHomeScreen extends StatefulWidget {
@@ -2174,6 +2175,39 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                   onTap: () => _markOccupied(p),
                 )),
               ],
+              const SizedBox(width: 8),
+              // Bouton Modifier — disponible seulement dans les 24h après publication
+              Builder(builder: (ctx) {
+                final age = DateTime.now().difference(p.createdAt);
+                final canEdit = age.inHours < 24;
+                return _iconAction(
+                  Icons.edit_outlined,
+                  canEdit ? AppTheme.accentColor : AppTheme.textHint,
+                  canEdit
+                      ? () async {
+                          final updated = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditPropertyScreen(property: p),
+                            ),
+                          );
+                          if (updated == true && mounted) _load();
+                        }
+                      : () {
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                            content: Text(
+                              age.inHours == 0
+                                  ? 'Modification disponible uniquement dans les 24h suivant la publication.'
+                                  : 'Délai de modification dépassé (${age.inHours}h écoulées). La modification n\'est plus possible.',
+                              style: const TextStyle(fontFamily: 'Poppins'),
+                            ),
+                            backgroundColor: AppTheme.textSecondary,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ));
+                        },
+                );
+              }),
               const SizedBox(width: 8),
               // Supprimer
               _iconAction(Icons.delete_outline_rounded, AppTheme.errorColor,

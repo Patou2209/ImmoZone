@@ -363,6 +363,10 @@ class DataService {
     'garantieMois': p.garantieMois,
     'hasCommission': p.hasCommission,
     'commissionPct': p.commissionPct,
+    'hasAscenseur': p.hasAscenseur,
+    'hasCuisineEquipee': p.hasCuisineEquipee,
+    'longueurM': p.longueurM,
+    'largeurM': p.largeurM,
   };
 
   Future<List<PropertyModel>> getProperties() async {
@@ -425,6 +429,19 @@ class DataService {
           .toList();
     } catch (_) {
       return [];
+    }
+  }
+
+  /// Récupère une annonce par son identifiant depuis Firestore.
+  /// Effectue un accès direct au document (plus fiable que la liste
+  /// pour les documents contenant de grandes images base64).
+  Future<PropertyModel?> getPropertyById(String id) async {
+    try {
+      final snap = await _propertiesCol.doc(id).get();
+      if (!snap.exists) return null;
+      return PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+    } catch (_) {
+      return null;
     }
   }
 

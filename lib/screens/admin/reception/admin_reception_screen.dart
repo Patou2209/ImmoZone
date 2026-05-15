@@ -290,7 +290,9 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
 
   void _showFullDetail(PropertyModel p) {
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _ReceptionDetailScreen(property: p,
+      builder: (_) => _ReceptionDetailScreen(
+        initialProperty: p,
+        dataService: _ds,
         onApprove: p.status == 'En attente' ? () { Navigator.pop(context); _approve(p); } : null,
         onReject:  p.status == 'En attente' ? () { Navigator.pop(context); _showRejectDialog(p); } : null,
       ),
@@ -493,19 +495,52 @@ class _ReceptionCard extends StatelessWidget {
 // ══════════════════════════════════════════════════════════════════════════════
 // ÉCRAN DÉTAIL COMPLET (toutes les informations de l'annonce)
 // ══════════════════════════════════════════════════════════════════════════════
-class _ReceptionDetailScreen extends StatelessWidget {
-  final PropertyModel property;
+class _ReceptionDetailScreen extends StatefulWidget {
+  final PropertyModel initialProperty;
+  final DataService dataService;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
 
   const _ReceptionDetailScreen({
-    required this.property,
+    required this.initialProperty,
+    required this.dataService,
     this.onApprove,
     this.onReject,
   });
 
   @override
+  State<_ReceptionDetailScreen> createState() => _ReceptionDetailScreenState();
+}
+
+class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
+  PropertyModel? _property;
+  bool _loadingDetail = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Afficher immédiatement avec les données disponibles, puis recharger
+    // le document complet depuis Firestore pour garantir que les images
+    // (parfois grandes en base64) sont chargées intégralement.
+    _property = widget.initialProperty;
+    _loadingDetail = false;
+    _fetchFullProperty();
+  }
+
+  Future<void> _fetchFullProperty() async {
+    try {
+      final fresh = await widget.dataService.getPropertyById(widget.initialProperty.id);
+      if (fresh != null && mounted) {
+        setState(() => _property = fresh);
+      }
+    } catch (_) {
+      // On conserve initialProperty si le rechargement échoue
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final property = _property ?? widget.initialProperty;
     final statusColor = property.status == 'En attente'
         ? AppTheme.warningColor
         : property.status == 'Actif'
@@ -518,6 +553,16 @@ class _ReceptionDetailScreen extends StatelessWidget {
         title: const Text('Dossier Annonce', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
             onPressed: () => Navigator.pop(context)),
+        actions: [
+          if (_loadingDetail)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(child: SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -543,25 +588,56 @@ class _ReceptionDetailScreen extends StatelessWidget {
             property.images.isEmpty
               ? _emptyInfo('Aucune photo soumise')
               : SizedBox(
-                  height: 200,
+                  height: 220,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: property.images.length,
-                    itemBuilder: (_, i) => Padding(
-                      padding: EdgeInsets.only(right: i < property.images.length - 1 ? 10 : 0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: PropertyImage(
-                          src: property.images[i],
-                          width: 240, height: 200,
-                          placeholder: Container(
-                            width: 240, height: 200,
-                            color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                            child: const Icon(Icons.broken_image, size: 48, color: AppTheme.accentColor),
-                          ),
+                    itemBuilder: (_, i) {
+                      final src = property.images[i];
+                      // Déterminer le type de source pour l'étiquette de débogage
+                      final label = src.startsWith('data:image/')
+                          ? 'base64 (${(src.length / 1024).toStringAsFixed(0)} KB)'
+                          : src.startsWith('http')
+                              ? 'URL réseau'
+                              : 'Chemin local';
+                      return Padding(
+                        padding: EdgeInsets.only(right: i < property.images.length - 1 ? 10 : 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: PropertyImage(
+                                src: src,
+                                width: 240, height: 190,
+                                placeholder: Container(
+                                  width: 240, height: 190,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                    const Icon(Icons.broken_image_outlined, size: 40, color: AppTheme.accentColor),
+                                    const SizedBox(height: 6),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: Text('Photo ${i + 1} non disponible',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                                              color: AppTheme.textSecondary)),
+                                    ),
+                                  ]),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Photo ${i + 1} · $label',
+                                style: const TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                                    color: AppTheme.textHint)),
+                          ],
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
           ),
@@ -619,11 +695,11 @@ class _ReceptionDetailScreen extends StatelessWidget {
           const SizedBox(height: 20),
 
           // ── Boutons décision ───────────────────────────────────────────────
-          if (onApprove != null && onReject != null) ...[
+          if (widget.onApprove != null && widget.onReject != null) ...[
             Row(children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onReject,
+                  onPressed: widget.onReject,
                   icon: const Icon(Icons.cancel_outlined, size: 18, color: AppTheme.errorColor),
                   label: const Text('Rejeter', style: TextStyle(
                       fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: AppTheme.errorColor)),
@@ -638,7 +714,7 @@ class _ReceptionDetailScreen extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
-                  onPressed: onApprove,
+                  onPressed: widget.onApprove,
                   icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
                   label: const Text('Approuver & Publier', style: TextStyle(
                       fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
