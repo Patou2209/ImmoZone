@@ -651,14 +651,11 @@ class _HomeTabState extends State<_HomeTab>
   String? _commune;
   String _searchQuery = '';
   // Filtres avances
-  int? _minRooms;
-  int? _maxRooms;
-  int? _minBaths;
-  int? _maxBaths;
+  int? _minRooms;      // 1+ 2+ 3+ 4+ 5+ (dropdown, min uniquement)
+  int? _minBaths;      // 1+ 2+ 3+ 4+ 5+ (dropdown, min uniquement)
   double? _minPrice;
   double? _maxPrice;
-  double? _minSurface;
-  double? _maxSurface;
+  // superficie supprimée des filtres (v1.2.16)
   int? _minSeats;
   int? _maxSeats;
   double? _minHectares;
@@ -727,9 +724,9 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   void _resetFilters({bool clearSearch = true}) {
-    _minRooms = _maxRooms = _minBaths = _maxBaths = null;
+    _minRooms = _minBaths = null;
     _minBeds = _maxBeds = _minSeats = _maxSeats = null;
-    _minPrice = _maxPrice = _minSurface = _maxSurface = null;
+    _minPrice = _maxPrice = null;
     _minHectares = _maxHectares = null;
     _province = _city = _commune = null;
     _country = AppConstants.defaultCountry;
@@ -811,17 +808,11 @@ class _HomeTabState extends State<_HomeTab>
       if (_minPrice != null && p.price < _minPrice!) return false;
       if (_maxPrice != null && p.price > _maxPrice!) return false;
 
-      // Filtres chambres
+      // Filtres chambres (min uniquement — dropdown 1+ 2+ ...)
       if (_minRooms != null && (p.bedrooms ?? 0) < _minRooms!) return false;
-      if (_maxRooms != null && (p.bedrooms ?? 0) > _maxRooms!) return false;
 
-      // Filtres SDB
+      // Filtres SDB (min uniquement — dropdown 1+ 2+ ...)
       if (_minBaths != null && (p.bathrooms ?? 0) < _minBaths!) return false;
-      if (_maxBaths != null && (p.bathrooms ?? 0) > _maxBaths!) return false;
-
-      // Filtres surface
-      if (_minSurface != null && (p.surface ?? 0) < _minSurface!) return false;
-      if (_maxSurface != null && (p.surface ?? 0) > _maxSurface!) return false;
 
       // Filtres booléens
       if (_filterParking == true && !p.hasParking) return false;
@@ -1236,26 +1227,34 @@ class _HomeTabState extends State<_HomeTab>
         // Filtres avances selon categorie
         if (_hasCatRooms) ...[
           const SizedBox(height: 12),
-          const Text('Chambres', style: TextStyle(fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
           Row(children: [
-            Expanded(child: _numField('Min chambres', _minRooms?.toString() ?? '',
-                (v) => setState(() => _minRooms = int.tryParse(v)))),
-            const SizedBox(width: 8),
-            Expanded(child: _numField('Max chambres', _maxRooms?.toString() ?? '',
-                (v) => setState(() => _maxRooms = int.tryParse(v)))),
-          ]),
-          const SizedBox(height: 8),
-          const Text('Salles de bain', style: TextStyle(fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _numField('Min SDB', _minBaths?.toString() ?? '',
-                (v) => setState(() => _minBaths = int.tryParse(v)))),
-            const SizedBox(width: 8),
-            Expanded(child: _numField('Max SDB', _maxBaths?.toString() ?? '',
-                (v) => setState(() => _maxBaths = int.tryParse(v)))),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Chambres', style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
+              const SizedBox(height: 6),
+              _dropFilter(
+                value: _minRooms == null ? "N'importe" : '${_minRooms!}+',
+                items: const ["N'importe", '1+', '2+', '3+', '4+', '5+'],
+                onChanged: (v) => setState(() {
+                  _minRooms = (v == "N'importe") ? null : int.parse(v!.replaceAll('+', ''));
+                  _displayCount = 4;
+                }),
+              ),
+            ])),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Salles de bain', style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
+              const SizedBox(height: 6),
+              _dropFilter(
+                value: _minBaths == null ? "N'importe" : '${_minBaths!}+',
+                items: const ["N'importe", '1+', '2+', '3+', '4+', '5+'],
+                onChanged: (v) => setState(() {
+                  _minBaths = (v == "N'importe") ? null : int.parse(v!.replaceAll('+', ''));
+                  _displayCount = 4;
+                }),
+              ),
+            ])),
           ]),
         ],
 
@@ -1301,32 +1300,49 @@ class _HomeTabState extends State<_HomeTab>
           ]),
         ],
 
-        // Superficie (m²) — uniquement pour les catégories qui en ont besoin
-        if (_hasCatSurface) ...[
-          const SizedBox(height: 12),
-          const Text('Superficie (m²)', style: TextStyle(fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _numField('Min m²', _minSurface?.toString() ?? '',
-                (v) => setState(() => _minSurface = double.tryParse(v)))),
-            const SizedBox(width: 8),
-            Expanded(child: _numField('Max m²', _maxSurface?.toString() ?? '',
-                (v) => setState(() => _maxSurface = double.tryParse(v)))),
-          ]),
-        ],
-
-        // Prix
+        // Prix — dropdowns (min Location seulement, max toujours)
         const SizedBox(height: 12),
         const Text('Prix (USD)', style: TextStyle(fontFamily: 'Poppins',
             fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _numField('Prix min', _minPrice?.toString() ?? '',
-              (v) => setState(() => _minPrice = double.tryParse(v)))),
-          const SizedBox(width: 8),
-          Expanded(child: _numField('Prix max', _maxPrice?.toString() ?? '',
-              (v) => setState(() => _maxPrice = double.tryParse(v)))),
+          if (_activeMode == 'Location') ...[
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Min', style: TextStyle(fontFamily: 'Poppins',
+                  fontSize: 11, color: AppTheme.textSecondary)),
+              const SizedBox(height: 4),
+              _dropFilter(
+                value: _minPrice == null ? "N'importe" : _formatPriceLabel(_minPrice!),
+                items: const [
+                  "N'importe", '50 \$', '100 \$', '300 \$', '500 \$',
+                  '1 000 \$', '1 500 \$', '2 500 \$', '5 000 \$',
+                  '7 500 \$', '10 000 \$',
+                ],
+                onChanged: (v) => setState(() {
+                  _minPrice = _parsePriceLabel(v);
+                  _displayCount = 4;
+                }),
+              ),
+            ])),
+            const SizedBox(width: 12),
+          ],
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Max', style: TextStyle(fontFamily: 'Poppins',
+                fontSize: 11, color: AppTheme.textSecondary)),
+            const SizedBox(height: 4),
+            _dropFilter(
+              value: _maxPrice == null ? "N'importe" : _formatPriceLabel(_maxPrice!),
+              items: const [
+                "N'importe", '50 \$', '100 \$', '300 \$', '500 \$',
+                '1 000 \$', '1 500 \$', '2 500 \$', '5 000 \$',
+                '7 500 \$', '10 000 \$', '15 000 \$', '20 000 \$',
+              ],
+              onChanged: (v) => setState(() {
+                _maxPrice = _parsePriceLabel(v);
+                _displayCount = 4;
+              }),
+            ),
+          ])),
         ]),
 
         // Équipements / Options
@@ -1428,6 +1444,53 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
+  // ── Dropdown filtre générique ──────────────────────────────────────────────
+  Widget _dropFilter({
+    required String value,
+    required List<String> items,
+    required void Function(String?) onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: DropdownButton<String>(
+        value: items.contains(value) ? value : items.first,
+        isExpanded: true,
+        underline: const SizedBox(),
+        isDense: true,
+        style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+            color: AppTheme.textPrimary),
+        icon: const Icon(Icons.expand_more_rounded, size: 18,
+            color: AppTheme.textSecondary),
+        items: items.map((e) => DropdownMenuItem(
+          value: e,
+          child: Text(e, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+        )).toList(),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  // ── Helpers formatage prix dropdown ───────────────────────────────────────
+  String _formatPriceLabel(double v) {
+    if (v >= 1000) {
+      final thousands = (v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1);
+      return '${thousands.replaceAll('.0', '')} 000 \$';
+    }
+    return '${v.toInt()} \$';
+  }
+
+  double? _parsePriceLabel(String? label) {
+    if (label == null || label == "N'importe") return null;
+    // Supprimer le symbole $ et les espaces, parser le nombre
+    final cleaned = label.replaceAll('\$', '').replaceAll(' ', '').replaceAll('\u00a0', '');
+    return double.tryParse(cleaned);
+  }
+
   // Chip tri-état : null=tous / true=oui / (on ne propose que null/true ici)
   Widget _boolFilterChip({
     required String label,
@@ -1520,9 +1583,8 @@ class _HomeTabState extends State<_HomeTab>
   Widget _buildEmptyWithSimilar(List<PropertyModel> similar) {
     final bool hasActiveFilter = _searchQuery.isNotEmpty || _hasSearched ||
         _province != null || _city != null ||
-        _commune != null || _minRooms != null || _maxRooms != null ||
-        _minPrice != null || _maxPrice != null || _minBaths != null ||
-        _maxBaths != null || _minSurface != null || _maxSurface != null ||
+        _commune != null || _minRooms != null || _minBaths != null ||
+        _minPrice != null || _maxPrice != null ||
         _minSeats != null || _maxSeats != null || _minBeds != null ||
         _maxBeds != null || _minHectares != null || _maxHectares != null ||
         _filterParking != null || _filterGroupeElec != null || _filterSecurite != null;
@@ -2158,12 +2220,19 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
         Padding(
           padding: const EdgeInsets.all(12),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Image
-            PropertyImage(
-              src: p.images.isNotEmpty ? p.images[0] : '',
-              width: 80, height: 80,
+            // Image — BoxFit.contain pour éviter le crop sur tablette
+            ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              placeholder: _imgPlaceholder(),
+              child: Container(
+                width: 80, height: 80,
+                color: const Color(0xFFF0F4FF),
+                child: PropertyImage(
+                  src: p.images.isNotEmpty ? p.images[0] : '',
+                  width: 80, height: 80,
+                  fit: BoxFit.contain,
+                  placeholder: _imgPlaceholder(),
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             // Infos

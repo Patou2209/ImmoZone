@@ -329,7 +329,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               const SizedBox(width: 8),
               Expanded(
                 flex: 2,
-                child: _dropdown('Devise', const ['USD', 'CDF', 'XAF', 'AOA', 'RWF', 'BIF', 'EUR'],
+                child: _dropdown('Devise', const ['USD', 'CDF', 'CFA', 'AOA', 'RWF', 'BIF', 'EUR'],
                     _selectedCurrency, (v) {
                   if (v != null) setState(() => _selectedCurrency = v);
                 }),

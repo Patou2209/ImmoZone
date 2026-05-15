@@ -102,7 +102,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   // Devise locale selon pays
   String get _localCurrency {
     if (_selectedCountry == 'Congo (RDC)') return 'CDF';
-    if (_selectedCountry == 'Congo (Brazzaville)') return 'XAF';
+    if (_selectedCountry == 'Congo (Brazzaville)') return 'CFA';
     if (_selectedCountry == 'Angola') return 'AOA';
     if (_selectedCountry == 'Rwanda') return 'RWF';
     if (_selectedCountry == 'Burundi') return 'BIF';
@@ -1405,7 +1405,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               _selectedCountry  = v;
               // Reset devise selon le pays
               _selectedCurrency = v == 'Congo (RDC)' ? 'CDF'
-                  : v == 'Congo (Brazzaville)' ? 'XAF' : 'USD';
+                  : v == 'Congo (Brazzaville)' ? 'CFA' : 'USD';
               final prov = AppConstants.getProvincesForCountry(v);
               _selectedProvince = prov.isNotEmpty ? prov.first : '';
               final cits = AppConstants.getCitiesForProvince(v, _selectedProvince);
