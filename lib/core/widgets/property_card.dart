@@ -1,0 +1,470 @@
+import 'package:flutter/material.dart';
+import '../../models/property_model.dart';
+import '../../core/theme/app_theme.dart';
+import 'property_image.dart';
+
+class PropertyCard extends StatelessWidget {
+  final PropertyModel property;
+  final VoidCallback? onTap;
+  final VoidCallback? onFavorite;
+  final bool isFavorite;
+  final bool showStatus;
+
+  const PropertyCard({
+    super.key,
+    required this.property,
+    this.onTap,
+    this.onFavorite,
+    this.isFavorite = false,
+    this.showStatus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: PropertyImage(
+                    src: property.mainImage,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                // Transaction Badge
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: property.transactionType == 'Vente'
+                          ? AppTheme.accentColor
+                          : AppTheme.successColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      property.transactionType,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
+                ),
+                // Status Badge (admin)
+                if (showStatus)
+                  Positioned(
+                    top: 10,
+                    right: 50,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(property.status),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        property.status,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Poppins',
+                        ),
+                      ),
+                    ),
+                  ),
+                // Favorite Button
+                if (onFavorite != null)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: onFavorite,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 4,
+                            )
+                          ],
+                        ),
+                        child: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? Colors.red : Colors.grey,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ),
+                // Sold / Occupied overlay banner
+                if (property.isSold || property.isRented)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: property.isSold
+                                  ? AppTheme.successColor
+                                  : const Color(0xFF0288D1),
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 8, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  property.isSold
+                                      ? Icons.check_circle_rounded
+                                      : Icons.lock_rounded,
+                                  color: Colors.white, size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  property.isSold ? 'VENDU' : 'OCCUPÉ',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'Poppins',
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Featured badge
+                if (property.isFeatured && !property.isSold && !property.isRented)
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star, color: Colors.white, size: 11),
+                          SizedBox(width: 3),
+                          Text(
+                            'En vedette',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Category badge (Agence / Commissionnaire / Propriétaire)
+                if (property.ownerCategory.isNotEmpty)
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _getCategoryColor(property.ownerCategory),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_getCategoryIcon(property.ownerCategory),
+                              color: Colors.white, size: 10),
+                          const SizedBox(width: 4),
+                          Text(
+                            _categoryShortLabel(property.ownerCategory),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    property.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontFamily: 'Poppins',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on,
+                          size: 13, color: AppTheme.accentColor),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          '${property.commune}, ${property.city}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            fontFamily: 'Poppins',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Features – horizontal Wrap layout
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (property.bedrooms != null && property.bedrooms! > 0)
+                        _featureChip(Icons.bed, '${property.bedrooms} Ch.'),
+                      if (property.bathrooms != null && property.bathrooms! > 0)
+                        _featureChip(Icons.bathtub, '${property.bathrooms} SDB'),
+                      // Affichage superficie selon le type de bien
+                      if (property.type == 'Concession' && property.surface != null)
+                        _featureChip(Icons.landscape_outlined, '${property.surface!.toStringAsFixed(property.surface! == property.surface!.truncateToDouble() ? 0 : 2)} ha')
+                      else if (property.type == 'Terrain à bâtir' && property.longueurM != null && property.largeurM != null)
+                        _featureChip(Icons.straighten, '${property.longueurM!.toInt()}m × ${property.largeurM!.toInt()}m')
+                      else if (property.surface != null)
+                        _featureChip(Icons.square_foot, '${property.surface!.toInt()} m²'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Prix + /mois + Garantie badge
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              property.formattedPrice,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                            if (property.transactionType == 'Location') ...
+                              [
+                                const Text(
+                                  '/mois',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppTheme.textSecondary,
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                                if (property.garantieMois != null &&
+                                    property.garantieMois! > 0) ...
+                                  [
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentColor
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                        border: Border.all(
+                                            color: AppTheme.accentColor
+                                                .withValues(alpha: 0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.security_rounded,
+                                              size: 9,
+                                              color: AppTheme.accentColor),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${property.garantieMois}m',
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppTheme.accentColor,
+                                              fontFamily: 'Poppins',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                              ],
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.visibility,
+                              size: 13, color: AppTheme.textHint),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${property.views}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textHint,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _featureChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: AppTheme.accentColor),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppTheme.accentColor,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Poppins',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Agence Immobilière':
+        return const Color(0xFF1565C0);
+      case 'Commissionnaire':
+        return const Color(0xFF6A1B9A);
+      case 'Propriétaire':
+      default:
+        return const Color(0xFF2E7D32);
+    }
+  }
+
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Agence Immobilière':
+        return Icons.business_rounded;
+      case 'Commissionnaire':
+        return Icons.handshake_rounded;
+      case 'Propriétaire':
+      default:
+        return Icons.home_rounded;
+    }
+  }
+
+  String _categoryShortLabel(String category) {
+    switch (category) {
+      case 'Agence Immobilière':
+        return 'Agence';
+      case 'Commissionnaire':
+        return 'Commis.';
+      case 'Propriétaire':
+      default:
+        return 'Propriétaire';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Actif':
+        return AppTheme.statusActive;
+      case 'En attente':
+        return AppTheme.statusPending;
+      case 'Vendu':
+        return AppTheme.statusSold;
+      case 'Loué':
+        return AppTheme.statusRented;
+      case 'Rejeté':
+        return AppTheme.statusRejected;
+      default:
+        return Colors.grey;
+    }
+  }
+}

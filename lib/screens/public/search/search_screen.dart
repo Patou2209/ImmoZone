@@ -1,0 +1,437 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/property_provider.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/property_card.dart';
+import '../../../services/data_service.dart';
+import '../property_detail/property_detail_screen.dart';
+
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final _searchCtrl = TextEditingController();
+  String? _selectedType;
+  String? _selectedTransaction;
+
+  // Filtres géographiques en cascade
+  String? _selectedCountry;
+  String? _selectedProvince;
+  String? _selectedCity;
+  String? _selectedCommune;
+
+  bool _showFilters = false;
+  bool _hasSearched = false; // masque "aucune annonce" tant qu'aucune requête envoyée
+  List<String> _favorites = [];
+  final DataService _dataService = DataService();
+
+  // Listes dynamiques
+  List<String> get _availableProvinces {
+    if (_selectedCountry == null) return [];
+    return AppConstants.getProvincesForCountry(_selectedCountry!);
+  }
+
+  List<String> get _availableCities {
+    if (_selectedCountry == null || _selectedProvince == null) return [];
+    return AppConstants.getCitiesForProvince(_selectedCountry!, _selectedProvince!);
+  }
+
+  List<String> get _availableCommunes {
+    if (_selectedCity == null) return [];
+    return AppConstants.getCommunesForCity(_selectedCity!);
+  }
+
+  bool get _hasActiveFilters =>
+      _selectedType != null ||
+      _selectedTransaction != null ||
+      _selectedCountry != null ||
+      _selectedProvince != null ||
+      _selectedCity != null ||
+      _selectedCommune != null ||
+      _searchCtrl.text.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<PropertyProvider>().loadProperties();
+    _loadFavorites();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadFavorites() async {
+    final favs = await _dataService.getFavorites();
+    if (mounted) setState(() => _favorites = favs);
+  }
+
+  Future<void> _toggleFavorite(String id) async {
+    await _dataService.toggleFavorite(id);
+    await _loadFavorites();
+  }
+
+  void _applyFilters() {
+    setState(() => _hasSearched = true);
+    final provider = context.read<PropertyProvider>();
+    provider.filterByType(_selectedType);
+    provider.filterByTransaction(_selectedTransaction);
+    provider.filterByCity(_selectedCity);
+    provider.filterByCommune(_selectedCommune);
+    provider.filterByCountry(_selectedCountry);
+    provider.filterByProvince(_selectedProvince);
+    provider.search(_searchCtrl.text);
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedType = null;
+      _selectedTransaction = null;
+      _selectedCountry = null;
+      _selectedProvince = null;
+      _selectedCity = null;
+      _selectedCommune = null;
+      _hasSearched = false;
+      _searchCtrl.clear();
+    });
+    context.read<PropertyProvider>().clearFilters();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<PropertyProvider>();
+    final properties = provider.filteredProperties;
+
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: const Text('Rechercher',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+        backgroundColor: AppTheme.primaryColor,
+        actions: [
+          IconButton(
+            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
+            onPressed: () => setState(() => _showFilters = !_showFilters),
+            tooltip: 'Filtres',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // ── Barre de recherche ──────────────────────────────────────────────
+          Container(
+            color: AppTheme.accentColor,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onSubmitted: (_) => _applyFilters(),
+                    decoration: InputDecoration(
+                      hintText: 'Titre, ville, commune...',
+                      hintStyle: const TextStyle(fontSize: 14, fontFamily: 'Poppins', color: AppTheme.textHint),
+                      prefixIcon: const Icon(Icons.search, color: AppTheme.accentColor),
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: AppTheme.textSecondary),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                if (_hasSearched) _applyFilters();
+                              },
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: _applyFilters,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: AppTheme.accentColor, width: 1.5),
+                    ),
+                  ),
+                  child: const Text('Chercher',
+                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Panneau de filtres ──────────────────────────────────────────────
+          AnimatedCrossFade(
+            firstChild: Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+                // Ligne 1 : Type + Transaction
+                Row(children: [
+                  Expanded(child: _filterDropdown(
+                    hint: 'Type de propriété',
+                    value: _selectedType,
+                    items: AppConstants.propertyTypes,
+                    onChanged: (v) => setState(() => _selectedType = v),
+                  )),
+                  const SizedBox(width: 10),
+                  Expanded(child: _filterDropdown(
+                    hint: 'Transaction',
+                    value: _selectedTransaction,
+                    items: AppConstants.transactionTypes,
+                    onChanged: (v) => setState(() => _selectedTransaction = v),
+                  )),
+                ]),
+                const SizedBox(height: 10),
+
+                // Ligne 2 : Pays
+                _filterDropdown(
+                  hint: 'Pays',
+                  value: _selectedCountry,
+                  items: AppConstants.countries,
+                  icon: Icons.public,
+                  onChanged: (v) => setState(() {
+                    _selectedCountry = v;
+                    _selectedProvince = null;
+                    _selectedCity = null;
+                    _selectedCommune = null;
+                  }),
+                ),
+                const SizedBox(height: 10),
+
+                // Ligne 3 : Province + Ville (si pays sélectionné)
+                if (_selectedCountry != null) ...[
+                  Row(children: [
+                    Expanded(child: _filterDropdown(
+                      hint: 'Province',
+                      value: _selectedProvince,
+                      items: _availableProvinces,
+                      icon: Icons.map_outlined,
+                      onChanged: (v) => setState(() {
+                        _selectedProvince = v;
+                        _selectedCity = null;
+                        _selectedCommune = null;
+                      }),
+                    )),
+                    if (_selectedProvince != null && _availableCities.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(child: _filterDropdown(
+                        hint: 'Ville',
+                        value: _selectedCity,
+                        items: _availableCities,
+                        icon: Icons.location_city,
+                        onChanged: (v) => setState(() {
+                          _selectedCity = v;
+                          _selectedCommune = null;
+                        }),
+                      )),
+                    ],
+                  ]),
+                  const SizedBox(height: 10),
+                ],
+
+                // Ligne 4 : Commune (si ville sélectionnée)
+                if (_selectedCity != null && _availableCommunes.isNotEmpty) ...[
+                  _filterDropdown(
+                    hint: 'Commune',
+                    value: _selectedCommune,
+                    items: _availableCommunes,
+                    icon: Icons.location_on_outlined,
+                    onChanged: (v) => setState(() => _selectedCommune = v),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // Boutons Appliquer / Effacer
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _applyFilters,
+                      icon: const Icon(Icons.search, size: 16, color: Colors.white),
+                      label: const Text('Appliquer',
+                          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentColor,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: _clearFilters,
+                    icon: const Icon(Icons.clear_all, size: 16),
+                    label: const Text('Effacer', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.errorColor,
+                      side: const BorderSide(color: AppTheme.errorColor),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+            secondChild: const SizedBox.shrink(),
+            crossFadeState: _showFilters ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 250),
+          ),
+
+          // ── Barre de résultats ──────────────────────────────────────────────
+          if (_hasSearched)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  Text(
+                    '${properties.length} résultat${properties.length > 1 ? 's' : ''}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        fontFamily: 'Poppins', color: AppTheme.textSecondary),
+                  ),
+                  if (_hasActiveFilters)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text('Filtres actifs',
+                            style: TextStyle(fontSize: 11, color: AppTheme.accentColor, fontFamily: 'Poppins')),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+          // ── Liste des résultats ─────────────────────────────────────────────
+          Expanded(
+            child: provider.isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
+                : !_hasSearched
+                    // Aucune requête envoyée → invitation à chercher
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search, size: 72, color: Colors.grey[300]),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Recherchez un bien immobilier',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+                                  fontFamily: 'Poppins', color: AppTheme.textSecondary),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Utilisez la barre de recherche ou\nles filtres pour trouver votre bien.',
+                              style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                                  color: AppTheme.textHint),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: () => setState(() => _showFilters = true),
+                              icon: const Icon(Icons.filter_list, size: 16, color: Colors.white),
+                              label: const Text('Ouvrir les filtres',
+                                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.accentColor,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : properties.isEmpty
+                        // Recherche lancée mais aucun résultat
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
+                                const SizedBox(height: 12),
+                                const Text('Aucun résultat trouvé',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+                                        fontFamily: 'Poppins', color: AppTheme.textSecondary)),
+                                const SizedBox(height: 8),
+                                const Text("Essayez d'autres critères de recherche",
+                                    style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                                        color: AppTheme.textHint)),
+                                const SizedBox(height: 16),
+                                TextButton(
+                                  onPressed: _clearFilters,
+                                  child: const Text('Effacer les filtres',
+                                      style: TextStyle(fontFamily: 'Poppins', color: AppTheme.accentColor)),
+                                ),
+                              ],
+                            ),
+                          )
+                        // Résultats
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: properties.length,
+                            itemBuilder: (ctx, i) {
+                              final p = properties[i];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: PropertyCard(
+                                  property: p,
+                                  isFavorite: _favorites.contains(p.id),
+                                  onFavorite: () => _toggleFavorite(p.id),
+                                  onTap: () => Navigator.push(context,
+                                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterDropdown({
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    IconData? icon,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: (items.contains(value)) ? value : null,
+      hint: Text(hint, style: const TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        prefixIcon: icon != null ? Icon(icon, size: 16, color: AppTheme.accentColor) : null,
+      ),
+      isExpanded: true,
+      items: [
+        DropdownMenuItem<String>(value: null, child: Text('Tous', style: const TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.textHint))),
+        ...items.map((t) => DropdownMenuItem(
+              value: t,
+              child: Text(t, style: const TextStyle(fontSize: 12, fontFamily: 'Poppins'), overflow: TextOverflow.ellipsis),
+            )),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}

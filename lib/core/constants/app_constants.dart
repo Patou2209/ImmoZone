@@ -1,0 +1,439 @@
+class AppConstants {
+  // App Info
+  static const String appName = 'ImmoZone';
+  static const String appVersion = '1.0.0';
+  static const String appTagline = 'Achetez, Vendez, Louez ou mettez un bien immobilier en quelques clics';
+
+  // Storage Keys
+  static const String keyUserRole    = 'user_role';
+  static const String keyUserId      = 'user_id';
+  static const String keyUserName    = 'user_name';
+  static const String keyUserEmail   = 'user_email';
+  static const String keyUserPhone   = 'user_phone';
+  static const String keyUserAvatar  = 'user_avatar';
+  static const String keyIsLoggedIn  = 'is_logged_in';
+  static const String keyAuthToken   = 'auth_token';
+  static const String keyFavorites   = 'favorites';
+
+  // User Roles
+  static const String roleAdmin      = 'admin';
+  static const String roleAnnonceur  = 'annonceur';
+  static const String roleDemandeur  = 'demandeur';
+
+  // Catégories d'annonceur (obligatoire à la création du compte)
+  static const String categoryAgence          = 'Agence Immobilière';
+  static const String categoryCommissionnaire = 'Commissionnaire';
+  static const String categoryProprietaire    = 'Propriétaire';
+  static const List<String> annonceurCategories = [
+    categoryAgence,
+    categoryCommissionnaire,
+    categoryProprietaire,
+  ];
+
+  // ── MODE : filtres par defaut accueil ────────────────────────────────────
+  static const String defaultMode        = 'Location';
+  static const String defaultCategory   = 'Maison';
+  static const String defaultCountry    = 'Congo (RDC)';
+
+  // ── Pays disponibles dans les filtres (2 principaux) ─────────────────────
+  static const List<String> filterCountries = [
+    'Congo (RDC)',
+    'Congo (Brazzaville)',
+  ];
+
+  // Tous les pays (liste complete)
+  static const List<String> countries = [
+    'Congo (RDC)',
+    'Congo (Brazzaville)',
+    'Angola',
+    'Rwanda',
+    'Burundi',
+    'Tanzanie',
+    'Zambie',
+    'Autre',
+  ];
+
+  // ── Categories par mode ──────────────────────────────────────────────────
+  static const List<String> categoriesLocation = [
+    'Maison',
+    'Appartement / Flat',
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+    'Salle de Fêtes',
+    'Chambre d\'hôtel',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+
+  static const List<String> categoriesAchat = [
+    'Maison',
+    'Appartement / Flat',
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+    'Concession',
+    'Terrain à bâtir',
+    'Salle de Fêtes',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+
+  static const List<String> categoriesPublication = [
+    'Maison',
+    'Appartement / Flat',
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+    'Concession',
+    'Terrain à bâtir',
+    'Salle de Fêtes',
+    'Chambre d\'hôtel',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+
+  static const List<String> propertyTypes = [
+    'Maison',
+    'Appartement / Flat',
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+    'Concession',
+    'Terrain à bâtir',
+    'Salle de Fêtes',
+    'Chambre d\'hôtel',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+
+  static const List<String> transactionTypes = [
+    'Location',
+    'Vente',
+  ];
+
+  // ── Filtres avances par categorie ───────────────────────────────────────
+  static const List<String> catWithRooms = [
+    'Maison',
+    'Appartement / Flat',
+  ];
+  static const List<String> catWithBeds = [
+    'Chambre d\'hotel',
+  ];
+  // Superficie OBLIGATOIRE pour ces types
+  static const List<String> catWithSurfaceRequired = [
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+  ];
+  // Superficie OPTIONNELLE pour ces types
+  static const List<String> catWithSurfaceOptional = [
+    'Maison',
+    'Appartement / Flat',
+    'Chambre d\'hôtel',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+  // Garde l'ancien nom pour compatibilité (union des deux)
+  static const List<String> catWithSurface = [
+    'Bureau',
+    'Propriété Commerciale',
+    'Propriété Industrielle',
+    'Maison',
+    'Appartement / Flat',
+    'Chambre d\'hôtel',
+    'Espace Funéraire',
+    'Salle Polyvalente',
+  ];
+  static const List<String> catWithSeats = [
+    'Salle de Fetes',
+    'Espace Funeraire',
+    'Salle Polyvalente',
+  ];
+  // Superficie en hectares (ha) pour Concession
+  static const List<String> catWithHectares = [
+    'Concession',
+  ];
+  // Dimensions L×l pour Terrain à bâtir
+  static const List<String> catWithDimensions = [
+    'Terrain à bâtir',
+  ];
+
+  // ── Statuts des annonces ────────────────────────────────────────────────
+  static const String statusPending   = 'En attente';
+  static const String statusActive    = 'Actif';
+  static const String statusSold      = 'Vendu';
+  static const String statusOccupied  = 'Occupe';
+  static const String statusRented    = 'Loue';
+  static const String statusRejected  = 'Rejete';
+  static const String statusExpired   = 'Expire';
+  static const String statusSuspended = 'Suspendu';
+
+  // ── Provinces RDC ───────────────────────────────────────────────────────
+  static const List<String> provinces = [
+    'Kinshasa',
+    'Kongo-Central',
+    'Kwango',
+    'Kwilu',
+    'Mai-Ndombe',
+    'Kasai',
+    'Kasai-Central',
+    'Kasai-Oriental',
+    'Lomami',
+    'Sankuru',
+    'Maniema',
+    'Sud-Kivu',
+    'Nord-Kivu',
+    'Ituri',
+    'Haut-Uele',
+    'Bas-Uele',
+    'Tshopo',
+    'Mongala',
+    'Nord-Ubangi',
+    'Sud-Ubangi',
+    'Equateur',
+    'Tshuapa',
+    'Tanganyika',
+    'Haut-Lomami',
+    'Lualaba',
+    'Haut-Katanga',
+  ];
+
+  // ── Provinces Congo Brazzaville ──────────────────────────────────────────
+  static const List<String> provincesBrazzaville = [
+    'Brazzaville',
+    'Pointe-Noire',
+    'Pool',
+    'Bouenza',
+    'Niari',
+    'Lekoumou',
+    'Kouilou',
+    'Plateaux',
+    'Cuvette',
+    'Cuvette-Ouest',
+    'Sangha',
+    'Likouala',
+  ];
+
+  // ── Villes par province RDC ──────────────────────────────────────────────
+  static const Map<String, List<String>> citiesByProvince = {
+    'Kinshasa':      ['Kinshasa'],
+    'Kongo-Central': ['Matadi', 'Boma', 'Mbanza-Ngungu', 'Tshela'],
+    'Kwango':        ['Kenge', 'Kasongo-Lunda'],
+    'Kwilu':         ['Bandundu', 'Kikwit', 'Idiofa'],
+    'Mai-Ndombe':    ['Inongo', 'Bolobo'],
+    'Kasai':         ['Tshikapa', 'Ilebo'],
+    'Kasai-Central': ['Kananga', 'Mweka'],
+    'Kasai-Oriental':['Mbuji-Mayi', 'Kabinda'],
+    'Lomami':        ['Kabalo', 'Kabinda', 'Ngandajika'],
+    'Sankuru':       ['Lusambo', 'Kole'],
+    'Maniema':       ['Kindu', 'Kailo'],
+    'Sud-Kivu':      ['Bukavu', 'Uvira', 'Baraka', 'Fizi'],
+    'Nord-Kivu':     ['Goma', 'Butembo', 'Beni', 'Lubero'],
+    'Ituri':         ['Bunia', 'Butembo', 'Mahagi'],
+    'Haut-Uele':     ['Isiro', 'Wamba'],
+    'Bas-Uele':      ['Buta', 'Aketi'],
+    'Tshopo':        ['Kisangani', 'Ubundu'],
+    'Mongala':       ['Lisala', 'Bumba'],
+    'Nord-Ubangi':   ['Gbadolite', 'Yakoma'],
+    'Sud-Ubangi':    ['Gemena', 'Zongo'],
+    'Equateur':      ['Mbandaka', 'Bikoro'],
+    'Tshuapa':       ['Boende', 'Befale'],
+    'Tanganyika':    ['Kalemie', 'Moba', 'Kongolo'],
+    'Haut-Lomami':   ['Kamina', 'Bukama'],
+    'Lualaba':       ['Kolwezi', 'Dilolo', 'Mutshatsha'],
+    'Haut-Katanga':  ['Lubumbashi', 'Likasi', 'Kipushi', 'Kasenga'],
+  };
+
+  // ── Villes par province Congo Brazzaville ────────────────────────────────
+  static const Map<String, List<String>> citiesByProvinceBrazzaville = {
+    'Brazzaville':   ['Brazzaville'],
+    'Pointe-Noire':  ['Pointe-Noire'],
+    'Pool':          ['Kinkala', 'Boko'],
+    'Bouenza':       ['Madingou', 'Nkayi'],
+    'Niari':         ['Dolisie', 'Mossendjo'],
+    'Lekoumou':      ['Sibiti', 'Komono'],
+    'Kouilou':       ['Pointe-Noire', 'Loango'],
+    'Plateaux':      ['Djambala', 'Abala'],
+    'Cuvette':       ['Owando', 'Makoua'],
+    'Cuvette-Ouest': ['Ewo', 'Kelle'],
+    'Sangha':        ['Ouesso', 'Mokeko'],
+    'Likouala':      ['Impfondo', 'Epena'],
+  };
+
+  // ── Communes par ville RDC ────────────────────────────────────────────────
+  static const Map<String, List<String>> communesByCity = {
+    'Kinshasa': [
+      'Gombe', 'Lingwala', 'Kinshasa', 'Barumbu', 'Ngiri-Ngiri',
+      'Kalamu', 'Lemba', 'Makala', 'Bandalungwa', 'Kintambo',
+      'Mont-Ngafula', 'Ngaliema', 'Kisenso', 'Matete', 'Ndjili',
+      'Masina', 'Nsele', 'Maluku', 'Selembao', 'Bumbu',
+      'Kasavubu', 'Limete', 'Quartier Industriel',
+    ],
+    'Lubumbashi': [
+      'Kampemba', 'Kamalondo', 'Kenya', 'Katuba', 'Lubumbashi',
+      'Annexe', 'Ruashi',
+    ],
+    'Goma': [
+      'Goma', 'Karisimbi', 'Himbi', 'Mikeno', 'Nyiragongo',
+    ],
+    'Bukavu': [
+      'Ibanda', 'Kadutu', 'Bagira', 'Ndendere',
+    ],
+    'Mbuji-Mayi': [
+      'Diulu', 'Kanshi', 'Muya', 'Bipemba', 'Dibindi',
+    ],
+    'Kisangani': [
+      'Makiso', 'Tshopo', 'Kabondo', 'Mangobo', 'Lubunga',
+    ],
+    'Kananga': [
+      'Kananga', 'Lukonga', 'Ndesha',
+    ],
+    'Kolwezi': [
+      'Dilala', 'Manika', 'Musonoi',
+    ],
+    'Matadi': [
+      'Matadi', 'Mvuzi', 'Nzanza',
+    ],
+    'Boma': [
+      'Boma', 'Kalamu', 'Roba',
+    ],
+    'Likasi': [
+      'Likasi', 'Shituru', 'Panda',
+    ],
+    'Butembo': [
+      'Butembo', 'Vulamba', 'Kimemi',
+    ],
+    'Uvira': [
+      'Uvira', 'Mulongwe', 'Kalundu',
+    ],
+    'Mbandaka': [
+      'Mbandaka', 'Wangata', 'Bikoro',
+    ],
+    'Tshikapa': [
+      'Tshikapa', 'Mabondo',
+    ],
+    // Villes Congo Brazzaville
+    'Brazzaville': [
+      'Bacongo', 'Makelelekele', 'Moungali', 'Ouenzé', 'Poto-Poto',
+      'Mfilou', 'Talangai', 'Madibou', 'Djiri',
+    ],
+    'Pointe-Noire': [
+      'Lumumba', 'Mvou-Mvou', 'Ngoyo', 'Tié-Tié', 'Mongo-Mpoukou',
+    ],
+    'Dolisie': ['Dolisie Centre', 'Mvoumvou'],
+    'Owando':  ['Owando Centre'],
+    'Ouesso':  ['Ouesso Centre'],
+    'Impfondo':['Impfondo Centre'],
+  };
+
+  // Toutes les villes (liste plate – compatibilite)
+  static const List<String> cities = [
+    'Kinshasa', 'Lubumbashi', 'Goma', 'Bukavu', 'Mbuji-Mayi',
+    'Kisangani', 'Kananga', 'Kolwezi', 'Matadi', 'Boma',
+    'Likasi', 'Butembo', 'Uvira', 'Mbandaka', 'Tshikapa',
+  ];
+
+  // Communes de Kinshasa (compatibilite existante)
+  static const List<String> communesKinshasa = [
+    'Gombe', 'Lingwala', 'Kinshasa', 'Barumbu', 'Ngiri-Ngiri',
+    'Kalamu', 'Lemba', 'Makala', 'Bandalungwa', 'Kintambo',
+    'Mont-Ngafula', 'Ngaliema', 'Kisenso', 'Matete', 'Ndjili',
+    'Masina', 'Nsele', 'Maluku', 'Selembao', 'Bumbu',
+    'Kasavubu', 'Limete', 'Quartier Industriel',
+  ];
+
+  // ── Helper : retourne les villes selon pays + province ──────────────────
+  static List<String> getCitiesForProvince(String country, String province) {
+    if (country == 'Congo (Brazzaville)') {
+      return citiesByProvinceBrazzaville[province] ?? [];
+    }
+    return citiesByProvince[province] ?? [];
+  }
+
+  // ── Helper : retourne les provinces selon le pays ────────────────────────
+  static List<String> getProvincesForCountry(String country) {
+    if (country == 'Congo (Brazzaville)') return provincesBrazzaville;
+    return provinces;
+  }
+
+  // ── Helper : retourne les communes selon la ville ────────────────────────
+  static List<String> getCommunesForCity(String city) {
+    return communesByCity[city] ?? [];
+  }
+
+  // ── Equipements ─────────────────────────────────────────────────────────
+  static const List<String> amenities = [
+    'Piscine', 'Garage', 'Jardin', 'Terrasse', 'Gardiennage',
+    'Ascenseur', 'Groupe electrogene', 'Eau courante', 'Climatisation',
+    'Internet', 'Cuisine equipee', 'Parquet', 'Carrelage',
+    'Securite 24h/24', 'Parking', 'Cloture', 'Citerne d\'eau',
+    'Panneaux solaires', 'Annexe', 'Espace de stockage',
+  ];
+
+  // ── Duree auto-suppression annonces vendues (en heures) ─────────────────
+  static const int soldAutoDeleteHours = 72;
+
+  // Pagination
+  static const int pageSize = 10;
+
+  // Image placeholder
+  static const String placeholderProperty =
+      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800';
+
+  // ── Moyens de paiement par defaut ───────────────────────────────────────
+  static const List<Map<String, String>> defaultPaymentMethods = [
+    {'name': 'M-Pesa (Vodacom)', 'number': '+243 81 000 0001', 'icon': 'mpesa'},
+    {'name': 'Orange Money',     'number': '+243 84 000 0002', 'icon': 'orange'},
+    {'name': 'Airtel Money',     'number': '+243 99 000 0003', 'icon': 'airtel'},
+  ];
+
+  // ── Indicatifs pays du monde (pour WhatsApp) ────────────────────────────
+  static const List<Map<String, String>> countryCodes = [
+    {'code': '+243', 'country': 'Congo (RDC)',         'flag': '🇨🇩'},
+    {'code': '+242', 'country': 'Congo (Brazzaville)', 'flag': '🇨🇬'},
+    {'code': '+244', 'country': 'Angola',              'flag': '🇦🇴'},
+    {'code': '+250', 'country': 'Rwanda',              'flag': '🇷🇼'},
+    {'code': '+257', 'country': 'Burundi',             'flag': '🇧🇮'},
+    {'code': '+255', 'country': 'Tanzanie',            'flag': '🇹🇿'},
+    {'code': '+260', 'country': 'Zambie',              'flag': '🇿🇲'},
+    {'code': '+256', 'country': 'Ouganda',             'flag': '🇺🇬'},
+    {'code': '+254', 'country': 'Kenya',               'flag': '🇰🇪'},
+    {'code': '+251', 'country': 'Ethiopie',            'flag': '🇪🇹'},
+    {'code': '+234', 'country': 'Nigeria',             'flag': '🇳🇬'},
+    {'code': '+233', 'country': 'Ghana',               'flag': '🇬🇭'},
+    {'code': '+225', 'country': "Cote d'Ivoire",       'flag': '🇨🇮'},
+    {'code': '+237', 'country': 'Cameroun',            'flag': '🇨🇲'},
+    {'code': '+241', 'country': 'Gabon',               'flag': '🇬🇦'},
+    {'code': '+240', 'country': 'Guinee Equatoriale',  'flag': '🇬🇶'},
+    {'code': '+236', 'country': 'Rep. Centrafricaine', 'flag': '🇨🇫'},
+    {'code': '+235', 'country': 'Tchad',               'flag': '🇹🇩'},
+    {'code': '+249', 'country': 'Soudan',              'flag': '🇸🇩'},
+    {'code': '+212', 'country': 'Maroc',               'flag': '🇲🇦'},
+    {'code': '+213', 'country': 'Algerie',             'flag': '🇩🇿'},
+    {'code': '+216', 'country': 'Tunisie',             'flag': '🇹🇳'},
+    {'code': '+20',  'country': 'Egypte',              'flag': '🇪🇬'},
+    {'code': '+27',  'country': 'Afrique du Sud',      'flag': '🇿🇦'},
+    {'code': '+258', 'country': 'Mozambique',          'flag': '🇲🇿'},
+    {'code': '+263', 'country': 'Zimbabwe',            'flag': '🇿🇼'},
+    {'code': '+267', 'country': 'Botswana',            'flag': '🇧🇼'},
+    {'code': '+264', 'country': 'Namibie',             'flag': '🇳🇦'},
+    {'code': '+261', 'country': 'Madagascar',          'flag': '🇲🇬'},
+    {'code': '+230', 'country': 'Maurice',             'flag': '🇲🇺'},
+    {'code': '+33',  'country': 'France',              'flag': '🇫🇷'},
+    {'code': '+32',  'country': 'Belgique',            'flag': '🇧🇪'},
+    {'code': '+41',  'country': 'Suisse',              'flag': '🇨🇭'},
+    {'code': '+1',   'country': 'USA / Canada',        'flag': '🇺🇸'},
+    {'code': '+44',  'country': 'Royaume-Uni',         'flag': '🇬🇧'},
+    {'code': '+49',  'country': 'Allemagne',           'flag': '🇩🇪'},
+    {'code': '+39',  'country': 'Italie',              'flag': '🇮🇹'},
+    {'code': '+34',  'country': 'Espagne',             'flag': '🇪🇸'},
+    {'code': '+351', 'country': 'Portugal',            'flag': '🇵🇹'},
+    {'code': '+55',  'country': 'Bresil',              'flag': '🇧🇷'},
+    {'code': '+86',  'country': 'Chine',               'flag': '🇨🇳'},
+    {'code': '+81',  'country': 'Japon',               'flag': '🇯🇵'},
+    {'code': '+91',  'country': 'Inde',                'flag': '🇮🇳'},
+    {'code': '+971', 'country': 'Emirats Arabes Unis', 'flag': '🇦🇪'},
+    {'code': '+966', 'country': 'Arabie Saoudite',     'flag': '🇸🇦'},
+  ];
+}
