@@ -70,9 +70,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final _commissionPctCtrl = TextEditingController();
 
   // ── Etape 2 — Images ──────────────────────────────────────────────────────
-  final List<String> _imageUrls = [];
-  final List<XFile> _localImages = [];
+  // Photo principale (obligatoire) + 3 photos secondaires (obligatoires) = 4 exactement
+  XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
+  final List<XFile> _secondaryPhotos = []; // max 3 photos secondaires
   final ImagePicker _picker = ImagePicker();
+  // Compatibilité avec l'ancien système URL (conserver pour _addSampleImages)
+  final List<String> _imageUrls = [];
   final _imageUrlCtrl = TextEditingController();
 
   // ── Etape 3 — Paiement ────────────────────────────────────────────────────
@@ -159,7 +162,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _capacityCtrl, _pricePerDayCtrl, _hectaresCtrl,
       _longueurCtrl, _largeurCtrl,
       _commissionPctCtrl,
-      _imageUrlCtrl, _transactionRefCtrl,
+      _imageUrlCtrl,  _transactionRefCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -190,7 +193,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       if (_emailCtrl.text.trim().isEmpty) { _err('Email requis'); return false; }
     }
     // Quartier est optionnel
-    if (_priceCtrl.text.trim().isEmpty)    { _err('Prix requis'); return false; }
+    if (_priceCtrl.text.trim().isEmpty) { _err('Prix requis'); return false; }
+    // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
+    if (_selectedType == 'Salle de Fêtes' || _selectedType == 'Salle Polyvalente') {
+      if (_capacityCtrl.text.trim().isEmpty || int.tryParse(_capacityCtrl.text.trim()) == null) {
+        _err('La capacité (personnes) est obligatoire pour ce type de bien'); return false;
+      }
+    }
     // Chambres & SDB obligatoires pour Maison et Appartement/Flat
     final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Appartement / Flat';
     if (requiresRooms) {
@@ -220,9 +229,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   bool _validateStep2() {
-    final total = _imageUrls.length + _localImages.length;
-    if (total < 4) {
-      _err('Veuillez ajouter au moins 4 photos du bien (${total}/4)'); return false;
+    if (_mainPhoto == null && _imageUrls.isEmpty) {
+      _err('Veuillez sélectionner une photo principale'); return false;
+    }
+    if (_secondaryPhotos.length < 3 && _imageUrls.length < 4) {
+      final done = (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length + _imageUrls.length;
+      _err('Veuillez ajouter les 4 photos requises ($done/4)'); return false;
     }
     return true;
   }
@@ -339,15 +351,21 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       // Les chemins locaux (/data/user/0/...) ne sont accessibles que sur l'appareil
       // de l'annonceur. On encode en base64 pour que tous les appareils voient les photos.
       // Limite Firestore : 1 Mo par document. imageQuality:40 ≈ 80–150 KB/photo → 5×150=750KB OK.
-      final images = [..._imageUrls]; // URLs réseau conservées telles quelles
+      // ── Encoder les photos : principale en [0], secondaires en [1..3] ────────
+      final images = <String>[];
       if (!kIsWeb) {
         int totalBytes = 0;
         const int maxDocBytes = 900000; // 900 KB marge de sécurité sous 1 MB
-        for (final xfile in _localImages) {
-          if (totalBytes >= maxDocBytes) break; // ne pas dépasser la limite
+        // Photo principale en premier (position [0])
+        final allPhotos = [
+          if (_mainPhoto != null) _mainPhoto!,
+          ..._secondaryPhotos,
+        ];
+        for (final xfile in allPhotos) {
+          if (totalBytes >= maxDocBytes) break;
           try {
             final bytes = await File(xfile.path).readAsBytes();
-            if (totalBytes + bytes.length > maxDocBytes) break; // photo ferait dépasser
+            if (totalBytes + bytes.length > maxDocBytes) break;
             final b64 = base64Encode(bytes);
             final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
             images.add('data:image/$ext;base64,$b64');
@@ -357,6 +375,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           }
         }
       }
+      // URLs réseau (mode test / sample) conservées telles quelles
+      images.addAll(_imageUrls);
       final finalImages = images;
 
       // Utiliser les infos du compte connecte ou ce qui a ete saisi
@@ -397,7 +417,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         numberOfBeds: int.tryParse(_numberOfBedsCtrl.text.trim()),
         hasAirConditioning: _hasAirConditioning,
         hasBreakfast: _hasBreakfast,
-        pricePerNight: double.tryParse(_pricePerNightCtrl.text.trim()),
+        // Pour Chambre d'hôtel, _priceCtrl contient le prix par nuit (champ unique)
+        pricePerNight: _selectedType == 'Chambre d\'hôtel'
+            ? double.tryParse(_priceCtrl.text.trim())
+            : double.tryParse(_pricePerNightCtrl.text.trim()),
         capacity: int.tryParse(_capacityCtrl.text.trim()),
         pricePerDay: double.tryParse(_pricePerDayCtrl.text.trim()),
         garantieMois: _garantieMois > 0 ? _garantieMois : null,
@@ -610,12 +633,32 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         _sectionLabel('Type de propriété'),
         const SizedBox(height: 10),
         _dropdown('Type de propriété *', _selectedType, AppConstants.propertyTypes,
-            Icons.home_outlined, (v) => setState(() => _selectedType = v!)),
-        _dropdown('Type de transaction *', _selectedTransaction,
-            AppConstants.transactionTypes, Icons.swap_horiz,
-            (v) => setState(() => _selectedTransaction = v!)),
-        _field(_priceCtrl, 'Prix *', Icons.attach_money, '0',
-            type: TextInputType.number, suffix: _currencyDropdown()),
+            Icons.home_outlined, (v) {
+          setState(() {
+            _selectedType = v!;
+            // Terrain à bâtir et Concession ne peuvent être qu'en Vente
+            if (_selectedType == 'Terrain à bâtir' || _selectedType == 'Concession') {
+              _selectedTransaction = 'Vente';
+            }
+          });
+        }),
+        // Pour Terrain à bâtir et Concession : transaction forcée à Vente
+        Builder(builder: (ctx) {
+          final isVenteOnly = _selectedType == 'Terrain à bâtir' ||
+              _selectedType == 'Concession';
+          final availableTx = isVenteOnly
+              ? const ['Vente']
+              : AppConstants.transactionTypes;
+          return _dropdown('Type de transaction *', _selectedTransaction,
+              availableTx, Icons.swap_horiz,
+              (v) => setState(() => _selectedTransaction = v!));
+        }),
+        // Prix affiché selon le type de bien (label adapté pour Chambre d'hôtel)
+        _selectedType == 'Chambre d\'hôtel'
+            ? _field(_priceCtrl, 'Prix par nuitée (USD) *', Icons.nights_stay_outlined, '0',
+                type: TextInputType.number, suffix: _currencyDropdown())
+            : _field(_priceCtrl, 'Prix *', Icons.attach_money, '0',
+                type: TextInputType.number, suffix: _currencyDropdown()),
 
         // ── Champs conditionnels selon la catégorie ─────────────────────────
         _buildCategoryFields(),
@@ -869,9 +912,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         _field(_numberOfBedsCtrl, 'Nombre de lits', Icons.single_bed_rounded,
             '1',
             type: TextInputType.number),
-        _field(_pricePerNightCtrl, 'Prix par nuit (USD)',
-            Icons.nights_stay_outlined, '0',
-            type: TextInputType.number),
+        // Prix par nuit géré dans le champ global _priceCtrl (relabelé dynamiquement)
         yesNoToggle('Climatisation', Icons.ac_unit_rounded, _hasAirConditioning,
             (v) => setState(() => _hasAirConditioning = v)),
         yesNoToggle('Petit-déjeuner inclus', Icons.free_breakfast_outlined,
@@ -887,8 +928,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     else if (type == 'Salle de Fêtes' ||
         type == 'Espace Funéraire' ||
         type == 'Salle Polyvalente') {
+      // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
+      final capLabel = (type == 'Salle de Fêtes' || type == 'Salle Polyvalente')
+          ? 'Capacité (personnes) *'
+          : 'Capacité (personnes)';
       fields.addAll([
-        _field(_capacityCtrl, 'Capacité (personnes)', Icons.event_seat_rounded,
+        _field(_capacityCtrl, capLabel, Icons.event_seat_rounded,
             '100',
             type: TextInputType.number),
         _field(_surfaceCtrl, 'Superficie (m²) — optionnel', Icons.square_foot, '',
@@ -1375,14 +1420,22 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 2 — Photos du bien (min 4)
+  // ETAPE 2 — Photos du bien (exactement 4 : 1 principale + 3 secondaires)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep2() {
+    final bool hasSampleUrls = _imageUrls.isNotEmpty;
+    final int total = (hasSampleUrls)
+        ? _imageUrls.length
+        : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length;
+    final bool complete = total >= 4;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Etape 2', 'Photos du bien (minimum 4)', Icons.photo_library_rounded),
+        _stepHeader('Etape 2', 'Photos du bien (4 photos requises)', Icons.photo_library_rounded),
         const SizedBox(height: 8),
+
+        // Bannière info
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -1394,238 +1447,429 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Icon(Icons.info_outline, color: AppTheme.accentColor, size: 18),
             SizedBox(width: 10),
             Expanded(child: Text(
-              'Ajoutez au moins 4 photos claires de votre bien. Des photos de qualite augmentent vos chances de vente.',
+              'Sélectionnez exactement 4 photos : 1 photo principale (couverture) puis 3 photos secondaires.',
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor),
             )),
           ]),
         ),
+        const SizedBox(height: 24),
+
+        // ── SECTION 1 : Photo principale ──────────────────────────────────────
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('1', style: TextStyle(color: Colors.white,
+                fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          const Text('Photo principale (couverture)',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 14, color: AppTheme.textPrimary)),
+          const Spacer(),
+          if (_mainPhoto != null)
+            Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
+        ]),
+        const SizedBox(height: 10),
+
+        // Zone photo principale
+        GestureDetector(
+          onTap: hasSampleUrls ? null : () async {
+            await _pickMainPhoto();
+          },
+          child: Container(
+            height: 180,
+            decoration: BoxDecoration(
+              color: _mainPhoto != null
+                  ? Colors.transparent
+                  : AppTheme.primaryColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _mainPhoto != null
+                    ? AppTheme.successColor.withValues(alpha: 0.5)
+                    : AppTheme.accentColor.withValues(alpha: 0.4),
+                width: _mainPhoto != null ? 2 : 1.5,
+              ),
+            ),
+            child: hasSampleUrls && _imageUrls.isNotEmpty
+                ? Stack(fit: StackFit.expand, children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(13),
+                      child: Image.network(_imageUrls[0], fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image, color: AppTheme.accentColor)),
+                    ),
+                    Positioned(bottom: 8, left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.star_rounded, color: Colors.white, size: 12),
+                          SizedBox(width: 4),
+                          Text('Photo principale',
+                              style: TextStyle(color: Colors.white, fontSize: 10,
+                                  fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                        ]),
+                      ),
+                    ),
+                  ])
+                : _mainPhoto != null
+                  ? Stack(fit: StackFit.expand, children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(13),
+                        child: kIsWeb
+                            ? Container(color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                child: const Icon(Icons.image, color: AppTheme.accentColor, size: 48))
+                            : Image.file(File(_mainPhoto!.path), fit: BoxFit.cover),
+                      ),
+                      // Badge principale
+                      Positioned(bottom: 8, left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.star_rounded, color: Colors.white, size: 12),
+                            SizedBox(width: 4),
+                            Text('Photo principale',
+                                style: TextStyle(color: Colors.white, fontSize: 10,
+                                    fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                          ]),
+                        ),
+                      ),
+                      // Bouton supprimer
+                      Positioned(top: 6, right: 6,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _mainPhoto = null),
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: const BoxDecoration(
+                                color: AppTheme.errorColor, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, color: Colors.white, size: 12),
+                          ),
+                        ),
+                      ),
+                      // Bouton changer
+                      Positioned(top: 6, left: 6,
+                        child: GestureDetector(
+                          onTap: () async { await _pickMainPhoto(); },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.edit_rounded, color: Colors.white, size: 12),
+                              SizedBox(width: 4),
+                              Text('Changer', style: TextStyle(color: Colors.white,
+                                  fontSize: 10, fontFamily: 'Poppins')),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ])
+                  : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.add_photo_alternate_outlined,
+                          size: 42, color: AppTheme.accentColor.withValues(alpha: 0.7)),
+                      const SizedBox(height: 10),
+                      const Text('Appuyez pour sélectionner\nla photo principale',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                              color: AppTheme.textSecondary)),
+                      const SizedBox(height: 6),
+                      Text('Cette photo sera la couverture de votre annonce',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                              color: AppTheme.textHint.withValues(alpha: 0.8))),
+                    ]),
+          ),
+        ),
+
+        // Boutons galerie/caméra pour photo principale
+        if (_mainPhoto == null && !hasSampleUrls) ...([
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async { await _pickMainPhoto(fromCamera: false); },
+                icon: const Icon(Icons.photo_library_outlined, size: 16),
+                label: const Text('Galerie', style: TextStyle(
+                    fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryColor,
+                  side: const BorderSide(color: AppTheme.accentColor),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: kIsWeb ? null : () async { await _pickMainPhoto(fromCamera: true); },
+                icon: Icon(Icons.camera_alt_outlined, size: 16,
+                    color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                label: Text('Caméra', style: TextStyle(
+                    fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
+                    color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                      color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ]),
+        ]),
+
+        const SizedBox(height: 24),
+
+        // ── SECTION 2 : 3 photos secondaires ─────────────────────────────────
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text('2', style: TextStyle(color: Colors.white,
+                fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          const Text('3 photos secondaires',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 14, color: AppTheme.textPrimary)),
+          const Spacer(),
+          Text('${hasSampleUrls ? (_imageUrls.length - 1).clamp(0, 3) : _secondaryPhotos.length}/3',
+              style: TextStyle(
+                fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700,
+                color: (hasSampleUrls ? (_imageUrls.length >= 4) : (_secondaryPhotos.length >= 3))
+                    ? AppTheme.successColor : AppTheme.textSecondary,
+              )),
+        ]),
+        const SizedBox(height: 10),
+
+        // Grille 3 slots secondaires
+        Row(children: List.generate(3, (i) {
+          final hasUrl  = hasSampleUrls && _imageUrls.length > (i + 1);
+          final hasFile = !hasSampleUrls && i < _secondaryPhotos.length;
+          final isEmpty = !hasUrl && !hasFile;
+          final isNextToFill = !hasSampleUrls &&
+              i == _secondaryPhotos.length &&
+              _mainPhoto != null;
+
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+              child: GestureDetector(
+                onTap: isEmpty && isNextToFill
+                    ? () async { await _pickSecondaryPhoto(); }
+                    : null,
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isEmpty
+                          ? AppTheme.primaryColor.withValues(alpha: 0.06)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: hasFile || hasUrl
+                            ? AppTheme.successColor.withValues(alpha: 0.5)
+                            : isNextToFill
+                                ? AppTheme.accentColor.withValues(alpha: 0.5)
+                                : AppTheme.dividerColor,
+                        width: hasFile || hasUrl ? 1.5 : 1,
+                      ),
+                    ),
+                    child: hasUrl
+                        ? Stack(fit: StackFit.expand, children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(9),
+                              child: Image.network(_imageUrls[i + 1], fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.broken_image, color: AppTheme.accentColor)),
+                            ),
+                            Positioned(bottom: 3, left: 3,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text('Photo ${i + 2}',
+                                    style: const TextStyle(color: Colors.white,
+                                        fontSize: 8, fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ])
+                        : hasFile
+                          ? Stack(fit: StackFit.expand, children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: kIsWeb
+                                    ? Container(
+                                        color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                        child: const Icon(Icons.image,
+                                            color: AppTheme.accentColor))
+                                    : Image.file(File(_secondaryPhotos[i].path),
+                                        fit: BoxFit.cover),
+                              ),
+                              // Badge numéro
+                              Positioned(bottom: 3, left: 3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(4)),
+                                  child: Text('Photo ${i + 2}',
+                                      style: const TextStyle(color: Colors.white,
+                                          fontSize: 8, fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                              // Bouton supprimer
+                              Positioned(top: 3, right: 3,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _secondaryPhotos.removeAt(i)),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: const BoxDecoration(
+                                        color: AppTheme.errorColor,
+                                        shape: BoxShape.circle),
+                                    child: const Icon(Icons.close,
+                                        color: Colors.white, size: 9),
+                                  ),
+                                ),
+                              ),
+                            ])
+                          : Center(
+                              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Icon(
+                                  isNextToFill
+                                      ? Icons.add_photo_alternate_outlined
+                                      : Icons.image_outlined,
+                                  size: 26,
+                                  color: isNextToFill
+                                      ? AppTheme.accentColor
+                                      : AppTheme.dividerColor,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  isNextToFill ? 'Ajouter' : 'En attente',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 9,
+                                    color: isNextToFill
+                                        ? AppTheme.accentColor
+                                        : AppTheme.textHint,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ]),
+                            ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        })),
+
+        // Bouton ajouter photo secondaire
+        if (!hasSampleUrls && _mainPhoto != null && _secondaryPhotos.length < 3) ...([
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () async { await _pickSecondaryPhoto(fromCamera: false); },
+                icon: const Icon(Icons.photo_library_outlined, size: 16),
+                label: Text('Galerie (photo ${_secondaryPhotos.length + 2})',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primaryColor,
+                  side: const BorderSide(color: AppTheme.accentColor),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: kIsWeb ? null : () async { await _pickSecondaryPhoto(fromCamera: true); },
+                icon: Icon(Icons.camera_alt_outlined, size: 16,
+                    color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                label: Text('Caméra', style: TextStyle(
+                    fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
+                    color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                      color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ]),
+        ]),
+
         const SizedBox(height: 20),
 
-        // Boutons d'import local (Galerie + Camera)
-        Row(children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _pickLocalImages,
-              icon: const Icon(Icons.photo_library_outlined, size: 18, color: Colors.white),
-              label: const Text('Galerie', style: TextStyle(
-                  fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white, fontSize: 13)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: AppTheme.accentColor, width: 1.5)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: kIsWeb ? null : _pickCameraImage,
-              icon: Icon(Icons.camera_alt_outlined, size: 18,
-                  color: kIsWeb ? Colors.white38 : Colors.white),
-              label: Text('Camera', style: TextStyle(
-                  fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                  color: kIsWeb ? Colors.white38 : Colors.white, fontSize: 13)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 12),
-
-        // Separateur OU
-        Row(children: [
-          const Expanded(child: Divider()),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text('OU par URL', style: TextStyle(fontFamily: 'Poppins',
-                fontSize: 11, color: AppTheme.textHint)),
-          ),
-          const Expanded(child: Divider()),
-        ]),
-        const SizedBox(height: 12),
-
-        // Saisie URL d'image
-        Row(children: [
-          Expanded(
-            child: TextField(
-              controller: _imageUrlCtrl,
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'URL de l\'image...',
-                hintStyle: const TextStyle(fontFamily: 'Poppins', color: AppTheme.textHint),
-                prefixIcon: const Icon(Icons.link, color: AppTheme.accentColor, size: 18),
-                filled: true, fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppTheme.accentColor, width: 2)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: AppTheme.dividerColor)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          ElevatedButton(
-            onPressed: () {
-              final url = _imageUrlCtrl.text.trim();
-              if (url.isNotEmpty && !_imageUrls.contains(url)) {
-                setState(() { _imageUrls.add(url); _imageUrlCtrl.clear(); });
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
-        ]),
-        const SizedBox(height: 6),
+        // ── Exemples de test ──────────────────────────────────────────────────
         TextButton.icon(
           onPressed: _addSampleImages,
           icon: const Icon(Icons.auto_fix_high, size: 16, color: AppTheme.accentColor),
           label: const Text('Utiliser des exemples (test)',
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor)),
         ),
+
         const SizedBox(height: 16),
 
-        // Afficher les images locales
-        if (_localImages.isNotEmpty) ...[
-          const Text('Photos importees localement :',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                  fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1,
-            ),
-            itemCount: _localImages.length,
-            itemBuilder: (_, i) => Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: kIsWeb
-                      ? Container(color: AppTheme.accentColor.withValues(alpha: 0.1),
-                          child: const Icon(Icons.image, color: AppTheme.accentColor))
-                      : Image.file(File(_localImages[i].path), fit: BoxFit.cover),
-                ),
-                Positioned(top: 2, right: 2,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _localImages.removeAt(i)),
-                    child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, color: Colors.white, size: 10),
-                    ),
-                  ),
-                ),
-                if (i == 0 && _imageUrls.isEmpty)
-                  Positioned(bottom: 2, left: 2,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(color: AppTheme.accentColor, borderRadius: BorderRadius.circular(4)),
-                      child: const Text('Principale', style: TextStyle(color: Colors.white, fontSize: 7,
-                          fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-                    ),
-                  ),
-              ],
+        // ── Compteur progression ──────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: complete
+                ? AppTheme.successColor.withValues(alpha: 0.08)
+                : AppTheme.primaryColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: complete
+                  ? AppTheme.successColor.withValues(alpha: 0.3)
+                  : AppTheme.dividerColor,
             ),
           ),
-          const SizedBox(height: 12),
-        ],
-
-        // Afficher les images par URL
-        if (_imageUrls.isEmpty && _localImages.isEmpty)
-          Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.dividerColor),
+          child: Row(children: [
+            Icon(
+              complete ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+              size: 20,
+              color: complete ? AppTheme.successColor : AppTheme.textHint,
             ),
-            child: const Center(child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_photo_alternate_outlined, size: 36, color: AppTheme.accentColor),
-                SizedBox(height: 6),
-                Text('Aucune photo ajoutee', style: TextStyle(
-                    fontFamily: 'Poppins', fontSize: 12, color: AppTheme.textSecondary)),
-              ],
-            )),
-          )
-        else if (_imageUrls.isNotEmpty)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.4,
-            ),
-            itemCount: _imageUrls.length,
-            itemBuilder: (_, i) => Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(_imageUrls[i], fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                      child: const Icon(Icons.broken_image, color: AppTheme.accentColor),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 4, right: 4,
-                  child: GestureDetector(
-                    onTap: () => setState(() => _imageUrls.removeAt(i)),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                          color: AppTheme.errorColor, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, color: Colors.white, size: 12),
-                    ),
-                  ),
-                ),
-                if (i == 0)
-                  Positioned(
-                    bottom: 4, left: 4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('Photo principale',
-                          style: TextStyle(color: Colors.white, fontSize: 9,
-                              fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 12),
-        Builder(builder: (ctx) {
-          final total = _imageUrls.length + _localImages.length;
-          return Row(children: [
-            Icon(total >= 4 ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 18, color: total >= 4 ? AppTheme.successColor : AppTheme.textHint),
-            const SizedBox(width: 8),
-            Text('$total/4 photos minimum (${_localImages.length} locale(s), ${_imageUrls.length} URL)',
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                complete
+                    ? '4/4 photos sélectionnées — vous pouvez continuer'
+                    : '$total/4 photos — ${4 - total} restante(s)',
                 style: TextStyle(
-                  fontFamily: 'Poppins', fontSize: 12,
-                  color: total >= 4 ? AppTheme.successColor : AppTheme.textSecondary,
-                  fontWeight: FontWeight.w600,
-                )),
-          ]);
-        }),
+                  fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
+                  color: complete ? AppTheme.successColor : AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ]),
+        ),
+
         const SizedBox(height: 28),
         _navButtons(
           onNext: () { if (_validateStep2()) _goTo(2); },
@@ -1636,53 +1880,49 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     );
   }
 
-  Future<void> _pickLocalImages() async {
-    try {
-      final List<XFile> picked = await _picker.pickMultiImage(
-        imageQuality: 40,   // compression agressive pour rester sous 1MB Firestore
-        maxWidth: 1024,     // max 1024px de large
-        maxHeight: 1024,
-        limit: 5,           // max 5 photos
-      );
-      if (picked.isNotEmpty) {
-        setState(() {
-          for (final img in picked) {
-            if (!_localImages.any((e) => e.path == img.path)) {
-              _localImages.add(img);
-            }
-          }
-        });
-      }
-    } catch (e) {
-      _err('Impossible d\'ouvrir la galerie: $e');
-    }
-  }
-
-  Future<void> _pickCameraImage() async {
+  // ── Sélection photo principale ─────────────────────────────────────────────
+  Future<void> _pickMainPhoto({bool fromCamera = false}) async {
     try {
       final XFile? photo = await _picker.pickImage(
-        source: ImageSource.camera,
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
         imageQuality: 40,
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      if (photo != null) {
-        setState(() => _localImages.add(photo));
-      }
+      if (photo != null) setState(() => _mainPhoto = photo);
     } catch (e) {
-      _err('Impossible d\'ouvrir la camera: $e');
+      _err('Impossible d\'ouvrir ${fromCamera ? 'la caméra' : 'la galerie'}: $e');
+    }
+  }
+
+  // ── Sélection photo secondaire ─────────────────────────────────────────────
+  Future<void> _pickSecondaryPhoto({bool fromCamera = false}) async {
+    if (_secondaryPhotos.length >= 3) return; // déjà 3 photos secondaires
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        imageQuality: 40,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      if (photo != null) setState(() => _secondaryPhotos.add(photo));
+    } catch (e) {
+      _err('Impossible d\'ouvrir ${fromCamera ? 'la caméra' : 'la galerie'}: $e');
     }
   }
 
   void _addSampleImages() {
     setState(() {
+      // Réinitialiser les photos locales
+      _mainPhoto = null;
+      _secondaryPhotos.clear();
+      // Charger exactement 4 URLs exemple
       _imageUrls.clear();
       _imageUrls.addAll([
         'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800',
         'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800',
         'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
         'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800',
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800',
       ]);
     });
   }
@@ -2402,7 +2642,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             if (_quartierCtrl.text.isNotEmpty)
               _recapRow('Quartier',    _quartierCtrl.text, Icons.holiday_village_outlined),
             const Divider(height: 20),
-            _recapRow('Photos', '${_imageUrls.length + _localImages.length} photo(s)', Icons.photo_library_outlined),
+            _recapRow('Photos',
+                '${_imageUrls.isNotEmpty ? _imageUrls.length : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length} photo(s)',
+                Icons.photo_library_outlined),
             if (_hasEnoughCredits) ...[
               _recapRow('Paiement', 'Crédits disponibles ($_userAvailableCredits)', Icons.toll_outlined),
               _recapRow('Coût', '$_requiredCredits crédit(s) débité(s)', Icons.check_circle_outline),
