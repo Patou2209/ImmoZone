@@ -95,7 +95,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 24 + MediaQuery.of(ctx).viewPadding.bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1301,8 +1301,8 @@ class _HomeTabState extends State<_HomeTab>
           ]),
         ],
 
-        // Superficie (m²) — masquée si la catégorie affiche déjà les hectares
-        if (!_hasCatHectares) ...[
+        // Superficie (m²) — uniquement pour les catégories qui en ont besoin
+        if (_hasCatSurface) ...[
           const SizedBox(height: 12),
           const Text('Superficie (m²)', style: TextStyle(fontFamily: 'Poppins',
               fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
