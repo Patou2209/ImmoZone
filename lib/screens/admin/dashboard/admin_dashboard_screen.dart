@@ -218,32 +218,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
                                   style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
                             ]),
-                            // Bouton Accueil plateforme (top-right)
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
-                                  (route) => false,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentColor.withValues(alpha: 0.25),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                                ),
-                                child: const Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.home_rounded, color: Colors.white, size: 22),
-                                    SizedBox(height: 2),
-                                    Text('Accueil', style: TextStyle(
-                                        fontFamily: 'Poppins', fontSize: 9,
-                                        color: Colors.white70, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
+                            // Badge rôle admin
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accentColor.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.admin_panel_settings_rounded,
+                                      color: AppTheme.accentColor, size: 16),
+                                  SizedBox(width: 6),
+                                  Text('Admin', style: TextStyle(
+                                      fontFamily: 'Poppins', fontSize: 11,
+                                      color: AppTheme.accentColor, fontWeight: FontWeight.w700)),
+                                ],
                               ),
                             ),
                           ],

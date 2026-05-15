@@ -16,6 +16,7 @@ import '../favorites/favorites_screen.dart';
 import '../post_property/post_property_screen.dart';
 import '../post_property/edit_property_screen.dart';
 import '../../auth/login_screen.dart';
+import '../../admin/admin_home_screen.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -926,23 +927,53 @@ class _HomeTabState extends State<_HomeTab>
               final auth = ctx.watch<AuthProvider>();
               if (auth.isLoggedIn) {
                 return GestureDetector(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(builder: (_) => const _UserDashboardScreen())),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.person_rounded, color: AppTheme.accentColor, size: 16),
-                      const SizedBox(width: 6),
-                      Text(auth.currentUser?.name.split(' ').first ?? '',
-                          style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                              fontSize: 12, color: AppTheme.accentColor)),
-                    ]),
-                  ),
+                  onTap: () {
+                    // L'admin est redirigé vers son panneau, jamais vers le dashboard utilisateur
+                    if (auth.isAdmin) {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+                        (route) => false,
+                      );
+                    } else {
+                      Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
+                    }
+                  },
+                  child: auth.isAdmin
+                    // Badge spécial admin — icône bouclier, libellé "Admin"
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.accentColor, width: 1.5),
+                        ),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.admin_panel_settings_rounded,
+                              color: AppTheme.accentColor, size: 16),
+                          SizedBox(width: 6),
+                          Text('Admin Panel',
+                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                                  fontSize: 12, color: AppTheme.accentColor)),
+                        ]),
+                      )
+                    // Bouton Mon compte standard pour les utilisateurs normaux
+                    : Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.person_rounded, color: AppTheme.accentColor, size: 16),
+                          const SizedBox(width: 6),
+                          Text(auth.currentUser?.name.split(' ').first ?? '',
+                              style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                                  fontSize: 12, color: AppTheme.accentColor)),
+                        ]),
+                      ),
                 );
               }
               return GestureDetector(
@@ -1811,6 +1842,26 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
+    // ── Garde admin : l'admin ne doit JAMAIS voir le dashboard utilisateur ───
+    // Si un admin arrive ici (ex: via lien direct ou navigation résiduelle),
+    // on le redirige immédiatement vers son panneau d'administration.
+    if (auth.isAdmin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+            (route) => false,
+          );
+        }
+      });
+      // Afficher un indicateur pendant la redirection
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      );
+    }
+
     final user = auth.currentUser;
     final actives    = _myProperties.where((p) => p.status == 'Actif' && !p.isMarkedClosed).toList();
     final pending    = _myProperties.where((p) => p.status == 'En attente').toList();
