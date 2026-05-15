@@ -87,76 +87,80 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.dividerColor,
-                borderRadius: BorderRadius.circular(2),
+      useSafeArea: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Contacter ImmoZone',
-                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                    fontSize: 16, color: AppTheme.textPrimary)),
-            const SizedBox(height: 6),
-            const Text('Choisissez votre mode de contact',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                    color: AppTheme.textSecondary)),
-            const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              const Text('Contacter ImmoZone',
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                      fontSize: 16, color: AppTheme.textPrimary)),
+              const SizedBox(height: 6),
+              const Text('Choisissez votre mode de contact',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: AppTheme.textSecondary)),
+              const SizedBox(height: 20),
 
-            // WhatsApp
-            if (hasWa)
-              _contactOption(
-                icon: Icons.chat_rounded,
-                color: const Color(0xFF25D366),
-                label: 'WhatsApp',
-                subtitle: '+${_waContactNumber.replaceAll(RegExp(r'[^0-9]'), '')}',
-                onTap: () {
-                  Navigator.pop(context);
-                  _launchWhatsApp();
-                },
-              ),
+              // WhatsApp
+              if (hasWa)
+                _contactOption(
+                  icon: Icons.chat_rounded,
+                  color: const Color(0xFF25D366),
+                  label: 'WhatsApp',
+                  subtitle: '+${_waContactNumber.replaceAll(RegExp(r'[^0-9]'), '')}',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _launchWhatsApp();
+                  },
+                ),
 
-            if (hasWa && (hasPhone || hasEmail)) const SizedBox(height: 10),
+              if (hasWa && (hasPhone || hasEmail)) const SizedBox(height: 10),
 
-            // Appel Normal
-            if (hasPhone)
-              _contactOption(
-                icon: Icons.phone_rounded,
-                color: AppTheme.accentColor,
-                label: 'Appel Normal',
-                subtitle: _phoneContactNumber,
-                onTap: () {
-                  Navigator.pop(context);
-                  _launchPhone();
-                },
-              ),
+              // Appel Normal
+              if (hasPhone)
+                _contactOption(
+                  icon: Icons.phone_rounded,
+                  color: AppTheme.accentColor,
+                  label: 'Appel Normal',
+                  subtitle: _phoneContactNumber,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _launchPhone();
+                  },
+                ),
 
-            if (hasPhone && hasEmail) const SizedBox(height: 10),
+              if (hasPhone && hasEmail) const SizedBox(height: 10),
 
-            // Email
-            if (hasEmail)
-              _contactOption(
-                icon: Icons.email_outlined,
-                color: AppTheme.primaryColor,
-                label: 'E-Mail',
-                subtitle: _emailContact,
-                onTap: () {
-                  Navigator.pop(context);
-                  _launchEmail();
-                },
-              ),
-          ],
+              // Email
+              if (hasEmail)
+                _contactOption(
+                  icon: Icons.email_outlined,
+                  color: AppTheme.primaryColor,
+                  label: 'E-Mail',
+                  subtitle: _emailContact,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _launchEmail();
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1269,20 +1273,6 @@ class _HomeTabState extends State<_HomeTab>
           ]),
         ],
 
-        if (_hasCatSurface) ...[
-          const SizedBox(height: 12),
-          const Text('Superficie (m²)', style: TextStyle(fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: _numField('Min m²', _minSurface?.toString() ?? '',
-                (v) => setState(() => _minSurface = double.tryParse(v)))),
-            const SizedBox(width: 8),
-            Expanded(child: _numField('Max m²', _maxSurface?.toString() ?? '',
-                (v) => setState(() => _maxSurface = double.tryParse(v)))),
-          ]),
-        ],
-
         if (_hasCatSeats) ...[
           const SizedBox(height: 12),
           const Text('Places assises', style: TextStyle(fontFamily: 'Poppins',
@@ -1894,7 +1884,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
               onRefresh: _load,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
                   // Profil utilisateur
