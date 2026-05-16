@@ -2220,19 +2220,12 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
         Padding(
           padding: const EdgeInsets.all(12),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Image — BoxFit.contain pour éviter le crop sur tablette
-            ClipRRect(
+            // Image
+            PropertyImage(
+              src: p.images.isNotEmpty ? p.images[0] : '',
+              width: 80, height: 80,
               borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 80, height: 80,
-                color: const Color(0xFFF0F4FF),
-                child: PropertyImage(
-                  src: p.images.isNotEmpty ? p.images[0] : '',
-                  width: 80, height: 80,
-                  fit: BoxFit.contain,
-                  placeholder: _imgPlaceholder(),
-                ),
-              ),
+              placeholder: _imgPlaceholder(),
             ),
             const SizedBox(width: 12),
             // Infos

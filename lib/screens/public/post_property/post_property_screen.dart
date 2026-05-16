@@ -640,15 +640,22 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             if (_selectedType == 'Terrain à bâtir' || _selectedType == 'Concession') {
               _selectedTransaction = 'Vente';
             }
+            // Chambre d'hôtel ne peut être qu'en Location
+            if (_selectedType == 'Chambre d\'hôtel') {
+              _selectedTransaction = 'Location';
+            }
           });
         }),
-        // Pour Terrain à bâtir et Concession : transaction forcée à Vente
+        // Pour Terrain à bâtir et Concession : Vente only. Chambre d'hôtel : Location only.
         Builder(builder: (ctx) {
           final isVenteOnly = _selectedType == 'Terrain à bâtir' ||
               _selectedType == 'Concession';
+          final isLocationOnly = _selectedType == 'Chambre d\'hôtel';
           final availableTx = isVenteOnly
               ? const ['Vente']
-              : AppConstants.transactionTypes;
+              : isLocationOnly
+                  ? const ['Location']
+                  : AppConstants.transactionTypes;
           return _dropdown('Type de transaction *', _selectedTransaction,
               availableTx, Icons.swap_horiz,
               (v) => setState(() => _selectedTransaction = v!));
@@ -828,8 +835,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             (v) => setState(() => _hasCuisineEquipee = v)),
         yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
             (v) => setState(() => _hasElectricity = v)),
-        yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
-            (v) => setState(() => _hasWater = v)),
+        if (isLocationTx)
+          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+              (v) => setState(() => _hasWater = v)),
         if (isLocationTx) ...[
           _garantieDropdown(),
           _commissionField(),
@@ -852,8 +860,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             (v) => setState(() => _hasAirConditioning = v)),
         yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
             (v) => setState(() => _hasElectricity = v)),
-        yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
-            (v) => setState(() => _hasWater = v)),
+        if (isLocationTx)
+          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+              (v) => setState(() => _hasWater = v)),
         if (isLocationTx) ...[
           _garantieDropdown(),
           _commissionField(),
@@ -871,8 +880,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             (v) => setState(() => _hasParking = v)),
         yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
             (v) => setState(() => _hasElectricity = v)),
-        yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
-            (v) => setState(() => _hasWater = v)),
+        if (isLocationTx)
+          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+              (v) => setState(() => _hasWater = v)),
         if (isLocationTx) ...[
           _garantieDropdown(),
           _commissionField(),
@@ -884,8 +894,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     else if (type == 'Terrain à bâtir') {
       fields.addAll([
         _dimensionsTerrainField(),
-        yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded,
-            _hasElectricity, (v) => setState(() => _hasElectricity = v)),
         yesNoToggle('Clôture', Icons.fence_rounded, _hasWater,
             (v) => setState(() => _hasWater = v)),
       ]);
@@ -899,14 +907,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             suffix: const Text('ha',
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                     color: AppTheme.accentColor, fontSize: 13))),
-        yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded,
-            _hasElectricity, (v) => setState(() => _hasElectricity = v)),
-        yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+        yesNoToggle('Clôture', Icons.fence_rounded, _hasWater,
             (v) => setState(() => _hasWater = v)),
       ]);
     }
 
-    // ── Chambre d'hôtel ─────────────────────────────────────────────────────
+    // ── Chambre d'hôtel (Location uniquement) ─────────────────────────────────
     else if (type == 'Chambre d\'hôtel') {
       fields.addAll([
         _field(_numberOfBedsCtrl, 'Nombre de lits', Icons.single_bed_rounded,
@@ -943,10 +949,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             type: TextInputType.number),
         yesNoToggle('Parking', Icons.local_parking_rounded, _hasParking,
             (v) => setState(() => _hasParking = v)),
-        yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
-            (v) => setState(() => _hasElectricity = v)),
-        yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
-            (v) => setState(() => _hasWater = v)),
+        if (type != 'Espace Funéraire' || isLocationTx)
+          yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
+              (v) => setState(() => _hasElectricity = v)),
+        if (isLocationTx)
+          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+              (v) => setState(() => _hasWater = v)),
       ]);
     }
 

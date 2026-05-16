@@ -44,16 +44,11 @@ class PropertyCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(14)),
-                  child: Container(
+                  child: PropertyImage(
+                    src: property.mainImage,
                     height: 180,
                     width: double.infinity,
-                    color: const Color(0xFFF0F4FF), // fond neutre si image ne couvre pas
-                    child: PropertyImage(
-                      src: property.mainImage,
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.contain,
-                    ),
+                    fit: BoxFit.cover,
                   ),
                 ),
                 // Transaction Badge

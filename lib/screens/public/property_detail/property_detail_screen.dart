@@ -141,7 +141,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       final img = p.images.isNotEmpty
                           ? p.images[i]
                           : AppConstants.placeholderProperty;
-                      return _buildPropertyImage(img);
+                      return InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 4.0,
+                        child: _buildPropertyImage(img),
+                      );
                     },
                   ),
                   // Gradient bas
