@@ -247,18 +247,55 @@ class PropertyCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    property.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                      fontFamily: 'Poppins',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  // Row 1: Title LEFT + Price RIGHT on the same line
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          property.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                            fontFamily: 'Poppins',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            property.formattedPrice,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.accentColor,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          if (property.transactionType == 'Location')
+                            const Text(
+                              '/mois',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AppTheme.textSecondary,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
+                  // Row 2: Location
                   Row(
                     children: [
                       const Icon(Icons.location_on,
@@ -268,7 +305,7 @@ class PropertyCard extends StatelessWidget {
                         child: Text(
                           '${property.commune}, ${property.city}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: AppTheme.textSecondary,
                             fontFamily: 'Poppins',
                           ),
@@ -278,7 +315,7 @@ class PropertyCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  // Features – horizontal Wrap layout
+                  // Row 3: Feature chips
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -287,86 +324,76 @@ class PropertyCard extends StatelessWidget {
                         _featureChip(Icons.bed, '${property.bedrooms} Ch.'),
                       if (property.bathrooms != null && property.bathrooms! > 0)
                         _featureChip(Icons.bathtub, '${property.bathrooms} SDB'),
-                      // Affichage superficie selon le type de bien
                       if (property.type == 'Concession' && property.surface != null)
-                        _featureChip(Icons.landscape_outlined, '${property.surface!.toStringAsFixed(property.surface! == property.surface!.truncateToDouble() ? 0 : 2)} ha')
-                      else if (property.type == 'Terrain à bâtir' && property.longueurM != null && property.largeurM != null)
-                        _featureChip(Icons.straighten, '${property.longueurM!.toInt()}m × ${property.largeurM!.toInt()}m')
+                        _featureChip(Icons.landscape_outlined,
+                            '${property.surface!.toStringAsFixed(property.surface! == property.surface!.truncateToDouble() ? 0 : 2)} ha')
+                      else if (property.type == 'Terrain à bâtir' &&
+                          property.longueurM != null &&
+                          property.largeurM != null)
+                        _featureChip(Icons.straighten,
+                            '${property.longueurM!.toInt()}m × ${property.largeurM!.toInt()}m')
                       else if (property.surface != null)
-                        _featureChip(Icons.square_foot, '${property.surface!.toInt()} m²'),
+                        _featureChip(
+                            Icons.square_foot, '${property.surface!.toInt()} m²'),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
+                  // Row 4: Garantie badge LEFT + clock + views RIGHT
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Prix + /mois + Garantie badge
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text(
-                              property.formattedPrice,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.accentColor,
-                                fontFamily: 'Poppins',
-                              ),
-                            ),
-                            if (property.transactionType == 'Location') ...
-                              [
-                                const Text(
-                                  '/mois',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.textSecondary,
-                                    fontFamily: 'Poppins',
-                                  ),
+                      // Garantie badge (Location only)
+                      if (property.transactionType == 'Location' &&
+                          property.garantieMois != null &&
+                          property.garantieMois! > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color:
+                                    AppTheme.accentColor.withValues(alpha: 0.25)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.security_rounded,
+                                  size: 9, color: AppTheme.accentColor),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Gar. ${property.garantieMois}m',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.accentColor,
+                                  fontFamily: 'Poppins',
                                 ),
-                                if (property.garantieMois != null &&
-                                    property.garantieMois! > 0) ...
-                                  [
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 5, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.accentColor
-                                            .withValues(alpha: 0.1),
-                                        borderRadius:
-                                            BorderRadius.circular(6),
-                                        border: Border.all(
-                                            color: AppTheme.accentColor
-                                                .withValues(alpha: 0.3)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.security_rounded,
-                                              size: 9,
-                                              color: AppTheme.accentColor),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            '${property.garantieMois}m',
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppTheme.accentColor,
-                                              fontFamily: 'Poppins',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                              ],
-                          ],
-                        ),
-                      ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      // Clock (time ago) + eye (views)
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.visibility,
-                              size: 13, color: AppTheme.textHint),
+                          const Icon(Icons.access_time_rounded,
+                              size: 12, color: AppTheme.textHint),
+                          const SizedBox(width: 3),
+                          Text(
+                            _timeAgo(property.createdAt),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textHint,
+                              fontFamily: 'Poppins',
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Icon(Icons.visibility_outlined,
+                              size: 12, color: AppTheme.textHint),
                           const SizedBox(width: 3),
                           Text(
                             '${property.views}',
@@ -387,6 +414,17 @@ class PropertyCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Returns a human-readable time-ago string based on [dt].
+  static String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}j';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}sem';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo';
+    return '${(diff.inDays / 365).floor()}an';
   }
 
   Widget _featureChip(IconData icon, String label) {

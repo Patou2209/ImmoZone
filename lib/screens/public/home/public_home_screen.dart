@@ -957,302 +957,246 @@ class _HomeTabState extends State<_HomeTab>
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, {int filteredCount = 0}) {
-    return Container(
-      color: Colors.white,
-      child: Column(children: [
-        // ── Top bar: Logo + actions ──────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(children: [
-            // Logo icon + text
-            Row(children: [
-              Container(
-                width: 36, height: 36,
+    return Column(children: [
+      // ══════════════════════════════════════════════════════════════
+      // PARTIE 1 : Top bar blanche (logo + cloche + avatar)
+      // ══════════════════════════════════════════════════════════════
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(children: [
+          // Logo : icone maison bleue + texte "Immo" noir + "Zone" bleu
+          Row(children: [
+            Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 8),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 20),
+                children: [
+                  TextSpan(text: 'Immo',
+                      style: TextStyle(fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary)),
+                  TextSpan(text: 'Zone',
+                      style: TextStyle(fontWeight: FontWeight.w800,
+                          color: AppTheme.primaryColor)),
+                ],
+              ),
+            ),
+          ]),
+          const Spacer(),
+          // Cloche notification dans cercle gris
+          Stack(clipBehavior: Clip.none, children: [
+            Container(
+              width: 42, height: 42,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEEF2FA),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.notifications_none_rounded,
+                  color: AppTheme.textPrimary, size: 22),
+            ),
+            Positioned(
+              top: 7, right: 8,
+              child: Container(
+                width: 9, height: 9,
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
-                  borderRadius: BorderRadius.circular(10),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
                 ),
-                child: const Icon(Icons.location_city_rounded,
-                    color: Colors.white, size: 20),
               ),
-              const SizedBox(width: 8),
-              const Text('ImmoZone',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: AppTheme.textPrimary,
-                  )),
-            ]),
-            const Spacer(),
-            // Notification bell
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF1F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.notifications_none_rounded,
-                      color: AppTheme.textPrimary, size: 22),
-                ),
-                // Blue dot badge
-                Positioned(
-                  top: 6, right: 6,
-                  child: Container(
-                    width: 8, height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
             ),
-            const SizedBox(width: 10),
-            // User avatar / connexion
-            Builder(builder: (ctx) {
-              final auth = ctx.watch<AuthProvider>();
-              if (auth.isLoggedIn) {
-                return GestureDetector(
-                  onTap: () {
-                    if (auth.isAdmin) {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-                        (route) => false,
-                      );
-                    } else {
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
-                    }
-                  },
-                  child: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: auth.isAdmin
-                          ? AppTheme.primaryColor.withValues(alpha: 0.15)
-                          : const Color(0xFFEFF1F5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: auth.isAdmin
-                          ? Border.all(color: AppTheme.primaryColor, width: 1.5)
-                          : null,
-                    ),
-                    child: Center(
-                      child: auth.isAdmin
-                          ? const Icon(Icons.admin_panel_settings_rounded,
-                              color: AppTheme.primaryColor, size: 20)
-                          : Text(
-                              (auth.currentUser?.name.isNotEmpty == true
-                                  ? auth.currentUser!.name[0].toUpperCase()
-                                  : 'U'),
-                              style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                    ),
-                  ),
-                );
-              }
+          ]),
+          const SizedBox(width: 10),
+          // Avatar utilisateur (cercle gris avec initiales 2 lettres)
+          Builder(builder: (ctx) {
+            final auth = ctx.watch<AuthProvider>();
+            if (auth.isLoggedIn) {
               return GestureDetector(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen())),
+                onTap: () {
+                  if (auth.isAdmin) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+                      (route) => false,
+                    );
+                  } else {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
+                  }
+                },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  width: 42, height: 42,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
-                    borderRadius: BorderRadius.circular(10),
+                    color: auth.isAdmin
+                        ? AppTheme.primaryColor
+                        : const Color(0xFFD8E0EE),
+                    shape: BoxShape.circle,
                   ),
-                  child: const Text('Connexion',
-                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                          fontSize: 12, color: Colors.white)),
+                  child: Center(
+                    child: auth.isAdmin
+                        ? const Icon(Icons.admin_panel_settings_rounded,
+                            color: Colors.white, size: 20)
+                        : Text(
+                            () {
+                              final name = auth.currentUser?.name ?? '';
+                              if (name.length >= 2) return name.substring(0, 2).toUpperCase();
+                              if (name.length == 1) return name[0].toUpperCase();
+                              return 'U';
+                            }(),
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                  ),
                 ),
               );
-            }),
-          ]),
-        ),
-
-        const SizedBox(height: 14),
-
-        // ── Greeting section ────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Builder(builder: (ctx) {
-              final auth = ctx.watch<AuthProvider>();
-              final firstName = auth.isLoggedIn
-                  ? auth.currentUser?.name.split(' ').first ?? 'Bonjour'
-                  : 'Bonjour';
-              return Text('$firstName !',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ));
-            }),
-            const SizedBox(height: 2),
-            const Text(
-              'Trouvez Votre Maison de Rêve',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                color: AppTheme.textPrimary,
-                height: 1.2,
+            }
+            return GestureDetector(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen())),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: const Text('Connexion',
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                        fontSize: 12, color: Colors.white)),
               ),
-            ),
-          ]),
+            );
+          }),
+        ]),
+      ),
+
+      // ══════════════════════════════════════════════════════════════
+      // PARTIE 2 : Hero section gradient bleu clair vers blanc
+      // ══════════════════════════════════════════════════════════════
+      Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFCADCF8), Color(0xFFDEEBFC), Color(0xFFF4F6FB)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
         ),
-
-        const SizedBox(height: 14),
-
-        // ── Segmented tabs Location / Achat ─────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF1F5),
-              borderRadius: BorderRadius.circular(12),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
+        child: Column(children: [
+          const Text(
+            'Trouvez Votre\nMaison de R\u00eave',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800,
+              fontSize: 30,
+              color: AppTheme.textPrimary,
+              height: 1.15,
             ),
-            padding: const EdgeInsets.all(4),
-            child: TabBar(
-              controller: _modeCtrl,
-              indicator: BoxDecoration(
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Des milliers de propri\u00e9t\u00e9s \u00e0 votre port\u00e9e',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w400,
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: () {},
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 13),
+              decoration: BoxDecoration(
                 color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.25),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              labelColor: Colors.white,
-              unselectedLabelColor: AppTheme.textSecondary,
-              labelStyle: const TextStyle(fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700, fontSize: 13),
-              unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w500, fontSize: 13),
-              tabs: const [
-                Tab(text: 'Location'),
-                Tab(text: 'Achat'),
-              ],
+              child: const Text(
+                'Commencer',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
+          const SizedBox(height: 4),
+        ]),
+      ),
+
+      // ══════════════════════════════════════════════════════════════
+      // PARTIE 3 : Tabs Location / Achat pill container
+      // ══════════════════════════════════════════════════════════════
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FA),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: TabBar(
+            controller: _modeCtrl,
+            indicator: BoxDecoration(
+              color: AppTheme.primaryColor,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.30),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            labelColor: Colors.white,
+            unselectedLabelColor: AppTheme.textSecondary,
+            labelStyle: const TextStyle(fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700, fontSize: 14),
+            unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500, fontSize: 14),
+            tabs: const [
+              Tab(text: 'Location'),
+              Tab(text: 'Achat'),
+            ],
+          ),
         ),
+      ),
 
-        const SizedBox(height: 12),
-
-        // ── Barre de recherche + filtres ─────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [
-            Expanded(
-              child: Container(
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF1F5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  onChanged: (v) => setState(() {
-                    _searchQuery = v;
-                    _displayCount = 4;
-                    _hasSearched = v.isNotEmpty;
-                  }),
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
-                      color: AppTheme.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Rechercher (maison, quartier...)',
-                    hintStyle: TextStyle(fontFamily: 'Poppins',
-                        fontSize: 12, color: AppTheme.textHint),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: AppTheme.textHint, size: 20),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Favoris
-            GestureDetector(
-              onTap: () {
-                final parent = context.findAncestorStateOfType<_PublicHomeScreenState>();
-                if (parent != null) {
-                  parent.setState(() => parent._currentIndex = 1);
-                }
-              },
-              child: Container(
-                height: 46,
-                width: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF1F5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Stack(
-                  children: [
-                    const Center(
-                      child: Icon(Icons.favorite_border_rounded,
-                          color: AppTheme.textSecondary, size: 22),
-                    ),
-                    if (_favorites.isNotEmpty)
-                      Positioned(
-                        right: 8, top: 8,
-                        child: Container(
-                          width: 8, height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Bouton filtres
-            GestureDetector(
-              onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
-              child: Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: _filtersExpanded ? AppTheme.primaryColor : const Color(0xFFEFF1F5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.tune_rounded,
-                      color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
-                      size: 18),
-                  const SizedBox(width: 5),
-                  Text('Filtres',
-                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                          color: _filtersExpanded ? Colors.white : AppTheme.textSecondary)),
-                ]),
-              ),
-            ),
-          ]),
-        ),
-
-        const SizedBox(height: 12),
-
-        // ── Categories horizontales ──────────────────────────────────────────
-        SizedBox(
-          height: 38,
+      // ══════════════════════════════════════════════════════════════
+      // PARTIE 4 : Chips categories horizontales
+      // ══════════════════════════════════════════════════════════════
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+        child: SizedBox(
+          height: 40,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1268,11 +1212,15 @@ class _HomeTabState extends State<_HomeTab>
                   _displayCount = 4;
                 }),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                   decoration: BoxDecoration(
-                    color: selected ? AppTheme.primaryColor : const Color(0xFFEFF1F5),
-                    borderRadius: BorderRadius.circular(20),
+                    color: selected ? AppTheme.primaryColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: selected ? AppTheme.primaryColor : const Color(0xFFCDD4E4),
+                      width: 1.5,
+                    ),
                   ),
                   child: Text(cat,
                       style: TextStyle(
@@ -1286,12 +1234,72 @@ class _HomeTabState extends State<_HomeTab>
             },
           ),
         ),
+      ),
 
-        // Divider séparateur du header
-        const SizedBox(height: 12),
-        const Divider(height: 1, color: Color(0xFFE9EBF0)),
-      ]),
-    );
+      // ══════════════════════════════════════════════════════════════
+      // PARTIE 5 : Barre recherche + filtres
+      // ══════════════════════════════════════════════════════════════
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Row(children: [
+          Expanded(
+            child: Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                onChanged: (v) => setState(() {
+                  _searchQuery = v;
+                  _displayCount = 4;
+                  _hasSearched = v.isNotEmpty;
+                }),
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                    color: AppTheme.textPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'Rechercher (maison, quartier...)',
+                  hintStyle: TextStyle(fontFamily: 'Poppins',
+                      fontSize: 12, color: AppTheme.textHint),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      color: AppTheme.textHint, size: 20),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+            child: Container(
+              height: 46,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: _filtersExpanded ? AppTheme.primaryColor : const Color(0xFFEEF2FA),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.tune_rounded,
+                    color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
+                    size: 18),
+                const SizedBox(width: 5),
+                Text('Filtres',
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: _filtersExpanded ? Colors.white : AppTheme.textSecondary)),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+
+      // Divider bas header
+      const Divider(height: 1, color: Color(0xFFE4E8F0)),
+    ]);
   }
 
   // ── FILTRES AVANCES ────────────────────────────────────────────────────────
