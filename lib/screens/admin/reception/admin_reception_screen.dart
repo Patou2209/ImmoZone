@@ -130,10 +130,11 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
         ],
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: AppTheme.accentColor,
-          labelColor: AppTheme.accentColor,
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 11),
+          indicatorColor: const Color(0xFFFFA726),
+          indicatorWeight: 3,
+          labelColor: const Color(0xFFFFA726),
+          unselectedLabelColor: AppTheme.primaryColor,
+          labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 11),
           tabs: [
             Tab(
               child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -705,7 +706,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
                       fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: AppTheme.errorColor)),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppTheme.errorColor, width: 2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
@@ -720,7 +721,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
                       fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.successColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

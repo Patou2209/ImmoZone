@@ -78,12 +78,12 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: Colors.white),
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Rechercher...',
-                    hintStyle: const TextStyle(color: Colors.white60, fontFamily: 'Poppins'),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white70, size: 20),
-                    fillColor: Colors.white24,
+                    hintStyle: const TextStyle(color: AppTheme.textHint, fontFamily: 'Poppins'),
+                    prefixIcon: const Icon(Icons.search, color: AppTheme.textHint, size: 20),
+                    fillColor: const Color(0xFFEEF2FA),
                     filled: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     border: OutlineInputBorder(
@@ -95,7 +95,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 controller: _tabCtrl,
                 isScrollable: true,
                 labelColor: const Color(0xFFFFA726),
-                unselectedLabelColor: Colors.white70,
+                unselectedLabelColor: AppTheme.primaryColor,
                 indicatorColor: const Color(0xFFFFA726),
                 indicatorWeight: 3,
                 labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 12),

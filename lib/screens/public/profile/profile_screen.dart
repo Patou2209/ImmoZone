@@ -507,7 +507,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 style: TextStyle(color: Colors.red, fontFamily: 'Poppins')),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Colors.red),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
             ),
           ),
         ),
@@ -542,7 +542,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _statCard(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),

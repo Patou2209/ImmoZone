@@ -208,8 +208,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: const Color(0xFFFFA726),
+          indicatorWeight: 3,
           labelColor: const Color(0xFFFFA726),
-          unselectedLabelColor: Colors.white70,
+          unselectedLabelColor: AppTheme.primaryColor,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 11),
@@ -1369,7 +1370,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: const BorderSide(color: AppTheme.accentColor, width: 1.5),

@@ -530,7 +530,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.accentColor,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),

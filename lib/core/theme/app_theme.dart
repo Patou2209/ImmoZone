@@ -102,20 +102,20 @@ class AppTheme {
         ),
       ),
 
-      // Elevated Button
+      // Elevated Button — taille uniforme, moins haute
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
-          elevation: 2,
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(30)),
+          elevation: 1,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)),
           ),
-          textStyle: TextStyle(
+          textStyle: const TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),
@@ -125,14 +125,14 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
           side: const BorderSide(color: primaryColor, width: 1.5),
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)),
           ),
-          textStyle: TextStyle(
+          textStyle: const TextStyle(
             fontFamily: 'Poppins',
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ),

@@ -907,7 +907,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 ],
               ),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                 decoration: BoxDecoration(
                   color: AppTheme.accentColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -1005,7 +1005,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
               shadowColor: const Color(0xFF25D366).withValues(alpha: 0.4),
@@ -1026,7 +1026,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 2,
               shadowColor: AppTheme.primaryColor.withValues(alpha: 0.4),

@@ -71,14 +71,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   style: const TextStyle(
-                      fontFamily: 'Poppins', fontSize: 13, color: Colors.white),
+                      fontFamily: 'Poppins', fontSize: 13, color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     hintText: 'Rechercher un utilisateur...',
                     hintStyle: const TextStyle(
-                        color: Colors.white60, fontFamily: 'Poppins'),
+                        color: AppTheme.textHint, fontFamily: 'Poppins'),
                     prefixIcon: const Icon(Icons.search,
-                        color: Colors.white70, size: 20),
-                    fillColor: Colors.white24,
+                        color: AppTheme.textHint, size: 20),
+                    fillColor: const Color(0xFFEEF2FA),
                     filled: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     border: OutlineInputBorder(
@@ -89,9 +89,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
               ),
               TabBar(
                 controller: _tabCtrl,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white54,
-                indicatorColor: Colors.white,
+                labelColor: const Color(0xFFFFA726),
+                unselectedLabelColor: AppTheme.primaryColor,
+                indicatorColor: const Color(0xFFFFA726),
+                indicatorWeight: 3,
                 labelStyle: const TextStyle(
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600,

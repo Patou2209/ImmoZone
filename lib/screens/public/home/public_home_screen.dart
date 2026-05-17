@@ -176,7 +176,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
@@ -1805,7 +1805,7 @@ class _HomeTabState extends State<_HomeTab>
   // ── VOIR PLUS ─────────────────────────────────────────────────────────────
   Widget _buildVoirPlus(int total) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: OutlinedButton(
         onPressed: () => setState(() => _displayCount += 8),
         style: OutlinedButton.styleFrom(
@@ -2219,7 +2219,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                               fontWeight: FontWeight.w700, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 9),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),

@@ -158,7 +158,7 @@ class AdminCategoriesScreen extends StatelessWidget {
                         fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppTheme.errorColor),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),

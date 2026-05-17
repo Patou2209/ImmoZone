@@ -1123,7 +1123,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             GestureDetector(
               onTap: () => _showCountryCodePicker(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
                   border: Border(right: BorderSide(color: AppTheme.dividerColor)),
                 ),
@@ -2395,7 +2395,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.accentColor,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 15),
+            padding: const EdgeInsets.symmetric(vertical: 9),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           icon: _submittingPayment
@@ -2801,7 +2801,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                   side: const BorderSide(color: AppTheme.accentColor, width: 1.5),
@@ -2952,7 +2952,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.textSecondary,
               side: const BorderSide(color: AppTheme.dividerColor),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
@@ -2968,7 +2968,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 15),
+            padding: const EdgeInsets.symmetric(vertical: 9),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: const BorderSide(color: AppTheme.accentColor, width: 1.5),
@@ -2996,7 +2996,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppTheme.textSecondary,
           side: const BorderSide(color: AppTheme.dividerColor),
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         icon: const Icon(Icons.arrow_back_ios_rounded, size: 14),
