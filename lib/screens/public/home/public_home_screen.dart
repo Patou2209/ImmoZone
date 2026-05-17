@@ -866,7 +866,7 @@ class _HomeTabState extends State<_HomeTab>
       body: SafeArea(
         child: Column(children: [
           // ── HEADER fixe ─────────────────────────────────────────────────
-          _buildHeader(context),
+          _buildHeader(context, filteredCount: filtered.length),
 
           // ── BODY scrollable ─────────────────────────────────────────────
           Expanded(
@@ -903,7 +903,7 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, {int filteredCount = 0}) {
     return Container(
       color: AppTheme.primaryColor,
       child: Column(children: [
@@ -1094,7 +1094,7 @@ class _HomeTabState extends State<_HomeTab>
               ),
             ),
             const SizedBox(width: 8),
-            // Bouton filtres
+            // Bouton filtres avec nombre de r\u00e9sultats
             GestureDetector(
               onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
               child: Container(
@@ -1113,6 +1113,25 @@ class _HomeTabState extends State<_HomeTab>
                       style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                           fontSize: 12,
                           color: _filtersExpanded ? AppTheme.primaryColor : AppTheme.accentColor)),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _filtersExpanded
+                          ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                          : AppTheme.accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$filteredCount',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        color: _filtersExpanded ? AppTheme.primaryColor : AppTheme.accentColor,
+                      ),
+                    ),
+                  ),
                 ]),
               ),
             ),
@@ -1345,31 +1364,40 @@ class _HomeTabState extends State<_HomeTab>
           ])),
         ]),
 
-        // Équipements / Options
-        const SizedBox(height: 12),
-        const Text('Équipements', style: TextStyle(fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-        const SizedBox(height: 8),
-        _boolFilterChip(
-          label: 'Parking',
-          icon: Icons.local_parking_rounded,
-          value: _filterParking,
-          onChanged: (v) => setState(() { _filterParking = v; _displayCount = 4; }),
-        ),
-        const SizedBox(height: 6),
-        _boolFilterChip(
-          label: 'Groupe Électrogène / Panneau Solaire',
-          icon: Icons.electric_bolt_rounded,
-          value: _filterGroupeElec,
-          onChanged: (v) => setState(() { _filterGroupeElec = v; _displayCount = 4; }),
-        ),
-        const SizedBox(height: 6),
-        _boolFilterChip(
-          label: 'Sécurité 24h/24',
-          icon: Icons.security_rounded,
-          value: _filterSecurite,
-          onChanged: (v) => setState(() { _filterSecurite = v; _displayCount = 4; }),
-        ),
+        // Équipements / Options — masqués pour les cat. sans ces caract\u00e9ristiques
+        Builder(builder: (ctx) {
+          final noEquip = _selectedCategory == 'Terrain \u00e0 b\u00e2tir' ||
+              _selectedCategory == 'Concession' ||
+              _selectedCategory == 'Propri\u00e9t\u00e9 Commerciale' ||
+              _selectedCategory == 'Propri\u00e9t\u00e9 Industrielle';
+          if (noEquip) return const SizedBox.shrink();
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SizedBox(height: 12),
+            const Text('Équipements', style: TextStyle(fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
+            const SizedBox(height: 8),
+            _boolFilterChip(
+              label: 'Parking',
+              icon: Icons.local_parking_rounded,
+              value: _filterParking,
+              onChanged: (v) => setState(() { _filterParking = v; _displayCount = 4; }),
+            ),
+            const SizedBox(height: 6),
+            _boolFilterChip(
+              label: 'Groupe \u00c9lectrog\u00e8ne / Panneau Solaire',
+              icon: Icons.electric_bolt_rounded,
+              value: _filterGroupeElec,
+              onChanged: (v) => setState(() { _filterGroupeElec = v; _displayCount = 4; }),
+            ),
+            const SizedBox(height: 6),
+            _boolFilterChip(
+              label: 'S\u00e9curit\u00e9 24h/24',
+              icon: Icons.security_rounded,
+              value: _filterSecurite,
+              onChanged: (v) => setState(() { _filterSecurite = v; _displayCount = 4; }),
+            ),
+          ]);
+        }),
 
         const SizedBox(height: 12),
         // Bouton reset

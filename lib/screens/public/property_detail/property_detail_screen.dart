@@ -114,6 +114,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             pinned: true,
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
+            title: const Text(
+              'ImmoZone',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: AppTheme.accentColor,
+                letterSpacing: 0.5,
+              ),
+            ),
+            centerTitle: true,
             actions: [
               IconButton(
                 icon: Icon(_isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -123,16 +134,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.ios_share_rounded),
-                onPressed: () => _copyToClipboard(
-                    'ImmoZone — ${p.title} | ${p.formattedPrice} | ${p.city}',
-                    'Lien de l\'annonce'),
+                onPressed: () => _shareProperty(p),
                 tooltip: 'Partager',
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
-                  // Images PageView
+                  // Images PageView — tap pour zoom plein écran
                   PageView.builder(
                     controller: _pageCtrl,
                     itemCount: p.images.isNotEmpty ? p.images.length : 1,
@@ -141,9 +150,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       final img = p.images.isNotEmpty
                           ? p.images[i]
                           : AppConstants.placeholderProperty;
-                      return InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 4.0,
+                      return GestureDetector(
+                        onTap: () => _openImageFullscreen(context, p.images, i),
                         child: _buildPropertyImage(img),
                       );
                     },
@@ -162,7 +170,67 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       ),
                     ),
                   ),
-                  // Image indicators
+                  // Boutons Précédent / Suivant
+                  if (p.images.length > 1) ...
+                    [
+                      Positioned(
+                        left: 8,
+                        top: 0, bottom: 0,
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_currentImageIndex > 0) {
+                                _pageCtrl.previousPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut);
+                              }
+                            },
+                            child: AnimatedOpacity(
+                              opacity: _currentImageIndex > 0 ? 1.0 : 0.3,
+                              duration: const Duration(milliseconds: 200),
+                              child: Container(
+                                width: 36, height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.chevron_left_rounded,
+                                    color: Colors.white, size: 24),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 8,
+                        top: 0, bottom: 0,
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_currentImageIndex < p.images.length - 1) {
+                                _pageCtrl.nextPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut);
+                              }
+                            },
+                            child: AnimatedOpacity(
+                              opacity: _currentImageIndex < p.images.length - 1 ? 1.0 : 0.3,
+                              duration: const Duration(milliseconds: 200),
+                              child: Container(
+                                width: 36, height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.chevron_right_rounded,
+                                    color: Colors.white, size: 24),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  // Image indicators (dots)
                   if (p.images.length > 1)
                     Positioned(
                       bottom: 12, left: 0, right: 0,
@@ -618,16 +686,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ])),
                   ]),
 
-                  // Bouton WhatsApp unique
+                  // Boutons contact : WhatsApp + Appel
                   if (!isOwner) ...[
                     const SizedBox(height: 16),
                     const Divider(height: 1, color: AppTheme.dividerColor),
                     const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      child: _whatsappButton(
-                        p.ownerWhatsApp.isNotEmpty ? p.ownerWhatsApp : p.ownerPhone,
-                      ),
+                    _buildContactButtons(
+                      phone: p.ownerPhone,
+                      whatsapp: p.ownerWhatsApp,
                     ),
                   ],
                 ]),
@@ -856,6 +922,136 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   String _formatDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
+  // ── Partager : URL deep-link ImmoZone ─────────────────────────────────────
+  void _shareProperty(PropertyModel p) {
+    final link = 'https://immozone.app/property/${p.id}';
+    final text =
+        '${p.title}\n${p.type} \u2022 ${p.transactionType} \u2022 ${p.formattedPrice}\n${p.commune}, ${p.city}\n\n$link';
+    Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+        const SizedBox(width: 10),
+        Expanded(child: Text(
+          'Lien copi\u00e9 : $link',
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+          maxLines: 2, overflow: TextOverflow.ellipsis,
+        )),
+      ]),
+      backgroundColor: AppTheme.primaryColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  // ── Zoom plein \u00e9cran sur tap image ──────────────────────────────────────────
+  void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
+    if (images.isEmpty) return;
+    final pageCtrl = PageController(initialPage: initialIndex);
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(children: [
+          PageView.builder(
+            controller: pageCtrl,
+            itemCount: images.length,
+            itemBuilder: (_, i) => InteractiveViewer(
+              minScale: 1.0,
+              maxScale: 5.0,
+              child: Center(child: _buildPropertyImage(images[i])),
+            ),
+          ),
+          // Bouton fermer
+          Positioned(
+            top: 40, right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    ));
+  }
+
+  // ── Deux boutons contact : WhatsApp + Appel ───────────────────────────────
+  Widget _buildContactButtons({required String phone, required String whatsapp}) {
+    final effectivePhone = phone.isNotEmpty ? phone : '';
+    final effectiveWa = whatsapp.isNotEmpty ? whatsapp : phone;
+    return Row(
+      children: [
+        // Bouton WhatsApp
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: effectiveWa.isNotEmpty ? () => _openWhatsApp(effectiveWa) : null,
+            icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
+            label: const Text('WhatsApp',
+                style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF25D366),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 2,
+              shadowColor: const Color(0xFF25D366).withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Bouton Appel
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: effectivePhone.isNotEmpty ? () => _callPhone(effectivePhone) : null,
+            icon: const Icon(Icons.phone_rounded, size: 18, color: Colors.white),
+            label: const Text('Appeler',
+                style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 2,
+              shadowColor: AppTheme.primaryColor.withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Lancer un appel t\u00e9l\u00e9phonique ──────────────────────────────────────────
+  Future<void> _callPhone(String phone) async {
+    String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (!cleaned.startsWith('+') && !cleaned.startsWith('00')) {
+      cleaned = '+$cleaned';
+    }
+    final uri = Uri.parse('tel:$cleaned');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      _copyToClipboard(phone, 'Num\u00e9ro');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Appel impossible \u2014 Num\u00e9ro copi\u00e9 : $phone',
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.primaryColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    }
+  }
 
   void _showLoginRequired(BuildContext context) {
     showDialog(
