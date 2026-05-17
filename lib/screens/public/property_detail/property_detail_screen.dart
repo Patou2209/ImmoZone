@@ -139,9 +139,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         ],
       ),
 
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
+      body: SafeArea(
+        top: false, // AppBar gere deja la status bar
+        bottom: true,
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
             // ----------------------------------------------------------------
             // PHOTO GALLERY  (height 280 — starts immediately below the AppBar)
             // ----------------------------------------------------------------
@@ -325,11 +328,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             // ----------------------------------------------------------------
 
             // Message officiel ImmoZone
-            if (_officialMessage.isNotEmpty)
+            if (_officialMessage.isNotEmpty) ...[  
+              const SizedBox(height: 16),
               GestureDetector(
                 onTap: () => setState(() => _messageExpanded = !_messageExpanded),
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
@@ -405,9 +409,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 ),
               ),
 
+            ],
+
             // Main info card
+            const SizedBox(height: 16),
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -571,8 +578,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             ),
 
             // Caracteristiques
+            const SizedBox(height: 12),
             Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -861,7 +869,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             ],
 
             const SizedBox(height: 30),
-          ],
+            ],
+          ),
         ),
       ),
 
@@ -910,14 +919,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   // HELPERS
   // -------------------------------------------------------------------------
 
-  /// Native share sheet via share_plus (SharePlus.instance API)
+  /// Native share sheet — partage uniquement le lien deep-link
   Future<void> _shareProperty(PropertyModel p) async {
     final link = 'https://immozone.app/property/${p.id}';
-    final text =
-        '${p.title}\n${p.type} \u2022 ${p.transactionType} \u2022 ${p.formattedPrice}\n'
-        '${p.commune}, ${p.city}\n\n$link';
     await SharePlus.instance.share(
-      ShareParams(text: text, subject: p.title),
+      ShareParams(text: link),
     );
   }
 

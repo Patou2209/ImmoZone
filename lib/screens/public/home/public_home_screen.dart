@@ -881,6 +881,40 @@ class _HomeTabState extends State<_HomeTab>
 
                   const SizedBox(height: 12),
 
+                  // Bandeau nombre de resultats
+                  if (displayed.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: AppTheme.accentColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.home_work_rounded,
+                                size: 13, color: AppTheme.accentColor),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${filtered.length} '
+                              'propri\u00e9t\u00e9${filtered.length > 1 ? 's' : ''} trouv\u00e9e${filtered.length > 1 ? 's' : ''}',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor,
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ]),
+                    ),
+
+                  const SizedBox(height: 8),
+
                   // Liste ou etat vide
                   if (displayed.isEmpty)
                     _buildEmptyWithSimilar([])
