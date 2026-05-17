@@ -5,12 +5,12 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../models/property_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
-import '../../auth/login_screen.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel property;
@@ -106,42 +106,50 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: CustomScrollView(
-        slivers: [
-          // ── Image Sliver AppBar ───────────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            title: const Text(
-              'ImmoZone',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                color: AppTheme.accentColor,
-                letterSpacing: 0.5,
-              ),
+      // Fixed AppBar — never transparent, never scrolls, photo starts BELOW it
+      appBar: AppBar(
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'ImmoZone',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: AppTheme.accentColor,
+            letterSpacing: 0.5,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              color: _isFavorite ? Colors.redAccent : Colors.white,
             ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: Icon(_isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    color: _isFavorite ? Colors.redAccent : Colors.white),
-                onPressed: _toggleFavorite,
-                tooltip: 'Ajouter aux favoris',
-              ),
-              IconButton(
-                icon: const Icon(Icons.ios_share_rounded),
-                onPressed: () => _shareProperty(p),
-                tooltip: 'Partager',
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
+            onPressed: _toggleFavorite,
+            tooltip: 'Ajouter aux favoris',
+          ),
+          IconButton(
+            icon: const Icon(Icons.ios_share_rounded),
+            onPressed: () => _shareProperty(p),
+            tooltip: 'Partager',
+          ),
+        ],
+      ),
+
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // ----------------------------------------------------------------
+            // PHOTO GALLERY  (height 280 — starts immediately below the AppBar)
+            // ----------------------------------------------------------------
+            SizedBox(
+              height: 280,
+              child: Stack(
                 children: [
-                  // Images PageView — tap pour zoom plein écran
+                  // PageView images
                   PageView.builder(
                     controller: _pageCtrl,
                     itemCount: p.images.isNotEmpty ? p.images.length : 1,
@@ -156,7 +164,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       );
                     },
                   ),
-                  // Gradient bas
+
+                  // Bottom gradient
                   Positioned(
                     bottom: 0, left: 0, right: 0,
                     child: Container(
@@ -165,106 +174,123 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         gradient: LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
-                          colors: [Colors.black.withValues(alpha: 0.55), Colors.transparent],
+                          colors: [
+                            Colors.black.withValues(alpha: 0.55),
+                            Colors.transparent,
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  // Boutons Précédent / Suivant
-                  if (p.images.length > 1) ...
-                    [
-                      Positioned(
-                        left: 8,
-                        top: 0, bottom: 0,
-                        child: Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_currentImageIndex > 0) {
-                                _pageCtrl.previousPage(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOut);
-                              }
-                            },
-                            child: AnimatedOpacity(
-                              opacity: _currentImageIndex > 0 ? 1.0 : 0.3,
-                              duration: const Duration(milliseconds: 200),
-                              child: Container(
-                                width: 36, height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.45),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.chevron_left_rounded,
-                                    color: Colors.white, size: 24),
+
+                  // Prev / Next buttons
+                  if (p.images.length > 1) ...[
+                    Positioned(
+                      left: 8, top: 0, bottom: 0,
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_currentImageIndex > 0) {
+                              _pageCtrl.previousPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut);
+                            }
+                          },
+                          child: AnimatedOpacity(
+                            opacity: _currentImageIndex > 0 ? 1.0 : 0.3,
+                            duration: const Duration(milliseconds: 200),
+                            child: Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Icon(Icons.chevron_left_rounded,
+                                  color: Colors.white, size: 24),
                             ),
                           ),
                         ),
                       ),
-                      Positioned(
-                        right: 8,
-                        top: 0, bottom: 0,
-                        child: Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              if (_currentImageIndex < p.images.length - 1) {
-                                _pageCtrl.nextPage(
-                                    duration: const Duration(milliseconds: 300),
-                                    curve: Curves.easeInOut);
-                              }
-                            },
-                            child: AnimatedOpacity(
-                              opacity: _currentImageIndex < p.images.length - 1 ? 1.0 : 0.3,
-                              duration: const Duration(milliseconds: 200),
-                              child: Container(
-                                width: 36, height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.45),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.chevron_right_rounded,
-                                    color: Colors.white, size: 24),
+                    ),
+                    Positioned(
+                      right: 8, top: 0, bottom: 0,
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_currentImageIndex < p.images.length - 1) {
+                              _pageCtrl.nextPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut);
+                            }
+                          },
+                          child: AnimatedOpacity(
+                            opacity: _currentImageIndex < p.images.length - 1 ? 1.0 : 0.3,
+                            duration: const Duration(milliseconds: 200),
+                            child: Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                shape: BoxShape.circle,
                               ),
+                              child: const Icon(Icons.chevron_right_rounded,
+                                  color: Colors.white, size: 24),
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  // Image indicators (dots)
+                    ),
+                  ],
+
+                  // Dot indicators
                   if (p.images.length > 1)
                     Positioned(
                       bottom: 12, left: 0, right: 0,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(p.images.length, (i) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: _currentImageIndex == i ? 22 : 8,
-                          height: 8,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                            color: _currentImageIndex == i ? AppTheme.accentColor : Colors.white60,
-                            borderRadius: BorderRadius.circular(4),
+                        children: List.generate(
+                          p.images.length,
+                          (i) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: _currentImageIndex == i ? 22 : 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              color: _currentImageIndex == i
+                                  ? AppTheme.accentColor
+                                  : Colors.white60,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
-                        )),
+                        ),
                       ),
                     ),
-                  // Transaction Badge
+
+                  // Transaction badge
                   Positioned(
                     bottom: 40, left: 16,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: p.transactionType == 'Vente'
-                            ? AppTheme.primaryColor : AppTheme.successColor,
+                            ? AppTheme.primaryColor
+                            : AppTheme.successColor,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25),
-                            blurRadius: 6)],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            blurRadius: 6,
+                          ),
+                        ],
                       ),
                       child: Text(p.transactionType,
-                          style: const TextStyle(color: Colors.white, fontSize: 12,
-                              fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins')),
                     ),
                   ),
+
                   // Photo count badge
                   if (p.images.length > 1)
                     Positioned(
@@ -276,335 +302,370 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.photo_library_outlined, size: 12, color: Colors.white),
+                          const Icon(Icons.photo_library_outlined,
+                              size: 12, color: Colors.white),
                           const SizedBox(width: 4),
-                          Text('${_currentImageIndex + 1}/${p.images.length}',
-                              style: const TextStyle(color: Colors.white, fontSize: 11,
-                                  fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                          Text(
+                            '${_currentImageIndex + 1}/${p.images.length}',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600),
+                          ),
                         ]),
                       ),
                     ),
                 ],
               ),
             ),
-          ),
 
-          SliverToBoxAdapter(
-            child: Column(children: [
+            // ----------------------------------------------------------------
+            // SCROLLABLE CONTENT  (all cards, margin: symmetric(horizontal:16))
+            // ----------------------------------------------------------------
 
-              // ── MESSAGE OFFICIEL IMMOZONE ───────────────────────────────
-              if (_officialMessage.isNotEmpty)
-                GestureDetector(
-                  onTap: () => setState(() => _messageExpanded = !_messageExpanded),
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppTheme.primaryColor, AppTheme.primaryLight],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                            blurRadius: 10, offset: const Offset(0, 3)),
-                      ],
+            // Message officiel ImmoZone
+            if (_officialMessage.isNotEmpty)
+              GestureDetector(
+                onTap: () => setState(() => _messageExpanded = !_messageExpanded),
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppTheme.primaryColor, AppTheme.primaryLight],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                     ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.verified_rounded,
-                              color: AppTheme.accentColor, size: 16),
-                        ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text('Message Officiel ImmoZone',
-                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                                  fontSize: 12, color: AppTheme.accentColor)),
-                        ),
-                        Icon(_messageExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white54, size: 18),
-                      ]),
-                      if (_messageExpanded) ...[
-                        const SizedBox(height: 10),
-                        const Divider(color: Colors.white12, height: 1),
-                        const SizedBox(height: 10),
-                        Text(_officialMessage,
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                                color: Colors.white70, height: 1.6)),
-                      ],
-                      if (!_messageExpanded) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          _officialMessage.length > 80
-                              ? '${_officialMessage.substring(0, 80)}...'
-                              : _officialMessage,
-                          style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                              color: Colors.white54, height: 1.4),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ]),
-                  ),
-                ),
-
-              // ── MAIN INFO CARD ──────────────────────────────────────────
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10, offset: const Offset(0, 2))],
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  // Title + Status
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(
-                      child: Text(p.title,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _statusColor(p.status).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _statusColor(p.status).withValues(alpha: 0.3)),
-                      ),
-                      child: Text(p.status,
-                          style: TextStyle(fontSize: 11, color: _statusColor(p.status),
-                              fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
-                    ),
-                  ]),
-                  const SizedBox(height: 10),
-
-                  // Location
-                  Row(children: [
-                    const Icon(Icons.location_on_rounded, size: 15, color: AppTheme.accentColor),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text('${p.address.isNotEmpty ? "${p.address}, " : ""}${p.commune}, ${p.city}',
-                          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary,
-                              fontFamily: 'Poppins')),
-                    ),
-                  ]),
-                  const SizedBox(height: 14),
-
-                  // Price + Views
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(p.formattedPrice,
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
-                              color: AppTheme.accentColor, fontFamily: 'Poppins')),
-                      if (p.transactionType == 'Location') ...[  
-                        const Text('par mois',
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary,
-                                fontFamily: 'Poppins')),
-                        ...[  
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: (p.garantieMois != null && p.garantieMois! > 0)
-                                  ? AppTheme.accentColor.withValues(alpha: 0.08)
-                                  : AppTheme.textHint.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: (p.garantieMois != null && p.garantieMois! > 0)
-                                    ? AppTheme.accentColor.withValues(alpha: 0.3)
-                                    : AppTheme.textHint.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.security_rounded, size: 12,
-                                  color: (p.garantieMois != null && p.garantieMois! > 0)
-                                      ? AppTheme.accentColor
-                                      : AppTheme.textHint),
-                              const SizedBox(width: 4),
-                              Text(
-                                (p.garantieMois != null && p.garantieMois! > 0)
-                                    ? '${p.garantieMois} mois de garantie'
-                                    : '0 mois de garantie',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins', fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: (p.garantieMois != null && p.garantieMois! > 0)
-                                      ? AppTheme.accentColor
-                                      : AppTheme.textHint,
-                                ),
-                              ),
-                            ]),
-                          ),
-                        ],
-                        if (p.hasCommission) ...[  
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6A1B9A).withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFF6A1B9A).withValues(alpha: 0.3)),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.handshake_rounded, size: 12, color: Color(0xFF6A1B9A)),
-                              const SizedBox(width: 4),
-                              Text(
-                                p.commissionPct != null
-                                    ? 'Commission : ${p.commissionPct!.toStringAsFixed(0)} % du loyer'
-                                    : 'Commission incluse',
-                                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                                    fontWeight: FontWeight.w600, color: Color(0xFF6A1B9A)),
-                              ),
-                            ]),
-                          ),
-                        ],
-                      ],
-                    ]),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      Row(children: [
-                        const Icon(Icons.visibility_outlined, size: 14, color: AppTheme.textHint),
-                        const SizedBox(width: 4),
-                        Text('${p.views} vues',
-                            style: const TextStyle(fontSize: 12, color: AppTheme.textHint,
-                                fontFamily: 'Poppins')),
-                      ]),
-                      const SizedBox(height: 3),
-                      Text(_formatDate(p.createdAt),
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textHint,
-                              fontFamily: 'Poppins')),
-                    ]),
-                  ]),
-                ]),
-              ),
-
-              // ── CARACTERISTIQUES ────────────────────────────────────────
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10, offset: const Offset(0, 2))],
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Caracteristiques',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _featureTile(Icons.category_outlined, 'Type', p.type),
-                      _featureTile(Icons.swap_horiz_rounded, 'Transaction', p.transactionType),
-                      if (p.surface != null)
-                        _featureTile(Icons.square_foot_rounded, 'Surface', '${p.surface!.toInt()} m²'),
-                      if (p.bedrooms != null && p.bedrooms! > 0)
-                        _featureTile(Icons.bed_outlined, 'Chambres', '${p.bedrooms}'),
-                      if (p.bathrooms != null && p.bathrooms! > 0)
-                        _featureTile(Icons.bathtub_outlined, 'Salles de bain', '${p.bathrooms}'),
-                      if (p.floors != null)
-                        _featureTile(Icons.layers_outlined, 'Etages', '${p.floors}'),
-                      if (p.numberOfBeds != null && p.numberOfBeds! > 0)
-                        _featureTile(Icons.single_bed_rounded, 'Lits', '${p.numberOfBeds}'),
-                      if (p.capacity != null && p.capacity! > 0)
-                        _featureTile(Icons.event_seat_rounded, 'Capacite', '${p.capacity} places'),
-                      _featureTile(Icons.local_parking_rounded, 'Parking',
-                          p.hasParking ? 'Oui' : 'Non'),
-                      _featureTile(Icons.electric_bolt_rounded, 'Groupe Électrogène',
-                          p.hasElectricity ? 'Oui' : 'Non'),
-                      _featureTile(Icons.security_rounded, 'Sécurité 24h/24',
-                          p.hasWater ? 'Oui' : 'Non'),
-                      if (p.garantieMois != null && p.garantieMois! > 0)
-                        _featureTile(Icons.security_rounded, 'Garantie',
-                            '${p.garantieMois} mois'),
-                      if (p.hasCommission)
-                        _featureTile(Icons.handshake_rounded, 'Commission',
-                            p.commissionPct != null
-                                ? '${p.commissionPct!.toStringAsFixed(0)} % du loyer'
-                                : 'Oui'),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: AppTheme.accentColor.withValues(alpha: 0.5), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3)),
                     ],
                   ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.verified_rounded,
+                            color: AppTheme.accentColor, size: 16),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text('Message Officiel ImmoZone',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                                color: AppTheme.accentColor)),
+                      ),
+                      Icon(
+                        _messageExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white54,
+                        size: 18,
+                      ),
+                    ]),
+                    if (_messageExpanded) ...[
+                      const SizedBox(height: 10),
+                      const Divider(color: Colors.white12, height: 1),
+                      const SizedBox(height: 10),
+                      Text(_officialMessage,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: Colors.white70,
+                              height: 1.6)),
+                    ],
+                    if (!_messageExpanded) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _officialMessage.length > 80
+                            ? '${_officialMessage.substring(0, 80)}...'
+                            : _officialMessage,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: Colors.white54,
+                            height: 1.4),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ]),
+                ),
+              ),
+
+            // Main info card
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2))
+                ],
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Title + Status
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: Text(p.title,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Poppins',
+                            color: AppTheme.textPrimary)),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _statusColor(p.status).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: _statusColor(p.status).withValues(alpha: 0.3)),
+                    ),
+                    child: Text(p.status,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: _statusColor(p.status),
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Poppins')),
+                  ),
+                ]),
+                const SizedBox(height: 10),
+
+                // Location
+                Row(children: [
+                  const Icon(Icons.location_on_rounded,
+                      size: 15, color: AppTheme.accentColor),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      '${p.address.isNotEmpty ? "${p.address}, " : ""}${p.commune}, ${p.city}',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                          fontFamily: 'Poppins'),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+
+                // Price + Views
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(p.formattedPrice,
+                        style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.accentColor,
+                            fontFamily: 'Poppins')),
+                    if (p.transactionType == 'Location') ...[
+                      const Text('par mois',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontFamily: 'Poppins')),
+                      ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: (p.garantieMois != null && p.garantieMois! > 0)
+                                ? AppTheme.accentColor.withValues(alpha: 0.08)
+                                : AppTheme.textHint.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: (p.garantieMois != null && p.garantieMois! > 0)
+                                  ? AppTheme.accentColor.withValues(alpha: 0.3)
+                                  : AppTheme.textHint.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.security_rounded,
+                                size: 12,
+                                color: (p.garantieMois != null && p.garantieMois! > 0)
+                                    ? AppTheme.accentColor
+                                    : AppTheme.textHint),
+                            const SizedBox(width: 4),
+                            Text(
+                              (p.garantieMois != null && p.garantieMois! > 0)
+                                  ? '${p.garantieMois} mois de garantie'
+                                  : '0 mois de garantie',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: (p.garantieMois != null && p.garantieMois! > 0)
+                                    ? AppTheme.accentColor
+                                    : AppTheme.textHint,
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ],
+                      if (p.hasCommission) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6A1B9A).withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFF6A1B9A).withValues(alpha: 0.3)),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.handshake_rounded,
+                                size: 12, color: Color(0xFF6A1B9A)),
+                            const SizedBox(width: 4),
+                            Text(
+                              p.commissionPct != null
+                                  ? 'Commission : ${p.commissionPct!.toStringAsFixed(0)} % du loyer'
+                                  : 'Commission incluse',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF6A1B9A)),
+                            ),
+                          ]),
+                        ),
+                      ],
+                    ],
+                  ]),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Row(children: [
+                      const Icon(Icons.visibility_outlined,
+                          size: 14, color: AppTheme.textHint),
+                      const SizedBox(width: 4),
+                      Text('${p.views} vues',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textHint,
+                              fontFamily: 'Poppins')),
+                    ]),
+                    const SizedBox(height: 3),
+                    Text(_formatDate(p.createdAt),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textHint,
+                            fontFamily: 'Poppins')),
+                  ]),
+                ]),
+              ]),
+            ),
+
+            // Caracteristiques
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2))
+                ],
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Caracteristiques',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                        color: AppTheme.textPrimary)),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _featureTile(Icons.category_outlined, 'Type', p.type),
+                    _featureTile(Icons.swap_horiz_rounded, 'Transaction', p.transactionType),
+                    if (p.surface != null)
+                      _featureTile(Icons.square_foot_rounded, 'Surface',
+                          '${p.surface!.toInt()} m\u00b2'),
+                    if (p.bedrooms != null && p.bedrooms! > 0)
+                      _featureTile(Icons.bed_outlined, 'Chambres', '${p.bedrooms}'),
+                    if (p.bathrooms != null && p.bathrooms! > 0)
+                      _featureTile(Icons.bathtub_outlined, 'Salles de bain', '${p.bathrooms}'),
+                    if (p.floors != null)
+                      _featureTile(Icons.layers_outlined, 'Etages', '${p.floors}'),
+                    if (p.numberOfBeds != null && p.numberOfBeds! > 0)
+                      _featureTile(Icons.single_bed_rounded, 'Lits', '${p.numberOfBeds}'),
+                    if (p.capacity != null && p.capacity! > 0)
+                      _featureTile(Icons.event_seat_rounded, 'Capacite',
+                          '${p.capacity} places'),
+                    _featureTile(Icons.local_parking_rounded, 'Parking',
+                        p.hasParking ? 'Oui' : 'Non'),
+                    _featureTile(Icons.electric_bolt_rounded, 'Groupe \u00c9lectrog\u00e8ne',
+                        p.hasElectricity ? 'Oui' : 'Non'),
+                    _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24',
+                        p.hasWater ? 'Oui' : 'Non'),
+                    if (p.garantieMois != null && p.garantieMois! > 0)
+                      _featureTile(Icons.security_rounded, 'Garantie',
+                          '${p.garantieMois} mois'),
+                    if (p.hasCommission)
+                      _featureTile(Icons.handshake_rounded, 'Commission',
+                          p.commissionPct != null
+                              ? '${p.commissionPct!.toStringAsFixed(0)} % du loyer'
+                              : 'Oui'),
+                  ],
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+
+            // Description
+            if (p.description.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Description',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                          color: AppTheme.textPrimary)),
+                  const SizedBox(height: 10),
+                  Text(p.description,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                          fontFamily: 'Poppins',
+                          height: 1.7)),
                 ]),
               ),
-              const SizedBox(height: 12),
 
-              // ── DESCRIPTION ─────────────────────────────────────────────
-              if (p.description.isNotEmpty)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10, offset: const Offset(0, 2))],
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Description',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                            fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-                    const SizedBox(height: 10),
-                    Text(p.description,
-                        style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary,
-                            fontFamily: 'Poppins', height: 1.7)),
-                  ]),
-                ),
-
-              // ── EQUIPEMENTS ─────────────────────────────────────────────
-              if (p.amenities.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10, offset: const Offset(0, 2))],
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Equipements & Services',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                            fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: p.amenities.map((a) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.check_circle_rounded, size: 13, color: AppTheme.accentColor),
-                          const SizedBox(width: 5),
-                          Text(a, style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
-                        ]),
-                      )).toList(),
-                    ),
-                  ]),
-                ),
-              ],
-
-              // ── ANNONCEUR / CONTACT ─────────────────────────────────────
+            // Equipements
+            if (p.amenities.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -612,131 +673,210 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10, offset: const Offset(0, 2))],
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2))
+                  ],
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Annonceur',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-                  const SizedBox(height: 14),
-                  Row(children: [
-                    Container(
-                      width: 52, height: 52,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
-                      ),
-                      child: Center(
-                        child: Text(
-                          p.ownerName.isNotEmpty ? p.ownerName[0].toUpperCase() : '?',
-                          style: const TextStyle(fontWeight: FontWeight.w800,
-                              color: AppTheme.accentColor, fontFamily: 'Poppins', fontSize: 20),
-                        ),
+                  const Text('Equipements & Services',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                          color: AppTheme.textPrimary)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: p.amenities
+                        .map((a) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: AppTheme.accentColor.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.check_circle_rounded,
+                                    size: 13, color: AppTheme.accentColor),
+                                const SizedBox(width: 5),
+                                Text(a,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textPrimary,
+                                        fontWeight: FontWeight.w500,
+                                        fontFamily: 'Poppins')),
+                              ]),
+                            ))
+                        .toList(),
+                  ),
+                ]),
+              ),
+            ],
+
+            // Annonceur + contact buttons
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2))
+                ],
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Annonceur',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                        color: AppTheme.textPrimary)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: Center(
+                      child: Text(
+                        p.ownerName.isNotEmpty ? p.ownerName[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.accentColor,
+                            fontFamily: 'Poppins',
+                            fontSize: 20),
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            child: Text(p.ownerName,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                                    fontFamily: 'Poppins', color: AppTheme.textPrimary),
-                                overflow: TextOverflow.ellipsis),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        Expanded(
+                          child: Text(p.ownerName,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Poppins',
+                                  color: AppTheme.textPrimary),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        if (_ownerSince.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: AppTheme.accentColor.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.verified_user_rounded,
+                                  size: 10, color: AppTheme.accentColor),
+                              const SizedBox(width: 3),
+                              Text(_ownerSince,
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.accentColor)),
+                            ]),
                           ),
-                          if (_ownerSince.isNotEmpty) ...
-                            [
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accentColor.withValues(alpha: 0.10),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
-                                ),
-                                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  const Icon(Icons.verified_user_rounded,
-                                      size: 10, color: AppTheme.accentColor),
-                                  const SizedBox(width: 3),
-                                  Text(_ownerSince,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins', fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppTheme.accentColor)),
-                                ]),
-                              ),
-                            ],
                         ],
-                      ),
+                      ]),
                       const SizedBox(height: 3),
                       if (p.ownerPhone.isNotEmpty)
                         GestureDetector(
                           onTap: () => _copyToClipboard(p.ownerPhone, 'Numero'),
                           child: Row(children: [
-                            const Icon(Icons.phone_rounded, size: 13, color: AppTheme.accentColor),
+                            const Icon(Icons.phone_rounded,
+                                size: 13, color: AppTheme.accentColor),
                             const SizedBox(width: 4),
                             Text(p.ownerPhone,
-                                style: const TextStyle(fontSize: 12, color: AppTheme.accentColor,
-                                    fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.accentColor,
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600)),
                           ]),
                         ),
-                    ])),
-                  ]),
+                    ]),
+                  ),
+                ]),
 
-                  // Boutons contact : WhatsApp + Appel
-                  if (!isOwner) ...[
-                    const SizedBox(height: 16),
-                    const Divider(height: 1, color: AppTheme.dividerColor),
-                    const SizedBox(height: 14),
-                    _buildContactButtons(
-                      phone: p.ownerPhone,
-                      whatsapp: p.ownerWhatsApp,
-                    ),
-                  ],
+                // WhatsApp + Call buttons (non-owner only)
+                if (!isOwner) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: AppTheme.dividerColor),
+                  const SizedBox(height: 14),
+                  _buildContactButtons(
+                    phone: p.ownerPhone,
+                    whatsapp: p.ownerWhatsApp,
+                  ),
+                ],
+              ]),
+            ),
+
+            // Expiry info (owner only)
+            if (isOwner && p.expiresAt != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.schedule_rounded,
+                      color: AppTheme.accentColor, size: 16),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Annonce valide jusqu\'au ${_formatDate(p.expiresAt!)}',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppTheme.accentColor,
+                        fontWeight: FontWeight.w600),
+                  ),
                 ]),
               ),
+            ],
 
-              // ── INFORMATIONS COMPLEMENTAIRES (visible propriétaire uniquement) ─
-              if (isOwner && p.expiresAt != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(children: [
-                    const Icon(Icons.schedule_rounded, color: AppTheme.accentColor, size: 16),
-                    const SizedBox(width: 10),
-                    Text('Annonce valide jusqu\'au ${_formatDate(p.expiresAt!)}',
-                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                            color: AppTheme.accentColor, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-              ],
-
-              const SizedBox(height: 100),
-            ]),
-          ),
-        ],
+            const SizedBox(height: 30),
+          ],
+        ),
       ),
 
-      // ── BOTTOM BAR ─────────────────────────────────────────────────────────
-      // Non-propriétaires : le bouton WhatsApp est dans le contenu défilant,
-      // pas besoin d'une barre fixe en bas.
-      // Propriétaires : panneau informatif seulement.
+      // Bottom bar (owner info panel only)
       bottomNavigationBar: isOwner
           ? Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 12, offset: const Offset(0, -3))],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, -3))
+                ],
               ),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -745,259 +885,98 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
                 ),
-                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.person_pin_rounded, color: AppTheme.accentColor, size: 18),
-                  SizedBox(width: 8),
-                  Text('Votre annonce — gérable depuis votre tableau de bord',
-                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                          fontWeight: FontWeight.w600, color: AppTheme.accentColor)),
-                ]),
+                child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.person_pin_rounded,
+                          color: AppTheme.accentColor, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Votre annonce \u2014 g\u00e9rable depuis votre tableau de bord',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.accentColor),
+                      ),
+                    ]),
               ),
             )
           : null,
     );
   }
 
-  /// Ouvre WhatsApp avec le numéro du propriétaire
-  Future<void> _openWhatsApp(String phone) async {
-    final p = widget.property;
+  // -------------------------------------------------------------------------
+  // HELPERS
+  // -------------------------------------------------------------------------
 
-    // ── Nettoyage du numéro ──────────────────────────────────────────────────
-    // Supprimer espaces, tirets, parenthèses, garder le +
-    String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-    // Pour wa.me et whatsapp:// le numéro doit être SANS le + (ex: 243812345678)
-    final number = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
-
-    if (number.isEmpty) {
-      _showCopyFallback(phone);
-      return;
-    }
-
-    final message = Uri.encodeComponent(
-        'Bonjour, je suis intéressé(e) par votre annonce "${p.title}" à ${p.city}. '
-        'Est-elle toujours disponible ?');
-
-    // ── Essai 1 : Intent natif whatsapp:// ───────────────────────────────────
-    // Sur Android, c'est le plus fiable — ouvre directement WhatsApp sans browser
-    final nativeUri = Uri.parse('whatsapp://send?phone=$number&text=$message');
-    try {
-      // On tente directement sans canLaunchUrl (qui retourne false sur certains ROM)
-      await launchUrl(nativeUri, mode: LaunchMode.externalNonBrowserApplication);
-      return;
-    } catch (_) {}
-
-    // ── Essai 2 : whatsapp:// avec externalApplication ───────────────────────
-    try {
-      await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
-      return;
-    } catch (_) {}
-
-    // ── Essai 3 : wa.me via navigateur (fonctionne même sans WhatsApp installé)
-    final webUri = Uri.parse('https://wa.me/$number?text=$message');
-    try {
-      await launchUrl(webUri, mode: LaunchMode.externalApplication);
-      return;
-    } catch (_) {}
-
-    // ── Fallback final : copier le numéro ────────────────────────────────────
-    _showCopyFallback(phone);
+  /// Native share sheet via share_plus (SharePlus.instance API)
+  Future<void> _shareProperty(PropertyModel p) async {
+    final link = 'https://immozone.app/property/${p.id}';
+    final text =
+        '${p.title}\n${p.type} \u2022 ${p.transactionType} \u2022 ${p.formattedPrice}\n'
+        '${p.commune}, ${p.city}\n\n$link';
+    await SharePlus.instance.share(
+      ShareParams(text: text, subject: p.title),
+    );
   }
 
-  void _showCopyFallback(String phone) {
-    Clipboard.setData(ClipboardData(text: phone));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-        'WhatsApp indisponible — Numéro copié : $phone',
-        style: const TextStyle(fontFamily: 'Poppins'),
-      ),
-      backgroundColor: const Color(0xFF25D366),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
-  }
-
-  Widget _whatsappButton(String phone, {bool fullWidth = false}) {
-    if (phone.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      width: fullWidth ? double.infinity : null,
-      child: ElevatedButton.icon(
-        onPressed: () => _openWhatsApp(phone),
-        icon: const Icon(Icons.chat_rounded, size: 20, color: Colors.white),
-        label: const Text('Contacter sur WhatsApp',
-            style: TextStyle(fontSize: 14, fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700, color: Colors.white)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF25D366),
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  /// Fullscreen zoom viewer on image tap
+  void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
+    if (images.isEmpty) return;
+    final pageCtrl = PageController(initialPage: initialIndex);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(children: [
+            PageView.builder(
+              controller: pageCtrl,
+              itemCount: images.length,
+              itemBuilder: (_, i) => InteractiveViewer(
+                minScale: 1.0,
+                maxScale: 5.0,
+                child: Center(child: _buildPropertyImage(images[i])),
+              ),
+            ),
+            Positioned(
+              top: 40, right: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+          ]),
         ),
       ),
     );
   }
 
-  /// Chip compact horizontal — toutes les caractéristiques sur la même ligne
-  Widget _featureTile(IconData icon, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 14, color: AppTheme.accentColor),
-        const SizedBox(width: 5),
-        Text('$label: ',
-            style: const TextStyle(fontSize: 10, color: AppTheme.textHint,
-                fontFamily: 'Poppins')),
-        Text(value,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                fontFamily: 'Poppins', color: AppTheme.textPrimary)),
-      ]),
-    );
-  }
-
-  /// Affiche image : base64 (data URI), URL réseau, ou fichier local
-  Widget _buildPropertyImage(String src) {
-    final _placeholder = Container(
-      color: AppTheme.primaryColor,
-      child: const Center(
-        child: Icon(Icons.home_work_outlined,
-            size: 80, color: AppTheme.accentColor),
-      ),
-    );
-
-    // ── Base64 (stocké dans Firestore, visible sur tous les appareils) ──────
-    if (src.startsWith('data:image/')) {
-      try {
-        final commaIndex = src.indexOf(',');
-        if (commaIndex == -1) return _placeholder;
-        final b64str = src.substring(commaIndex + 1);
-        final bytes = base64Decode(b64str);
-        return Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          errorBuilder: (_, __, ___) => _placeholder,
-        );
-      } catch (_) {
-        return _placeholder;
-      }
-    }
-
-    // ── Fichier local (uniquement sur l'appareil de l'annonceur) ─────────────
-    if (!kIsWeb && !src.startsWith('http')) {
-      final file = File(src);
-      if (file.existsSync()) {
-        return Image.file(
-          file,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          errorBuilder: (_, __, ___) => _placeholder,
-        );
-      }
-      return _placeholder;
-    }
-
-    // ── URL réseau (Unsplash, etc.) ───────────────────────────────────────────
-    return Image.network(
-      src,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      errorBuilder: (_, __, ___) => _placeholder,
-      loadingBuilder: (_, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: AppTheme.primaryColor,
-          child: const Center(
-            child: CircularProgressIndicator(
-                color: AppTheme.accentColor, strokeWidth: 2),
-          ),
-        );
-      },
-    );
-  }
-
-  String _formatDate(DateTime dt) =>
-      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-
-  // ── Partager : URL deep-link ImmoZone ─────────────────────────────────────
-  void _shareProperty(PropertyModel p) {
-    final link = 'https://immozone.app/property/${p.id}';
-    final text =
-        '${p.title}\n${p.type} \u2022 ${p.transactionType} \u2022 ${p.formattedPrice}\n${p.commune}, ${p.city}\n\n$link';
-    Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-        const SizedBox(width: 10),
-        Expanded(child: Text(
-          'Lien copi\u00e9 : $link',
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-          maxLines: 2, overflow: TextOverflow.ellipsis,
-        )),
-      ]),
-      backgroundColor: AppTheme.primaryColor,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      duration: const Duration(seconds: 3),
-    ));
-  }
-
-  // ── Zoom plein \u00e9cran sur tap image ──────────────────────────────────────────
-  void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
-    if (images.isEmpty) return;
-    final pageCtrl = PageController(initialPage: initialIndex);
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(children: [
-          PageView.builder(
-            controller: pageCtrl,
-            itemCount: images.length,
-            itemBuilder: (_, i) => InteractiveViewer(
-              minScale: 1.0,
-              maxScale: 5.0,
-              child: Center(child: _buildPropertyImage(images[i])),
-            ),
-          ),
-          // Bouton fermer
-          Positioned(
-            top: 40, right: 16,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
-              ),
-            ),
-          ),
-        ]),
-      ),
-    ));
-  }
-
-  // ── Deux boutons contact : WhatsApp + Appel ───────────────────────────────
+  /// Dual contact buttons: WhatsApp (green) + Call (primary color)
   Widget _buildContactButtons({required String phone, required String whatsapp}) {
     final effectivePhone = phone.isNotEmpty ? phone : '';
     final effectiveWa = whatsapp.isNotEmpty ? whatsapp : phone;
     return Row(
       children: [
-        // Bouton WhatsApp
         Expanded(
           child: ElevatedButton.icon(
             onPressed: effectiveWa.isNotEmpty ? () => _openWhatsApp(effectiveWa) : null,
             icon: const Icon(Icons.chat_rounded, size: 18, color: Colors.white),
             label: const Text('WhatsApp',
-                style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700, color: Colors.white)),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               foregroundColor: Colors.white,
@@ -1009,14 +988,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        // Bouton Appel
         Expanded(
           child: ElevatedButton.icon(
             onPressed: effectivePhone.isNotEmpty ? () => _callPhone(effectivePhone) : null,
             icon: const Icon(Icons.phone_rounded, size: 18, color: Colors.white),
             label: const Text('Appeler',
-                style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700, color: Colors.white)),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
               foregroundColor: Colors.white,
@@ -1031,7 +1012,48 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     );
   }
 
-  // ── Lancer un appel t\u00e9l\u00e9phonique ──────────────────────────────────────────
+  /// Open WhatsApp with pre-filled message
+  Future<void> _openWhatsApp(String phone) async {
+    final p = widget.property;
+    String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final number = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
+    if (number.isEmpty) {
+      _showCopyFallback(phone);
+      return;
+    }
+    final message = Uri.encodeComponent(
+        'Bonjour, je suis int\u00e9ress\u00e9(e) par votre annonce "${p.title}" \u00e0 ${p.city}. '
+        'Est-elle toujours disponible ?');
+    final nativeUri = Uri.parse('whatsapp://send?phone=$number&text=$message');
+    try {
+      await launchUrl(nativeUri, mode: LaunchMode.externalNonBrowserApplication);
+      return;
+    } catch (_) {}
+    try {
+      await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      return;
+    } catch (_) {}
+    final webUri = Uri.parse('https://wa.me/$number?text=$message');
+    try {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      return;
+    } catch (_) {}
+    _showCopyFallback(phone);
+  }
+
+  void _showCopyFallback(String phone) {
+    Clipboard.setData(ClipboardData(text: phone));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('WhatsApp indisponible \u2014 Num\u00e9ro copi\u00e9 : $phone',
+          style: const TextStyle(fontFamily: 'Poppins')),
+      backgroundColor: const Color(0xFF25D366),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  /// Phone call with clipboard fallback
   Future<void> _callPhone(String phone) async {
     String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (!cleaned.startsWith('+') && !cleaned.startsWith('00')) {
@@ -1053,46 +1075,84 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
-  void _showLoginRequired(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(children: [
-          Icon(Icons.lock_outline_rounded, color: AppTheme.accentColor, size: 22),
-          SizedBox(width: 10),
-          Text('Connexion requise',
-              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                  fontSize: 15, color: AppTheme.textPrimary)),
-        ]),
-        content: const Text(
-          'Vous devez creer un compte ou vous connecter pour contacter un annonceur.',
-          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
-              color: AppTheme.textSecondary, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler',
-                style: TextStyle(fontFamily: 'Poppins', color: AppTheme.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()));
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Se connecter',
-                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                    color: Colors.white)),
-          ),
-        ],
+  /// Compact chip for each property characteristic
+  Widget _featureTile(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
       ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: AppTheme.accentColor),
+        const SizedBox(width: 5),
+        Text('$label: ',
+            style: const TextStyle(
+                fontSize: 10, color: AppTheme.textHint, fontFamily: 'Poppins')),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Poppins',
+                color: AppTheme.textPrimary)),
+      ]),
     );
   }
+
+  /// Render a property image from base64, local file, or network URL
+  Widget _buildPropertyImage(String src) {
+    final placeholder = Container(
+      color: AppTheme.primaryColor,
+      child: const Center(
+        child: Icon(Icons.home_work_outlined, size: 80, color: AppTheme.accentColor),
+      ),
+    );
+
+    if (src.startsWith('data:image/')) {
+      try {
+        final commaIndex = src.indexOf(',');
+        if (commaIndex == -1) return placeholder;
+        final bytes = base64Decode(src.substring(commaIndex + 1));
+        return Image.memory(bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      } catch (_) {
+        return placeholder;
+      }
+    }
+
+    if (!kIsWeb && !src.startsWith('http')) {
+      final file = File(src);
+      if (file.existsSync()) {
+        return Image.file(file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      }
+      return placeholder;
+    }
+
+    return Image.network(
+      src,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      errorBuilder: (_, __, ___) => placeholder,
+      loadingBuilder: (_, child, progress) {
+        if (progress == null) return child;
+        return Container(
+          color: AppTheme.primaryColor,
+          child: const Center(
+            child: CircularProgressIndicator(
+                color: AppTheme.accentColor, strokeWidth: 2),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
 }
