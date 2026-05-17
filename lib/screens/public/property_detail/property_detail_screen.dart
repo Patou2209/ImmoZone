@@ -163,6 +163,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         bottom: true,
         child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
             // ----------------------------------------------------------------
             // PHOTO GALLERY  (height 280 — starts immediately below the AppBar)
