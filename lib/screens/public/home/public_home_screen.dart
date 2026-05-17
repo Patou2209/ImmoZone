@@ -1068,14 +1068,21 @@ class _HomeTabState extends State<_HomeTab>
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const LoginScreen())),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.30),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: const Text('Connexion',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
-                        fontSize: 12, color: Colors.white)),
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                        fontSize: 13, color: Colors.white)),
               ),
             );
           }),
@@ -1094,12 +1101,18 @@ class _HomeTabState extends State<_HomeTab>
         width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFCADCF8), Color(0xFFDEEBFC), Color(0xFFF4F6FB)],
+            colors: [
+              Color(0xFFB8D0F5), // bleu vif en haut
+              Color(0xFFCADCF8), // bleu moyen
+              Color(0xFFE8F1FD), // bleu très clair
+              Color(0xFFFFFFFF), // blanc pur — fondu parfait vers les tabs
+            ],
+            stops: [0.0, 0.35, 0.70, 1.0],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Column(children: [
           const Text(
             'Trouvez Votre\nMaison de R\u00eave',
@@ -1107,9 +1120,9 @@ class _HomeTabState extends State<_HomeTab>
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w800,
-              fontSize: 28,
+              fontSize: 24,
               color: AppTheme.textPrimary,
-              height: 1.15,
+              height: 1.2,
             ),
           ),
           const SizedBox(height: 8),
@@ -1123,7 +1136,7 @@ class _HomeTabState extends State<_HomeTab>
               color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 8),
         ]),
       ),
 
