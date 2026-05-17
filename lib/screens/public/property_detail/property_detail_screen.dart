@@ -388,7 +388,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                 fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w700,
                                 fontSize: 12,
-                                color: AppTheme.accentColor)),
+                                color: Colors.white)),
                       ),
                       Icon(
                         _messageExpanded
@@ -465,7 +465,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       border: Border.all(
                           color: _statusColor(p.status).withValues(alpha: 0.3)),
                     ),
-                    child: Text(p.status,
+                    child: Text(
+                        p.status == 'Actif' ? 'Disponible' : p.status,
                         style: TextStyle(
                             fontSize: 11,
                             color: _statusColor(p.status),
