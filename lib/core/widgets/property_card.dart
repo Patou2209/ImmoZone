@@ -46,7 +46,7 @@ class PropertyCard extends StatelessWidget {
                       const BorderRadius.vertical(top: Radius.circular(18)),
                   child: PropertyImage(
                     src: property.mainImage,
-                    height: 130,
+                    height: 175,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),

@@ -218,23 +218,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
                                   style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
                             ]),
-                            // Badge rôle admin
+                            // Badge rôle admin — orange pour contraste sur fond bleu
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: AppTheme.accentColor.withValues(alpha: 0.25),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.5)),
+                                color: const Color(0xFFFFA726).withValues(alpha: 0.20),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.7)),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.admin_panel_settings_rounded,
-                                      color: AppTheme.accentColor, size: 16),
-                                  SizedBox(width: 6),
+                                      color: Color(0xFFFFA726), size: 15),
+                                  SizedBox(width: 5),
                                   Text('Admin', style: TextStyle(
                                       fontFamily: 'Poppins', fontSize: 11,
-                                      color: AppTheme.accentColor, fontWeight: FontWeight.w700)),
+                                      color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
                                 ],
                               ),
                             ),

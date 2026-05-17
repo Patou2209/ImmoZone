@@ -207,9 +207,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         automaticallyImplyLeading: false,
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: AppTheme.accentColor,
-          labelColor: AppTheme.accentColor,
-          unselectedLabelColor: Colors.white54,
+          indicatorColor: const Color(0xFFFFA726),
+          labelColor: const Color(0xFFFFA726),
+          unselectedLabelColor: Colors.white70,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
           labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 11),
@@ -494,7 +494,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B35),
-                padding: const EdgeInsets.symmetric(vertical: 13),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -565,7 +565,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                       fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
-                padding: const EdgeInsets.symmetric(vertical: 11),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -611,7 +611,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                       fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.accentColor,
-                padding: const EdgeInsets.symmetric(vertical: 11),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -657,7 +657,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                       fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 11),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
@@ -684,7 +684,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 13),
+                padding: const EdgeInsets.symmetric(vertical: 9),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -1540,39 +1540,35 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     );
   }
 
-  Widget _saveBar(String label, VoidCallback onSave) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: AppTheme.dividerColor.withValues(alpha: 0.5))),
-      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2))],
-    ),
+  Widget _saveBar(String label, VoidCallback onSave) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 24),
     child: SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: _isSaving ? null : onSave,
         icon: _isSaving
-            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Icon(Icons.save_rounded, color: Colors.white, size: 18),
+            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Icon(Icons.save_rounded, color: Colors.white, size: 16),
         label: Text(label, style: const TextStyle(
-            fontFamily: 'Poppins', fontWeight: FontWeight.w700, color: Colors.white)),
+            fontFamily: 'Poppins', fontWeight: FontWeight.w500, fontSize: 13, color: Colors.white)),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.accentColor,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     ),
   );
 
   Widget _sectionHeader(String title) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [AppTheme.primaryColor, AppTheme.primaryDark]),
-      borderRadius: BorderRadius.circular(10),
+      color: AppTheme.primaryColor.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(8),
+      border: Border(left: BorderSide(color: AppTheme.primaryColor, width: 3)),
     ),
     child: Text(title, style: const TextStyle(fontFamily: 'Poppins',
-        fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white)),
+        fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.textPrimary)),
   );
 
   Widget _card(Widget child) => Container(

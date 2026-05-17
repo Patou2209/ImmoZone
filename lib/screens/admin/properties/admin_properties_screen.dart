@@ -94,10 +94,11 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
               TabBar(
                 controller: _tabCtrl,
                 isScrollable: true,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white54,
-                indicatorColor: Colors.white,
-                labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12),
+                labelColor: const Color(0xFFFFA726),
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: const Color(0xFFFFA726),
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 12),
                 tabs: [
                   Tab(text: 'Tous (${_filtered('Tous').length})'),
                   Tab(text: 'En attente (${_filtered('En attente').length})'),

@@ -51,10 +51,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           if (i == 1) _loadPendingCount();
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppTheme.accentColor,
-        unselectedItemColor: AppTheme.textHint,
-        selectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 10),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 10),
+        selectedItemColor: const Color(0xFFFFA726),
+        unselectedItemColor: Colors.white60,
+        selectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 10),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: Colors.white60),
         backgroundColor: AppTheme.primaryColor,
         items: [
           const BottomNavigationBarItem(

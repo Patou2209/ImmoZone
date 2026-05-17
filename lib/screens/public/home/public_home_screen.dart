@@ -884,10 +884,10 @@ class _HomeTabState extends State<_HomeTab>
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: Column(children: [
-          // ── HEADER fixe ─────────────────────────────────────────────────
-          _buildHeader(context, filteredCount: filtered.length),
+          // ── TOP BAR seul reste fixe (logo + cloche + avatar) ─────────────
+          _buildTopBar(context),
 
-          // ── BODY scrollable ─────────────────────────────────────────────
+          // ── BODY entierement scrollable (hero + tabs + chips + search + liste)
           Expanded(
             child: RefreshIndicator(
               color: AppTheme.accentColor,
@@ -895,6 +895,9 @@ class _HomeTabState extends State<_HomeTab>
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(children: [
+                  // Hero + Tabs + Chips + Search (tout scrolle avec la liste)
+                  _buildScrollableHeader(context, filteredCount: filtered.length),
+
                   // Filtres avances
                   if (_filtersExpanded) _buildAdvancedFilters(),
 
@@ -956,16 +959,15 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context, {int filteredCount = 0}) {
+  // ── TOP BAR (fixe — ne scrolle pas) ─────────────────────────────────────
+  Widget _buildTopBar(BuildContext context) {
     return Column(children: [
-      // ══════════════════════════════════════════════════════════════
-      // PARTIE 1 : Top bar blanche (logo + cloche + avatar)
-      // ══════════════════════════════════════════════════════════════
+      // Barre blanche : logo + cloche + avatar/connexion
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(children: [
-          // Logo : icone maison bleue + texte "Immo" noir + "Zone" bleu
+          // Logo
           Row(children: [
             Container(
               width: 38, height: 38,
@@ -991,7 +993,7 @@ class _HomeTabState extends State<_HomeTab>
             ),
           ]),
           const Spacer(),
-          // Cloche notification dans cercle gris
+          // Cloche notification
           Stack(clipBehavior: Clip.none, children: [
             Container(
               width: 42, height: 42,
@@ -1015,7 +1017,7 @@ class _HomeTabState extends State<_HomeTab>
             ),
           ]),
           const SizedBox(width: 10),
-          // Avatar utilisateur (cercle gris avec initiales 2 lettres)
+          // Avatar / bouton Connexion
           Builder(builder: (ctx) {
             final auth = ctx.watch<AuthProvider>();
             if (auth.isLoggedIn) {
@@ -1066,23 +1068,28 @@ class _HomeTabState extends State<_HomeTab>
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const LoginScreen())),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text('Connexion',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
                         fontSize: 12, color: Colors.white)),
               ),
             );
           }),
         ]),
       ),
+      // Ombre portee sous la barre fixe
+      Container(height: 1, color: const Color(0xFFE4E8F0)),
+    ]);
+  }
 
-      // ══════════════════════════════════════════════════════════════
-      // PARTIE 2 : Hero section gradient bleu clair vers blanc
-      // ══════════════════════════════════════════════════════════════
+  // ── HEADER SCROLLABLE (hero + tabs + chips + search) ──────────────────────
+  Widget _buildScrollableHeader(BuildContext context, {int filteredCount = 0}) {
+    return Column(children: [
+      // ══ PARTIE 2 : Hero gradient ══════════════════════════════════════════
       Container(
         width: double.infinity,
         decoration: const BoxDecoration(
@@ -1092,7 +1099,7 @@ class _HomeTabState extends State<_HomeTab>
             end: Alignment.bottomCenter,
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
         child: Column(children: [
           const Text(
             'Trouvez Votre\nMaison de R\u00eave',
@@ -1100,12 +1107,12 @@ class _HomeTabState extends State<_HomeTab>
             style: TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w800,
-              fontSize: 30,
+              fontSize: 28,
               color: AppTheme.textPrimary,
               height: 1.15,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           const Text(
             'Des milliers de propri\u00e9t\u00e9s \u00e0 votre port\u00e9e',
             textAlign: TextAlign.center,
@@ -1116,19 +1123,19 @@ class _HomeTabState extends State<_HomeTab>
               color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           GestureDetector(
             onTap: () {},
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 34, vertical: 13),
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 11),
               decoration: BoxDecoration(
                 color: AppTheme.primaryColor,
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
                     color: AppTheme.primaryColor.withValues(alpha: 0.35),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -1143,23 +1150,21 @@ class _HomeTabState extends State<_HomeTab>
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
         ]),
       ),
 
-      // ══════════════════════════════════════════════════════════════
-      // PARTIE 3 : Tabs Location / Achat pill container
-      // ══════════════════════════════════════════════════════════════
+      // ══ PARTIE 3 : Tabs Location / Achat pill ════════════════════════════
       Container(
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
-          height: 50,
+          height: 46,
           decoration: BoxDecoration(
             color: const Color(0xFFEEF2FA),
             borderRadius: BorderRadius.circular(30),
           ),
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(3),
           child: TabBar(
             controller: _modeCtrl,
             indicator: BoxDecoration(
@@ -1178,9 +1183,9 @@ class _HomeTabState extends State<_HomeTab>
             labelColor: Colors.white,
             unselectedLabelColor: AppTheme.textSecondary,
             labelStyle: const TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700, fontSize: 14),
+                fontWeight: FontWeight.w600, fontSize: 13),
             unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w500, fontSize: 14),
+                fontWeight: FontWeight.w500, fontSize: 13),
             tabs: const [
               Tab(text: 'Location'),
               Tab(text: 'Achat'),
@@ -1189,14 +1194,12 @@ class _HomeTabState extends State<_HomeTab>
         ),
       ),
 
-      // ══════════════════════════════════════════════════════════════
-      // PARTIE 4 : Chips categories horizontales
-      // ══════════════════════════════════════════════════════════════
+      // ══ PARTIE 4 : Chips categories ══════════════════════════════════════
       Container(
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+        padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
         child: SizedBox(
-          height: 40,
+          height: 38,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1213,7 +1216,7 @@ class _HomeTabState extends State<_HomeTab>
                 }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                   decoration: BoxDecoration(
                     color: selected ? AppTheme.primaryColor : Colors.transparent,
                     borderRadius: BorderRadius.circular(30),
@@ -1225,7 +1228,7 @@ class _HomeTabState extends State<_HomeTab>
                   child: Text(cat,
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                         fontSize: 12,
                         color: selected ? Colors.white : AppTheme.textSecondary,
                       )),
@@ -1236,16 +1239,14 @@ class _HomeTabState extends State<_HomeTab>
         ),
       ),
 
-      // ══════════════════════════════════════════════════════════════
-      // PARTIE 5 : Barre recherche + filtres
-      // ══════════════════════════════════════════════════════════════
+      // ══ PARTIE 5 : Barre recherche + filtres ═════════════════════════════
       Container(
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
         child: Row(children: [
           Expanded(
             child: Container(
-              height: 46,
+              height: 44,
               decoration: BoxDecoration(
                 color: const Color(0xFFEEF2FA),
                 borderRadius: BorderRadius.circular(12),
@@ -1267,7 +1268,7 @@ class _HomeTabState extends State<_HomeTab>
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -1276,8 +1277,8 @@ class _HomeTabState extends State<_HomeTab>
           GestureDetector(
             onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
             child: Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 color: _filtersExpanded ? AppTheme.primaryColor : const Color(0xFFEEF2FA),
                 borderRadius: BorderRadius.circular(12),
@@ -1285,10 +1286,10 @@ class _HomeTabState extends State<_HomeTab>
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.tune_rounded,
                     color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
-                    size: 18),
-                const SizedBox(width: 5),
+                    size: 17),
+                const SizedBox(width: 4),
                 Text('Filtres',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
                         fontSize: 12,
                         color: _filtersExpanded ? Colors.white : AppTheme.textSecondary)),
               ]),
@@ -1297,12 +1298,16 @@ class _HomeTabState extends State<_HomeTab>
         ]),
       ),
 
-      // Divider bas header
+      // Ligne séparatrice
       const Divider(height: 1, color: Color(0xFFE4E8F0)),
     ]);
   }
 
-  // ── FILTRES AVANCES ────────────────────────────────────────────────────────
+  // ── ANCIENNE METHODE _buildHeader (supprimee — remplacee par _buildTopBar + _buildScrollableHeader)
+  // ignore: unused_element
+  Widget _buildHeader(BuildContext context, {int filteredCount = 0}) => const SizedBox.shrink();
+
+    // ── FILTRES AVANCES ────────────────────────────────────────────────────────
   Widget _buildAdvancedFilters() {
     // Listes dynamiques selon le pays sélectionné
     final provinces = AppConstants.getProvincesForCountry(_country);
