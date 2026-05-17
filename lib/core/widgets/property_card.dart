@@ -26,7 +26,7 @@ class PropertyCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -43,10 +43,10 @@ class PropertyCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(14)),
+                      const BorderRadius.vertical(top: Radius.circular(18)),
                   child: PropertyImage(
                     src: property.mainImage,
-                    height: 180,
+                    height: 130,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
@@ -129,7 +129,7 @@ class PropertyCard extends StatelessWidget {
                 if (property.isSold || property.isRented)
                   Positioned.fill(
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.42),
                         child: Center(
@@ -393,7 +393,7 @@ class PropertyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+        color: const Color(0xFFEFF1F5),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

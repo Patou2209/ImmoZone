@@ -108,31 +108,50 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       backgroundColor: AppTheme.backgroundColor,
       // Fixed AppBar — never transparent, never scrolls, photo starts BELOW it
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.textPrimary,
+        surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          'ImmoZone',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w800,
-            fontSize: 18,
-            color: AppTheme.accentColor,
-            letterSpacing: 0.5,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: const Icon(Icons.location_city_rounded,
+                  color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 7),
+            const Text(
+              'ImmoZone',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE9EBF0)),
         ),
         actions: [
           IconButton(
             icon: Icon(
               _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              color: _isFavorite ? Colors.redAccent : Colors.white,
+              color: _isFavorite ? Colors.redAccent : AppTheme.textSecondary,
             ),
             onPressed: _toggleFavorite,
             tooltip: 'Ajouter aux favoris',
           ),
           IconButton(
-            icon: const Icon(Icons.ios_share_rounded),
+            icon: const Icon(Icons.ios_share_rounded, color: AppTheme.textSecondary),
             onPressed: () => _shareProperty(p),
             tooltip: 'Partager',
           ),

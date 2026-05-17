@@ -1,45 +1,47 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // ═══════════════════════════════════════════════════
-  // Palette IZ Logo — Bleu Nuit & Or
-  // ═══════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // Palette ImmoZone — Bleu Royal & Blanc (maquette v1.2.21)
+  // ═══════════════════════════════════════════════════════════════════════
 
-  // Primary Colors — Bleu Nuit
-  static const Color primaryColor  = Color(0xFF20202F); // Bleu nuit profond (fond du logo)
-  static const Color primaryLight  = Color(0xFF2E2E45); // Bleu nuit moyen
-  static const Color primaryDark   = Color(0xFF14141F); // Bleu nuit très sombre
-  static const Color accentColor   = Color(0xFFC8A864); // Or (épingle & bordure logo)
-  static const Color secondaryColor= Color(0xFFD4B86A); // Or clair
+  // Primary — Bleu royal maquette
+  static const Color primaryColor   = Color(0xFF3568D4); // Bleu royal principal
+  static const Color primaryLight   = Color(0xFF4D7BE0); // Bleu royal clair
+  static const Color primaryDark    = Color(0xFF2355B8); // Bleu royal foncé
+  static const Color accentColor    = Color(0xFF3568D4); // Même bleu (ex-or remplacé)
+
+  // Couleur secondaire (vert Location badge)
+  static const Color successColor   = Color(0xFF47B56B); // Vert badge Location
+  static const Color secondaryColor = Color(0xFF47B56B);
 
   // Status Colors
-  static const Color successColor  = Color(0xFF2E7D32);
-  static const Color warningColor  = Color(0xFFF57F17);
-  static const Color errorColor    = Color(0xFFC62828);
-  static const Color infoColor     = Color(0xFFB08C50); // Or foncé info
+  static const Color warningColor   = Color(0xFFF57F17);
+  static const Color errorColor     = Color(0xFFC62828);
+  static const Color infoColor      = Color(0xFF3568D4);
 
-  // Neutral Colors
-  static const Color backgroundColor = Color(0xFFF4F3F0); // Crème chaud
+  // Surfaces / Backgrounds
+  static const Color backgroundColor = Color(0xFFF7F7F9); // Fond app très léger
   static const Color surfaceColor    = Colors.white;
   static const Color cardColor       = Colors.white;
-  static const Color dividerColor    = Color(0xFFE4E0D8); // Séparateur doré léger
+  static const Color dividerColor    = Color(0xFFE9EBF0);
 
-  // Text Colors
-  static const Color textPrimary   = Color(0xFF1A1A2E); // Bleu nuit (sur fond clair)
-  static const Color textSecondary = Color(0xFF6B6B7A);
-  static const Color textHint      = Color(0xFFABABB8);
-  static const Color textOnPrimary = Colors.white;
+  // Text
+  static const Color textPrimary    = Color(0xFF1F2430); // Charcoal foncé
+  static const Color textSecondary  = Color(0xFF6F7480); // Gris moyen
+  static const Color textHint       = Color(0xFFA0A5B0); // Gris clair
+  static const Color textOnPrimary  = Colors.white;
 
-  // Property Status Colors
+  // Property Status
   static const Color statusPending  = Color(0xFFF57F17);
-  static const Color statusActive   = Color(0xFF2E7D32);
-  static const Color statusSold     = Color(0xFF20202F); // Bleu nuit
-  static const Color statusRented   = Color(0xFFC8A864); // Or
+  static const Color statusActive   = Color(0xFF47B56B);
+  static const Color statusSold     = Color(0xFF3568D4);
+  static const Color statusRented   = Color(0xFF47B56B);
   static const Color statusRejected = Color(0xFFC62828);
 
-  // ═══════════════════════════════════════════════════
-  // Gradients helpers (usage : AppTheme.primaryGradient)
-  // ═══════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  // Gradients
+  // ═══════════════════════════════════════════════════════════════════════
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryDark, primaryLight],
     begin: Alignment.topLeft,
@@ -47,14 +49,14 @@ class AppTheme {
   );
 
   static const LinearGradient goldGradient = LinearGradient(
-    colors: [Color(0xFFD4B86A), Color(0xFFC8A864), Color(0xFFB08C50)],
+    colors: [Color(0xFF4D7BE0), Color(0xFF3568D4), Color(0xFF2355B8)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  // ═══════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   // Light Theme
-  // ═══════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -62,7 +64,7 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryColor,
         primary: primaryColor,
-        secondary: accentColor,
+        secondary: successColor,
         surface: surfaceColor,
         error: errorColor,
       ),
@@ -70,17 +72,17 @@ class AppTheme {
 
       // AppBar
       appBarTheme: const AppBarTheme(
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontFamily: 'Poppins',
           fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: textPrimary),
       ),
 
       // Card
@@ -89,7 +91,7 @@ class AppTheme {
         elevation: 2,
         shadowColor: Colors.black12,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
         ),
       ),
 
@@ -101,7 +103,7 @@ class AppTheme {
           elevation: 2,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
             fontFamily: 'Poppins',
@@ -118,7 +120,7 @@ class AppTheme {
           side: const BorderSide(color: primaryColor, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
             fontFamily: 'Poppins',
@@ -131,7 +133,7 @@ class AppTheme {
       // Text Button
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: accentColor,
+          foregroundColor: primaryColor,
           textStyle: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
@@ -143,22 +145,22 @@ class AppTheme {
       // Input Decoration
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: const Color(0xFFEFF1F5),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFE4E0D8)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: accentColor, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryColor, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: errorColor),
         ),
         hintStyle: const TextStyle(
@@ -176,8 +178,8 @@ class AppTheme {
       // Bottom Navigation Bar
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
-        selectedItemColor: accentColor,   // Or pour l'élément actif
-        unselectedItemColor: Color(0xFFABABB8),
+        selectedItemColor: primaryColor,
+        unselectedItemColor: Color(0xFF7A7F8C),
         elevation: 8,
         type: BottomNavigationBarType.fixed,
         selectedLabelStyle: TextStyle(
@@ -193,7 +195,7 @@ class AppTheme {
 
       // Chip
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFF20202F).withValues(alpha: 0.08),
+        backgroundColor: const Color(0xFFEFF1F5),
         selectedColor: primaryColor,
         labelStyle: const TextStyle(
           fontFamily: 'Poppins',
@@ -213,8 +215,9 @@ class AppTheme {
 
       // FloatingActionButton
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: accentColor,
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
+        elevation: 6,
       ),
 
       // Text Theme

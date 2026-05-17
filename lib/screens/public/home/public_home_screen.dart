@@ -295,62 +295,74 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
           ],
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: SizedBox(
+            height: 64,
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                _navItem(0, Icons.search_rounded, Icons.search_rounded, 'Recherche'),
-                _navItem(1, Icons.favorite_border_rounded, Icons.favorite_rounded, 'Favoris'),
-                // Bouton publier central
-                GestureDetector(
-                  onTap: () => _openPublish(context, auth),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.6), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(color: AppTheme.accentColor.withValues(alpha: 0.25),
-                            blurRadius: 8, offset: const Offset(0, 3)),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
+                // Nav items row
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Icon(Icons.add_circle_outline_rounded,
-                            color: AppTheme.accentColor, size: 18),
-                        SizedBox(width: 6),
-                        Text('Publier',
-                            style: TextStyle(
-                              fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                              fontSize: 13, color: Colors.white,
-                            )),
+                        _navItem(0, Icons.search_rounded, Icons.search_rounded, 'Recherche'),
+                        _navItem(1, Icons.favorite_border_rounded, Icons.favorite_rounded, 'Favoris'),
+                        // Spacer for FAB center
+                        const SizedBox(width: 64),
+                        // Alertes
+                        _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
+                        // Contact
+                        GestureDetector(
+                          onTap: _openContactSheet,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.chat_rounded,
+                                    color: AppTheme.textHint, size: 22),
+                                const SizedBox(height: 2),
+                                const Text('Contact',
+                                    style: TextStyle(
+                                      fontSize: 9, fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w500,
+                                      color: AppTheme.textHint,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-                // Alertes (anciennement Offres)
-                _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
-                // Contact (BottomSheet : WhatsApp + Appel + Email)
-                GestureDetector(
-                  onTap: _openContactSheet,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    child: const Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.chat_rounded,
-                            color: AppTheme.textHint, size: 22),
-                        SizedBox(height: 2),
-                        Text('Contact',
-                            style: TextStyle(
-                              fontSize: 9, fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textHint,
-                            )),
-                      ],
+                // FAB circle Publier — floating above nav bar
+                Positioned(
+                  top: -20,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () => _openPublish(context, auth),
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.40),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white, size: 30),
+                      ),
                     ),
                   ),
                 ),
@@ -377,13 +389,14 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Icon(
                   isSelected ? activeIcon : icon,
-                  color: isSelected ? AppTheme.accentColor : AppTheme.textHint,
+                  color: isSelected ? AppTheme.primaryColor : AppTheme.textHint,
                   size: 22,
                 ),
                 if (badge > 0)
@@ -406,7 +419,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                 style: TextStyle(
                   fontSize: 9, fontFamily: 'Poppins',
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? AppTheme.accentColor : AppTheme.textHint,
+                  color: isSelected ? AppTheme.primaryColor : AppTheme.textHint,
                 )),
           ],
         ),
@@ -529,17 +542,23 @@ class _AlertsTabState extends State<_AlertsTab> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
         title: const Text('Notifications',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                color: Colors.white)),
+                color: AppTheme.textPrimary)),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
             onPressed: _load,
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: const Color(0xFFE9EBF0)),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -939,25 +958,66 @@ class _HomeTabState extends State<_HomeTab>
   // ── HEADER ─────────────────────────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, {int filteredCount = 0}) {
     return Container(
-      color: AppTheme.primaryColor,
+      color: Colors.white,
       child: Column(children: [
-        // Logo + bouton connexion
+        // ── Top bar: Logo + actions ──────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(children: [
-            // Logo
-            Image.asset('assets/images/app_logo.png', height: 36,
-                errorBuilder: (_, __, ___) => const Text('ImmoZone',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w900,
-                        fontSize: 18, color: AppTheme.accentColor))),
+            // Logo icon + text
+            Row(children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.location_city_rounded,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 8),
+              const Text('ImmoZone',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    color: AppTheme.textPrimary,
+                  )),
+            ]),
             const Spacer(),
-            // Connexion
+            // Notification bell
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF1F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.notifications_none_rounded,
+                      color: AppTheme.textPrimary, size: 22),
+                ),
+                // Blue dot badge
+                Positioned(
+                  top: 6, right: 6,
+                  child: Container(
+                    width: 8, height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            // User avatar / connexion
             Builder(builder: (ctx) {
               final auth = ctx.watch<AuthProvider>();
               if (auth.isLoggedIn) {
                 return GestureDetector(
                   onTap: () {
-                    // L'admin est redirigé vers son panneau, jamais vers le dashboard utilisateur
                     if (auth.isAdmin) {
                       Navigator.pushAndRemoveUntil(
                         context,
@@ -969,40 +1029,34 @@ class _HomeTabState extends State<_HomeTab>
                           MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
                     }
                   },
-                  child: auth.isAdmin
-                    // Badge spécial admin — icône bouclier, libellé "Admin"
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppTheme.accentColor, width: 1.5),
-                        ),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.admin_panel_settings_rounded,
-                              color: AppTheme.accentColor, size: 16),
-                          SizedBox(width: 6),
-                          Text('Admin Panel',
-                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                                  fontSize: 12, color: AppTheme.accentColor)),
-                        ]),
-                      )
-                    // Bouton Mon compte standard pour les utilisateurs normaux
-                    : Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.person_rounded, color: AppTheme.accentColor, size: 16),
-                          const SizedBox(width: 6),
-                          Text(auth.currentUser?.name.split(' ').first ?? '',
-                              style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                                  fontSize: 12, color: AppTheme.accentColor)),
-                        ]),
-                      ),
+                  child: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: auth.isAdmin
+                          ? AppTheme.primaryColor.withValues(alpha: 0.15)
+                          : const Color(0xFFEFF1F5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: auth.isAdmin
+                          ? Border.all(color: AppTheme.primaryColor, width: 1.5)
+                          : null,
+                    ),
+                    child: Center(
+                      child: auth.isAdmin
+                          ? const Icon(Icons.admin_panel_settings_rounded,
+                              color: AppTheme.primaryColor, size: 20)
+                          : Text(
+                              (auth.currentUser?.name.isNotEmpty == true
+                                  ? auth.currentUser!.name[0].toUpperCase()
+                                  : 'U'),
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                    ),
+                  ),
                 );
               }
               return GestureDetector(
@@ -1011,38 +1065,79 @@ class _HomeTabState extends State<_HomeTab>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
+                    color: AppTheme.primaryColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text('Se connecter',
+                  child: const Text('Connexion',
                       style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                          fontSize: 12, color: AppTheme.primaryColor)),
+                          fontSize: 12, color: Colors.white)),
                 ),
               );
             }),
           ]),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        // Tabs Location / Achat
+        // ── Greeting section ────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Builder(builder: (ctx) {
+              final auth = ctx.watch<AuthProvider>();
+              final firstName = auth.isLoggedIn
+                  ? auth.currentUser?.name.split(' ').first ?? 'Bonjour'
+                  : 'Bonjour';
+              return Text('$firstName !',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: AppTheme.textSecondary,
+                  ));
+            }),
+            const SizedBox(height: 2),
+            const Text(
+              'Trouvez Votre Maison de Rêve',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                color: AppTheme.textPrimary,
+                height: 1.2,
+              ),
+            ),
+          ]),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── Segmented tabs Location / Achat ─────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.primaryDark,
+              color: const Color(0xFFEFF1F5),
               borderRadius: BorderRadius.circular(12),
             ),
+            padding: const EdgeInsets.all(4),
             child: TabBar(
               controller: _modeCtrl,
               indicator: BoxDecoration(
-                color: AppTheme.accentColor,
-                borderRadius: BorderRadius.circular(10),
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              labelColor: AppTheme.primaryColor,
-              unselectedLabelColor: Colors.white60,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppTheme.textSecondary,
               labelStyle: const TextStyle(fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
@@ -1057,16 +1152,16 @@ class _HomeTabState extends State<_HomeTab>
 
         const SizedBox(height: 12),
 
-        // Barre de recherche + favoris
+        // ── Barre de recherche + filtres ─────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
             Expanded(
               child: Container(
-                height: 44,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFEFF1F5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
                   onChanged: (v) => setState(() {
@@ -1076,22 +1171,22 @@ class _HomeTabState extends State<_HomeTab>
                   }),
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                       color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Rechercher (maison, quartier...)',
-                    hintStyle: const TextStyle(fontFamily: 'Poppins',
+                    hintStyle: TextStyle(fontFamily: 'Poppins',
                         fontSize: 12, color: AppTheme.textHint),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        color: AppTheme.accentColor, size: 20),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: AppTheme.textHint, size: 20),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Icone favoris cote de la recherche
+            const SizedBox(width: 10),
+            // Favoris
             GestureDetector(
               onTap: () {
                 final parent = context.findAncestorStateOfType<_PublicHomeScreenState>();
@@ -1100,21 +1195,21 @@ class _HomeTabState extends State<_HomeTab>
                 }
               },
               child: Container(
-                height: 44,
-                width: 44,
+                height: 46,
+                width: 46,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFEFF1F5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Stack(
                   children: [
                     const Center(
                       child: Icon(Icons.favorite_border_rounded,
-                          color: AppTheme.accentColor, size: 20),
+                          color: AppTheme.textSecondary, size: 22),
                     ),
                     if (_favorites.isNotEmpty)
                       Positioned(
-                        right: 6, top: 6,
+                        right: 8, top: 8,
                         child: Container(
                           width: 8, height: 8,
                           decoration: const BoxDecoration(
@@ -1127,45 +1222,26 @@ class _HomeTabState extends State<_HomeTab>
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Bouton filtres avec nombre de r\u00e9sultats
+            const SizedBox(width: 10),
+            // Bouton filtres
             GestureDetector(
               onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
               child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: _filtersExpanded ? AppTheme.accentColor : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  color: _filtersExpanded ? AppTheme.primaryColor : const Color(0xFFEFF1F5),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.tune_rounded,
-                      color: _filtersExpanded ? AppTheme.primaryColor : AppTheme.accentColor,
+                      color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
                       size: 18),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   Text('Filtres',
                       style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                           fontSize: 12,
-                          color: _filtersExpanded ? AppTheme.primaryColor : AppTheme.accentColor)),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _filtersExpanded
-                          ? AppTheme.primaryColor.withValues(alpha: 0.2)
-                          : AppTheme.accentColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$filteredCount',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11,
-                        color: _filtersExpanded ? AppTheme.primaryColor : AppTheme.accentColor,
-                      ),
-                    ),
-                  ),
+                          color: _filtersExpanded ? Colors.white : AppTheme.textSecondary)),
                 ]),
               ),
             ),
@@ -1174,7 +1250,7 @@ class _HomeTabState extends State<_HomeTab>
 
         const SizedBox(height: 12),
 
-        // Categories horizontales
+        // ── Categories horizontales ──────────────────────────────────────────
         SizedBox(
           height: 38,
           child: ListView.separated(
@@ -1188,25 +1264,22 @@ class _HomeTabState extends State<_HomeTab>
               return GestureDetector(
                 onTap: () => setState(() {
                   _selectedCategory = cat;
-                  _resetFilters(clearSearch: false); // garde le texte de recherche
+                  _resetFilters(clearSearch: false);
                   _displayCount = 4;
                 }),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: selected ? AppTheme.accentColor : Colors.white.withValues(alpha: 0.12),
+                    color: selected ? AppTheme.primaryColor : const Color(0xFFEFF1F5),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: selected ? AppTheme.accentColor : Colors.white30,
-                    ),
                   ),
                   child: Text(cat,
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                         fontSize: 12,
-                        color: selected ? AppTheme.primaryColor : Colors.white,
+                        color: selected ? Colors.white : AppTheme.textSecondary,
                       )),
                 ),
               );
@@ -1214,7 +1287,9 @@ class _HomeTabState extends State<_HomeTab>
           ),
         ),
 
+        // Divider séparateur du header
         const SizedBox(height: 12),
+        const Divider(height: 1, color: Color(0xFFE9EBF0)),
       ]),
     );
   }
