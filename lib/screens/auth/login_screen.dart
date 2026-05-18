@@ -72,49 +72,29 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 32),
 
-              // ── Logo ImmoZone ────────────────────────────────────────
+              // ── Logo officiel ImmoZone (fond blanc) ─────────────────
               Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.accentColor.withValues(alpha: 0.30),
-                      blurRadius: 22,
-                      offset: const Offset(0, 8),
-                    )
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset(
-                    'assets/images/app_logo.png',
-                    fit: BoxFit.contain,
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Image.asset(
+                  'assets/images/immozone_logo.png',
+                  width: 220,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => RichText(
+                    text: const TextSpan(
+                      style: TextStyle(fontFamily: 'Poppins',
+                          fontSize: 30, fontWeight: FontWeight.w800),
+                      children: [
+                        TextSpan(text: 'Immo',
+                            style: TextStyle(color: AppTheme.primaryColor)),
+                        TextSpan(text: 'Zone',
+                            style: TextStyle(color: AppTheme.accentColor)),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // ── Titre ────────────────────────────────────────────────
-              const Text(
-                'ImmoZone',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.accentColor,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              const Text(
-                'Votre partenaire immobilier',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.textSecondary,
-                  fontFamily: 'Poppins',
-                ),
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               // ── Formulaire ───────────────────────────────────────────
               Container(

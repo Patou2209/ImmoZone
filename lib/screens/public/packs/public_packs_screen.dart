@@ -138,20 +138,35 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                       ],
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Image.asset('assets/images/app_logo.png', height: 40,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.home_work_rounded,
-                                color: AppTheme.accentColor, size: 40)),
-                        const SizedBox(width: 12),
-                        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('ImmoZone',
-                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                                  fontSize: 20, color: Colors.white)),
-                          Text('Plateforme immobiliere N°1 en RDC',
-                              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                                  color: Colors.white60)),
-                        ]),
-                      ]),
+                      // Logo sur fond blanc pour lisibilité sur fond bleu
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Image.asset(
+                          'assets/images/immozone_logo.png',
+                          height: 36,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => RichText(
+                            text: const TextSpan(
+                              style: TextStyle(fontFamily: 'Poppins',
+                                  fontSize: 18, fontWeight: FontWeight.w800),
+                              children: [
+                                TextSpan(text: 'Immo',
+                                    style: TextStyle(color: AppTheme.primaryColor)),
+                                TextSpan(text: 'Zone',
+                                    style: TextStyle(color: AppTheme.accentColor)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Plateforme immobiliere N°1 en RDC',
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                              color: Colors.white70)),
                       const SizedBox(height: 16),
                       const Text(
                         'Publiez vos biens immobiliers et touchez des milliers d\'acheteurs et locataires potentiels.',

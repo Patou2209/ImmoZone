@@ -113,29 +113,23 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(7),
-              ),
-              child: const Icon(Icons.location_city_rounded,
-                  color: Colors.white, size: 16),
+        title: Image.asset(
+          'assets/images/immozone_logo.png',
+          height: 32,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => RichText(
+            text: const TextSpan(
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 17),
+              children: [
+                TextSpan(text: 'Immo',
+                    style: TextStyle(fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary)),
+                TextSpan(text: 'Zone',
+                    style: TextStyle(fontWeight: FontWeight.w800,
+                        color: AppTheme.primaryColor)),
+              ],
             ),
-            const SizedBox(width: 7),
-            const Text(
-              'ImmoZone',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-          ],
+          ),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),

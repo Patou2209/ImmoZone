@@ -107,141 +107,68 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryColor,
-      body: Stack(
-        children: [
-          // Fond dégradé bleu nuit
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryDark, AppTheme.primaryColor, AppTheme.primaryLight],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-          // Bordure dorée subtile en haut
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: Container(height: 3, color: AppTheme.accentColor),
-          ),
-          // Contenu centré
-          Center(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: ScaleTransition(
-                scale: _scaleAnim,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // ── Logo IZ (image réelle) ──────────────────────
-                    Container(
-                      width: 140,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        border: Border.all(
-                          color: AppTheme.accentColor,
-                          width: 2.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.accentColor.withValues(alpha: 0.35),
-                            blurRadius: 40,
-                            offset: const Offset(0, 12),
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
-                            blurRadius: 30,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Image.asset(
-                          'assets/images/app_logo.png',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: AppTheme.primaryColor,
-                            child: const Icon(
-                              Icons.home_work,
-                              size: 70,
-                              color: AppTheme.accentColor,
-                            ),
-                          ),
+      backgroundColor: Colors.white,
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // ── Logo officiel ImmoZone sur fond blanc ───────────
+                Image.asset(
+                  'assets/images/immozone_logo.png',
+                  width: 260,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.home_work_rounded,
+                          size: 80, color: AppTheme.primaryColor),
+                      const SizedBox(height: 12),
+                      RichText(
+                        text: const TextSpan(
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontSize: 36, fontWeight: FontWeight.w800),
+                          children: [
+                            TextSpan(text: 'Immo',
+                                style: TextStyle(color: AppTheme.primaryColor)),
+                            TextSpan(text: 'Zone',
+                                style: TextStyle(color: AppTheme.accentColor)),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // ── Nom app ────────────────────────────────────
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins',
-                          letterSpacing: 1.5,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: 'Immo',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          TextSpan(
-                            text: 'Zone',
-                            style: TextStyle(color: AppTheme.accentColor),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // ── Slogan ─────────────────────────────────────
-                    const Text(
-                      'Votre partenaire immobilier',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white60,
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 70),
-
-                    // ── Indicateur de chargement doré ──────────────
-                    SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: CircularProgressIndicator(
-                        color: AppTheme.accentColor,
-                        strokeWidth: 2.5,
-                        backgroundColor: AppTheme.accentColor.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Chargement...',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white38,
-                        fontFamily: 'Poppins',
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 64),
+
+                // ── Spinner sur fond blanc ──────────────────────────
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryColor,
+                    strokeWidth: 2.5,
+                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Chargement...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textHint,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
-          // Bordure dorée subtile en bas
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(height: 3, color: AppTheme.accentColor),
-          ),
-        ],
+        ),
       ),
     );
   }

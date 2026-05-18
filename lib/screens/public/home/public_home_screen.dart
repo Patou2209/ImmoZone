@@ -967,18 +967,12 @@ class _HomeTabState extends State<_HomeTab>
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(children: [
-          // Logo
-          Row(children: [
-            Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
-            ),
-            const SizedBox(width: 8),
-            RichText(
+          // Logo officiel ImmoZone
+          Image.asset(
+            'assets/images/immozone_logo.png',
+            height: 38,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => RichText(
               text: const TextSpan(
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 20),
                 children: [
@@ -991,7 +985,7 @@ class _HomeTabState extends State<_HomeTab>
                 ],
               ),
             ),
-          ]),
+          ),
           const Spacer(),
           // Cloche notification
           Stack(clipBehavior: Clip.none, children: [
