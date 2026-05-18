@@ -115,7 +115,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         centerTitle: true,
         title: Image.asset(
           'assets/images/immozone_logo.png',
-          height: 32,
+          height: 44,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => RichText(
             text: const TextSpan(
@@ -425,6 +425,40 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
             ],
 
+            // ── Description (juste après le message officiel) ─────────────────
+            if (p.description.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Description',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Poppins',
+                          color: AppTheme.textPrimary)),
+                  const SizedBox(height: 10),
+                  Text(p.description,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                          fontFamily: 'Poppins',
+                          height: 1.7)),
+                ]),
+              ),
+            ],
+
             // Main info card
             const SizedBox(height: 16),
             Container(
@@ -651,66 +685,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               : 'Oui'),
                   ],
                 ),
-              ]),
-            ),
-            const SizedBox(height: 12),
 
-            // Description
-            if (p.description.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2))
-                  ],
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Description',
+                // ── Équipements & Services déclarés par l'annonceur ──────────
+                if (p.amenities.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  const SizedBox(height: 14),
+                  const Text('Équipements & Services',
                       style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                           fontFamily: 'Poppins',
                           color: AppTheme.textPrimary)),
                   const SizedBox(height: 10),
-                  Text(p.description,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                          fontFamily: 'Poppins',
-                          height: 1.7)),
-                ]),
-              ),
-
-            // Equipements
-            if (p.amenities.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2))
-                  ],
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Equipements & Services',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          fontFamily: 'Poppins',
-                          color: AppTheme.textPrimary)),
-                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -738,9 +725,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ))
                         .toList(),
                   ),
-                ]),
-              ),
-            ],
+                ],
+              ]),
+            ),
 
             // Annonceur + contact buttons
             const SizedBox(height: 12),

@@ -970,7 +970,7 @@ class _HomeTabState extends State<_HomeTab>
           // Logo officiel ImmoZone
           Image.asset(
             'assets/images/immozone_logo.png',
-            height: 38,
+            height: 52,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => RichText(
               text: const TextSpan(
