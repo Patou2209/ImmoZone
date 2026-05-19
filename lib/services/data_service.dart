@@ -475,6 +475,17 @@ class DataService {
     });
   }
 
+  /// Incrémente atomiquement le compteur de vues d'une annonce.
+  Future<void> incrementPropertyViews(String propertyId) async {
+    try {
+      await _propertiesCol.doc(propertyId).update({
+        'views': FieldValue.increment(1),
+      });
+    } catch (_) {
+      // Silencieux si l'annonce n'existe plus
+    }
+  }
+
   Future<void> markPropertySoldOrRented(String id,
       {bool sold = false, bool rented = false}) async {
     await _propertiesCol.doc(id).update({
@@ -636,6 +647,10 @@ class DataService {
 
   Future<void> markNotificationRead(String notifId) async {
     await _notificationsCol.doc(notifId).update({'isRead': true});
+  }
+
+  Future<void> deleteNotification(String notifId) async {
+    await _notificationsCol.doc(notifId).delete();
   }
 
   Future<void> markAllNotificationsRead(String userId) async {

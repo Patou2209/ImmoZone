@@ -35,6 +35,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     _checkFavorite();
     _loadOfficialMessage();
     _loadOwnerSince();
+    // Incrémenter le compteur de vues à chaque ouverture de l'annonce
+    _ds.incrementPropertyViews(widget.property.id);
   }
 
   Future<void> _loadOwnerSince() async {

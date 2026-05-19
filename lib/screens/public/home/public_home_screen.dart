@@ -596,48 +596,87 @@ class _AlertsTabState extends State<_AlertsTab> {
                   itemBuilder: (_, i) {
                     final n = _notifications[i];
                     final color = _colorForType(n.type);
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: color.withValues(alpha: 0.25)),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 6, offset: const Offset(0, 2)),
-                        ],
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        leading: Container(
-                          width: 42, height: 42,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.10),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(_iconForType(n.type), color: color, size: 22),
+                    return Dismissible(
+                      key: Key(n.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        title: Text(n.title,
-                            style: TextStyle(
-                                fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                                fontSize: 13, color: color)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const SizedBox(height: 4),
-                            Text(n.body,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins', fontSize: 12,
-                                    color: AppTheme.textSecondary, height: 1.4)),
-                            const SizedBox(height: 6),
-                            Text(_timeAgo(n.createdAt),
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins', fontSize: 10,
-                                    color: AppTheme.textHint)),
+                            Icon(Icons.delete_rounded, color: Colors.white, size: 24),
+                            SizedBox(height: 4),
+                            Text('Supprimer',
+                                style: TextStyle(fontFamily: 'Poppins',
+                                    fontSize: 11, color: Colors.white,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
-                        isThreeLine: true,
+                      ),
+                      onDismissed: (_) async {
+                        final removed = _notifications[i];
+                        setState(() => _notifications.removeAt(i));
+                        await _ds.deleteNotification(removed.id);
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: color.withValues(alpha: 0.25)),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 6, offset: const Offset(0, 2)),
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                          leading: Container(
+                            width: 42, height: 42,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.10),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(_iconForType(n.type), color: color, size: 22),
+                          ),
+                          title: Text(n.title,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                                  fontSize: 13, color: color)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(n.body,
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins', fontSize: 12,
+                                      color: AppTheme.textSecondary, height: 1.4)),
+                              const SizedBox(height: 6),
+                              Text(_timeAgo(n.createdAt),
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins', fontSize: 10,
+                                      color: AppTheme.textHint)),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          // Bouton X de suppression explicite
+                          trailing: IconButton(
+                            icon: Icon(Icons.close_rounded,
+                                size: 18, color: AppTheme.textHint.withValues(alpha: 0.6)),
+                            tooltip: 'Supprimer cette notification',
+                            onPressed: () async {
+                              final removed = _notifications[i];
+                              setState(() => _notifications.removeAt(i));
+                              await _ds.deleteNotification(removed.id);
+                            },
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -2156,13 +2195,14 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentColor.withValues(alpha: 0.2),
+                            color: Colors.white.withValues(alpha: 0.20),
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1),
                           ),
                           child: Text(user?.role ?? '',
                               style: const TextStyle(fontFamily: 'Poppins',
                                   fontSize: 10, fontWeight: FontWeight.w700,
-                                  color: AppTheme.accentColor)),
+                                  color: Colors.white)),
                         ),
                       ])),
                     ]),
@@ -2299,7 +2339,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
       statusIcon  = Icons.cancel_rounded;
     } else {
       statusColor = AppTheme.statusActive;
-      statusLabel = 'Actif';
+      statusLabel = 'Disponible';
       statusIcon  = Icons.check_circle_outline_rounded;
     }
 

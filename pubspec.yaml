@@ -1,7 +1,7 @@
 name: immo_zone
 description: ImmoZone - Application immobilière avec partie Administrative et Publique
 publish_to: 'none'
-version: 1.2.30+46
+version: 1.2.31+47
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
