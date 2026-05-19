@@ -1026,30 +1026,6 @@ class _HomeTabState extends State<_HomeTab>
             ),
           ),
           const Spacer(),
-          // Cloche notification
-          Stack(clipBehavior: Clip.none, children: [
-            Container(
-              width: 42, height: 42,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEEF2FA),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.notifications_none_rounded,
-                  color: AppTheme.textPrimary, size: 22),
-            ),
-            Positioned(
-              top: 7, right: 8,
-              child: Container(
-                width: 9, height: 9,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-              ),
-            ),
-          ]),
-          const SizedBox(width: 10),
           // Avatar / bouton Connexion
           Builder(builder: (ctx) {
             final auth = ctx.watch<AuthProvider>();
@@ -2093,7 +2069,8 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Mon Tableau de Bord',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                color: Color(0xFFFFA726))),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -2131,16 +2108,16 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                       Container(
                         width: 54, height: 54,
                         decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.2),
+                          color: const Color(0xFFFFA726).withValues(alpha: 0.25),
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppTheme.accentColor, width: 1.5),
+                          border: Border.all(color: const Color(0xFFFFA726), width: 2),
                         ),
                         child: Center(
                           child: Text(
                             user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
                             style: const TextStyle(fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w800, fontSize: 20,
-                                color: AppTheme.accentColor),
+                                color: Color(0xFFFFA726)),
                           ),
                         ),
                       ),
