@@ -1436,50 +1436,84 @@ class _HomeTabState extends State<_HomeTab>
           ]),
         ],
 
-        // Prix — dropdowns (min Location seulement, max toujours)
+        // Prix — dropdowns adapt\u00e9s au mode Location / Achat
         const SizedBox(height: 12),
-        const Text('Prix (USD)', style: TextStyle(fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
-        const SizedBox(height: 8),
-        Row(children: [
-          if (_activeMode == 'Location') ...[
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Min', style: TextStyle(fontFamily: 'Poppins',
-                  fontSize: 11, color: AppTheme.textSecondary)),
-              const SizedBox(height: 4),
-              _dropFilter(
-                value: _minPrice == null ? "N'importe" : _formatPriceLabel(_minPrice!),
-                items: const [
-                  "N'importe", '50 \$', '100 \$', '300 \$', '500 \$',
-                  '1 000 \$', '1 500 \$', '2 500 \$', '5 000 \$',
-                  '7 500 \$', '10 000 \$',
-                ],
-                onChanged: (v) => setState(() {
-                  _minPrice = _parsePriceLabel(v);
-                  _displayCount = 4;
-                }),
+        Builder(builder: (ctx) {
+          // Taux de conversion USD → monnaie locale selon pays s\u00e9lectionn\u00e9
+          final localCurrencyInfo = _getLocalCurrencyInfo(_country);
+          final showConversion = localCurrencyInfo != null;
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Text('Prix', style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A3A8F).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('USD', style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0A3A8F))),
               ),
-            ])),
-            const SizedBox(width: 12),
-          ],
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Max', style: TextStyle(fontFamily: 'Poppins',
-                fontSize: 11, color: AppTheme.textSecondary)),
-            const SizedBox(height: 4),
-            _dropFilter(
-              value: _maxPrice == null ? "N'importe" : _formatPriceLabel(_maxPrice!),
-              items: const [
-                "N'importe", '50 \$', '100 \$', '300 \$', '500 \$',
-                '1 000 \$', '1 500 \$', '2 500 \$', '5 000 \$',
-                '7 500 \$', '10 000 \$', '15 000 \$', '20 000 \$',
+              if (showConversion) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFA726).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text('≈ ${localCurrencyInfo['code']}',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFFFA726))),
+                ),
               ],
-              onChanged: (v) => setState(() {
-                _maxPrice = _parsePriceLabel(v);
-                _displayCount = 4;
-              }),
-            ),
-          ])),
-        ]),
+            ]),
+            if (showConversion) ...[
+              const SizedBox(height: 3),
+              Text('1 USD ≈ ${_formatLocalAmount(1, localCurrencyInfo)} ${localCurrencyInfo['code']}',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                      color: Color(0xFFFFA726), fontStyle: FontStyle.italic)),
+            ],
+            const SizedBox(height: 8),
+            Row(children: [
+              // Min — toujours affich\u00e9 (Location et Achat)
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Min', style: TextStyle(fontFamily: 'Poppins',
+                    fontSize: 11, color: AppTheme.textSecondary)),
+                const SizedBox(height: 4),
+                _dropFilter(
+                  value: _minPrice == null ? "N'importe" : _formatPriceLabelFull(_minPrice!, localCurrencyInfo),
+                  items: _activeMode == 'Location'
+                    ? _buildPriceItems(_priceListLocation, localCurrencyInfo)
+                    : _buildPriceItems(_priceListAchat, localCurrencyInfo),
+                  onChanged: (v) => setState(() {
+                    _minPrice = _parsePriceLabel(v);
+                    _displayCount = 4;
+                  }),
+                ),
+              ])),
+              const SizedBox(width: 12),
+              // Max
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Max', style: TextStyle(fontFamily: 'Poppins',
+                    fontSize: 11, color: AppTheme.textSecondary)),
+                const SizedBox(height: 4),
+                _dropFilter(
+                  value: _maxPrice == null ? "N'importe" : _formatPriceLabelFull(_maxPrice!, localCurrencyInfo),
+                  items: _activeMode == 'Location'
+                    ? _buildPriceItems(_priceListLocationMax, localCurrencyInfo)
+                    : _buildPriceItems(_priceListAchatMax, localCurrencyInfo),
+                  onChanged: (v) => setState(() {
+                    _maxPrice = _parsePriceLabel(v);
+                    _displayCount = 4;
+                  }),
+                ),
+              ])),
+            ]),
+          ]);
+        }),
 
         // Équipements / Options — masqués pour les cat. sans ces caract\u00e9ristiques
         Builder(builder: (ctx) {
@@ -1631,9 +1665,79 @@ class _HomeTabState extends State<_HomeTab>
 
   double? _parsePriceLabel(String? label) {
     if (label == null || label == "N'importe") return null;
-    // Supprimer le symbole $ et les espaces, parser le nombre
-    final cleaned = label.replaceAll('\$', '').replaceAll(' ', '').replaceAll('\u00a0', '');
+    // Supprimer le symbole $, la partie locale "≈ ..." et les espaces
+    final dollarPart = label.split('≈').first;
+    final cleaned = dollarPart.replaceAll('\$', '').replaceAll(' ', '').replaceAll('\u00a0', '');
     return double.tryParse(cleaned);
+  }
+
+  // ── Listes de prix par mode ────────────────────────────────────────────────
+  // Location (loyer mensuel / nuit en USD)
+  static const List<double> _priceListLocation    = [50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 2500];
+  static const List<double> _priceListLocationMax = [50, 100, 200, 300, 500, 750, 1000, 1500, 2000, 2500, 5000, 7500, 10000];
+
+  // Achat (vente immobili\u00e8re RDC — march\u00e9 r\u00e9el)
+  static const List<double> _priceListAchat = [
+    5000, 8000, 10000, 15000, 20000, 25000, 30000,
+    40000, 50000, 75000, 100000, 150000, 200000, 250000, 300000,
+  ];
+  static const List<double> _priceListAchatMax = [
+    5000, 8000, 10000, 15000, 20000, 25000, 30000,
+    40000, 50000, 75000, 100000, 150000, 200000, 250000, 300000,
+    400000, 500000, 750000, 1000000,
+  ];
+
+  // Formate un montant USD pour l'affichage dans le dropdown (avec \u00e9quivalent local si dispo)
+  String _formatPriceLabelFull(double v, Map<String, dynamic>? localCurrencyInfo) {
+    final usdLabel = _formatPriceLabel(v);
+    if (localCurrencyInfo == null) return usdLabel;
+    final localStr = _formatLocalAmount(v, localCurrencyInfo);
+    return '$usdLabel ≈ $localStr ${localCurrencyInfo['code']}';
+  }
+
+  // Construit la liste compl\u00e8te des items pour un dropdown (N'importe + chaque prix)
+  List<String> _buildPriceItems(List<double> prices, Map<String, dynamic>? localCurrencyInfo) {
+    return [
+      "N'importe",
+      ...prices.map((p) => _formatPriceLabelFull(p, localCurrencyInfo)),
+    ];
+  }
+
+  // ── Conversion USD → monnaie locale ──────────────────────────────────────
+  // Retourne null si le pays s\u00e9lectionn\u00e9 est la RDC (affichage USD uniquement)
+  Map<String, dynamic>? _getLocalCurrencyInfo(String country) {
+    const Map<String, Map<String, dynamic>> currencyMap = {
+      'Congo (Brazzaville)': {'code': 'FCFA', 'rate': 655.0,   'decimals': 0},
+      'Angola':              {'code': 'AOA',  'rate': 900.0,   'decimals': 0},
+      'Rwanda':              {'code': 'RWF',  'rate': 1300.0,  'decimals': 0},
+      'Burundi':             {'code': 'BIF',  'rate': 2850.0,  'decimals': 0},
+      'Tanzanie':            {'code': 'TZS',  'rate': 2500.0,  'decimals': 0},
+      'Zambie':              {'code': 'ZMW',  'rate': 27.0,    'decimals': 2},
+      'Autre':               {'code': 'USD',  'rate': 1.0,     'decimals': 2},
+    };
+    if (country == AppConstants.defaultCountry || country.isEmpty) return null;
+    return currencyMap[country]; // null si pays non trouv\u00e9 (affiche USD seulement)
+  }
+
+  // Formate un montant converti en monnaie locale
+  String _formatLocalAmount(double usdAmount, Map<String, dynamic> info) {
+    final rate = (info['rate'] as double);
+    final decimals = (info['decimals'] as int);
+    final converted = usdAmount * rate;
+    if (decimals == 0) {
+      // Formater avec s\u00e9parateurs de milliers
+      final intVal = converted.round();
+      if (intVal >= 1000000) {
+        return '${(intVal / 1000000).toStringAsFixed(1).replaceAll('.0', '')}M';
+      }
+      if (intVal >= 1000) {
+        final k = intVal ~/ 1000;
+        final rem = intVal % 1000;
+        return rem == 0 ? '${k}K' : '$k ${rem.toString().padLeft(3, '0')}';
+      }
+      return intVal.toString();
+    }
+    return converted.toStringAsFixed(decimals);
   }
 
   // Chip tri-état : null=tous / true=oui / (on ne propose que null/true ici)
@@ -1695,6 +1799,7 @@ class _HomeTabState extends State<_HomeTab>
             property: p,
             isFavorite: _favorites.contains(p.id),
             onFavorite: () => _toggleFavorite(p.id),
+            selectedCountry: _country,
             onTap: () => Navigator.push(ctx,
                 MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
           );

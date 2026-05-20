@@ -53,9 +53,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   bool _hasAirConditioning = false; // Climatisation (Appart/Maison/Bureau/Hotel)
   bool _hasCuisineEquipee  = false;
   // Chambre d'hotel
-  final _numberOfBedsCtrl = TextEditingController();
-  bool _hasBreakfast       = false;
-  final _pricePerNightCtrl = TextEditingController();
+  final _numberOfBedsCtrl  = TextEditingController();
+  bool _hasBreakfast        = false;
+  final _pricePerNightCtrl  = TextEditingController();
+  // Adresse exacte Chambre d'hôtel
+  final _avenueCtrl  = TextEditingController();
+  final _numeroCtrl  = TextEditingController();
   // Salle de fêtes / Espace Funéraire / Salle Polyvalente
   final _capacityCtrl    = TextEditingController();
   final _pricePerDayCtrl = TextEditingController();
@@ -159,6 +162,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _nomCtrl, _waNumberCtrl, _emailCtrl, _quartierCtrl,
       _descCtrl, _priceCtrl, _surfaceCtrl, _bedroomsCtrl, _bathroomsCtrl,
       _floorsCtrl, _numberOfBedsCtrl, _pricePerNightCtrl,
+      _avenueCtrl, _numeroCtrl,
       _capacityCtrl, _pricePerDayCtrl, _hectaresCtrl,
       _longueurCtrl, _largeurCtrl,
       _commissionPctCtrl,
@@ -192,7 +196,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       if (_waNumberCtrl.text.trim().isEmpty) { _err('Numero WhatsApp requis'); return false; }
       if (_emailCtrl.text.trim().isEmpty) { _err('Email requis'); return false; }
     }
-    // Quartier est optionnel
+    // Pour Chambre d'h\u00f4tel : quartier, avenue et num\u00e9ro obligatoires
+    if (_selectedType == 'Chambre d\'h\u00f4tel') {
+      if (_quartierCtrl.text.trim().isEmpty) { _err('Quartier obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
+      if (_avenueCtrl.text.trim().isEmpty)   { _err('Avenue obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
+      if (_numeroCtrl.text.trim().isEmpty)   { _err('Num\u00e9ro obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
+    }
     if (_priceCtrl.text.trim().isEmpty) { _err('Prix requis'); return false; }
     // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
     if (_selectedType == 'Salle de Fêtes' || _selectedType == 'Salle Polyvalente') {
@@ -388,7 +397,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
       final property = PropertyModel(
         id: 'prop_${DateTime.now().millisecondsSinceEpoch}',
-        title: '$_selectedType \u2013 ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCity',
+        title: _selectedType == 'Chambre d\'h\u00f4tel' && _avenueCtrl.text.trim().isNotEmpty
+            ? '$_selectedType \u2013 Av. ${_avenueCtrl.text.trim()}, ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCity'
+            : '$_selectedType \u2013 ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCity',
         description: _descCtrl.text.trim().isNotEmpty
             ? _descCtrl.text.trim()
             : '$_selectedType a $_selectedTransaction \u2013 ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCommune, $_selectedCity',
@@ -401,7 +412,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         city: _selectedCity,
         commune: _selectedCommune,
         quartier: _quartierCtrl.text.trim(),
-        address: _quartierCtrl.text.trim(),
+        address: _selectedType == 'Chambre d\'h\u00f4tel' && _avenueCtrl.text.trim().isNotEmpty
+            ? 'Av. ${_avenueCtrl.text.trim()} N°${_numeroCtrl.text.trim()}, ${_quartierCtrl.text.trim()}'
+            : _quartierCtrl.text.trim(),
         surface: double.tryParse(_surfaceCtrl.text.trim()) ??
                  double.tryParse(_hectaresCtrl.text.trim()),
         longueurM: double.tryParse(_longueurCtrl.text.trim()),
@@ -714,7 +727,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               Icons.location_on_outlined,
               (v) => setState(() => _selectedCommune = v ?? '')),
 
-        _field(_quartierCtrl, 'Quartier (optionnel)', Icons.holiday_village_outlined, 'Ex: Matonge'),
+        _field(
+          _quartierCtrl,
+          _selectedType == 'Chambre d\'h\u00f4tel' ? 'Quartier *' : 'Quartier (optionnel)',
+          Icons.holiday_village_outlined,
+          'Ex: Matonge',
+        ),
         const SizedBox(height: 10),
         _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
             'Decrivez votre bien...', maxLines: 4),
@@ -915,6 +933,32 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     // ── Chambre d'hôtel (Location uniquement) ─────────────────────────────────
     else if (type == 'Chambre d\'hôtel') {
       fields.addAll([
+        // Adresse exacte de l'h\u00f4tel
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: const EdgeInsets.only(bottom: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFA726).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.4)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.location_on_rounded, color: Color(0xFFFFA726), size: 16),
+            const SizedBox(width: 8),
+            const Expanded(child: Text(
+              'Adresse exacte requise pour les h\u00f4tels',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: Color(0xFFFFA726), fontWeight: FontWeight.w600),
+            )),
+          ]),
+        ),
+        const SizedBox(height: 4),
+        Row(children: [
+          Expanded(child: _field(_avenueCtrl, 'Avenue *', Icons.edit_road_rounded, 'Ex: Avenue Kasa-Vubu')),
+          const SizedBox(width: 8),
+          SizedBox(width: 100, child: _field(_numeroCtrl, 'Num\u00e9ro *', Icons.tag_rounded, 'Ex: 12')),
+        ]),
+        const SizedBox(height: 4),
         _field(_numberOfBedsCtrl, 'Nombre de lits', Icons.single_bed_rounded,
             '1',
             type: TextInputType.number),
@@ -2648,7 +2692,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             _recapRow('Ville',       _selectedCity,      Icons.location_city),
             _recapRow('Commune',     _selectedCommune,   Icons.map_outlined),
             if (_quartierCtrl.text.isNotEmpty)
-              _recapRow('Quartier',    _quartierCtrl.text, Icons.holiday_village_outlined),
+              _recapRow('Quartier', _quartierCtrl.text, Icons.holiday_village_outlined),
+            if (_avenueCtrl.text.isNotEmpty)
+              _recapRow('Avenue', _avenueCtrl.text, Icons.edit_road_rounded),
+            if (_numeroCtrl.text.isNotEmpty)
+              _recapRow('Num\u00e9ro', _numeroCtrl.text, Icons.tag_rounded),
             const Divider(height: 20),
             _recapRow('Photos',
                 '${_imageUrls.isNotEmpty ? _imageUrls.length : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length} photo(s)',

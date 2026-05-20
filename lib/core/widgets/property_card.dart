@@ -9,6 +9,8 @@ class PropertyCard extends StatelessWidget {
   final VoidCallback? onFavorite;
   final bool isFavorite;
   final bool showStatus;
+  /// Pays sélectionné dans le filtre — déclenche l'affichage de la conversion si non-RDC
+  final String? selectedCountry;
 
   const PropertyCard({
     super.key,
@@ -17,7 +19,43 @@ class PropertyCard extends StatelessWidget {
     this.onFavorite,
     this.isFavorite = false,
     this.showStatus = false,
+    this.selectedCountry,
   });
+
+  // ── Conversion USD → monnaie locale ─────────────────────────────────────
+  static const Map<String, Map<String, dynamic>> _currencyMap = {
+    'Congo (Brazzaville)': {'code': 'FCFA', 'rate': 655.0,  'decimals': 0},
+    'Angola':              {'code': 'AOA',  'rate': 900.0,  'decimals': 0},
+    'Rwanda':              {'code': 'RWF',  'rate': 1300.0, 'decimals': 0},
+    'Burundi':             {'code': 'BIF',  'rate': 2850.0, 'decimals': 0},
+    'Tanzanie':            {'code': 'TZS',  'rate': 2500.0, 'decimals': 0},
+    'Zambie':              {'code': 'ZMW',  'rate': 27.0,   'decimals': 2},
+  };
+
+  String? _localEquivalent() {
+    if (selectedCountry == null || selectedCountry == 'Congo (RDC)' || selectedCountry!.isEmpty) return null;
+    final info = _currencyMap[selectedCountry];
+    if (info == null) return null;
+    final rate = info['rate'] as double;
+    final decimals = info['decimals'] as int;
+    final converted = property.price * rate;
+    String formatted;
+    if (decimals == 0) {
+      final intVal = converted.round();
+      if (intVal >= 1000000) {
+        formatted = '${(intVal / 1000000).toStringAsFixed(1).replaceAll('.0', '')}M';
+      } else if (intVal >= 1000) {
+        final k = intVal ~/ 1000;
+        final rem = intVal % 1000;
+        formatted = rem == 0 ? '${k}K' : '${k} ${rem.toString().padLeft(3, '0')}';
+      } else {
+        formatted = intVal.toString();
+      }
+    } else {
+      formatted = converted.toStringAsFixed(decimals);
+    }
+    return '≈ $formatted ${info['code']}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -271,25 +309,47 @@ class PropertyCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
-                          Text(
-                            property.formattedPrice,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.accentColor,
-                              fontFamily: 'Poppins',
-                            ),
-                          ),
-                          if (property.transactionType == 'Location')
-                            const Text(
-                              '/mois',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textSecondary,
-                                fontFamily: 'Poppins',
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    property.formattedPrice,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.accentColor,
+                                      fontFamily: 'Poppins',
+                                    ),
+                                  ),
+                                  if (property.transactionType == 'Location')
+                                    const Text(
+                                      '/mois',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.textSecondary,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                    ),
+                                ],
                               ),
-                            ),
+                              if (_localEquivalent() != null)
+                                Text(
+                                  _localEquivalent()!,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFFFA726),
+                                    fontFamily: 'Poppins',
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ],
