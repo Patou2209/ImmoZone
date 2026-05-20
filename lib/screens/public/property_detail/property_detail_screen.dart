@@ -28,15 +28,35 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   String _officialMessage = '';
   bool _messageExpanded = false;
   String _ownerSince = '';
+  // Compteur de vues local — mis à jour après incrément Firestore
+  late int _views;
 
   @override
   void initState() {
     super.initState();
+    // Initialiser avec la valeur cachée puis mettre à jour après incrément
+    _views = widget.property.views;
     _checkFavorite();
     _loadOfficialMessage();
     _loadOwnerSince();
-    // Incrémenter le compteur de vues à chaque ouverture de l'annonce
-    _ds.incrementPropertyViews(widget.property.id);
+    _incrementAndRefreshViews();
+  }
+
+  /// Incrémente les vues dans Firestore puis relit la valeur réelle
+  Future<void> _incrementAndRefreshViews() async {
+    await _ds.incrementPropertyViews(widget.property.id);
+    // Relire le compteur réel depuis Firestore
+    try {
+      final fresh = await _ds.getPropertyById(widget.property.id);
+      if (fresh != null && mounted) {
+        setState(() => _views = fresh.views);
+      } else if (mounted) {
+        // Fallback : incrémenter localement si l'annonce n’est plus accessible
+        setState(() => _views = _views + 1);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _views = _views + 1);
+    }
   }
 
   Future<void> _loadOwnerSince() async {
@@ -611,7 +631,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       const Icon(Icons.visibility_outlined,
                           size: 14, color: AppTheme.textHint),
                       const SizedBox(width: 4),
-                      Text('${p.views} vues',
+                      Text('$_views vue${_views != 1 ? 's' : ''}',
                           style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textHint,

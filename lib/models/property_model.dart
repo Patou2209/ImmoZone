@@ -231,7 +231,7 @@ class PropertyModel {
     createdAt: DateTime.tryParse(m['createdAt'] ?? '') ?? DateTime.now(),
     updatedAt: m['updatedAt'] != null ? DateTime.tryParse(m['updatedAt']) : null,
     expiresAt: m['expiresAt'] != null ? DateTime.tryParse(m['expiresAt']) : null,
-    views: m['views'] ?? 0, isFeatured: m['isFeatured'] ?? false,
+    views: (m['views'] as num?)?.toInt() ?? 0, isFeatured: m['isFeatured'] ?? false,
     boostEnd: m['boostEnd'] != null ? DateTime.tryParse(m['boostEnd']) : null,
     boostType: m['boostType'],
     latitude: m['latitude']?.toDouble(), longitude: m['longitude']?.toDouble(),

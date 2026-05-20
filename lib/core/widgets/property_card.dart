@@ -42,7 +42,7 @@ class PropertyCard extends StatelessWidget {
     String formatted;
     if (decimals == 0) {
       // Arrondi au multiple de 1 000 le plus proche
-      final rounded = ((converted / 1000).round() * 1000);
+      final rounded = ((converted / 5000).round() * 5000);
       final s = rounded.toString();
       final buf = StringBuffer();
       for (int i = 0; i < s.length; i++) {

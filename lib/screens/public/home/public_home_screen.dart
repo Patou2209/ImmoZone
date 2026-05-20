@@ -1729,7 +1729,7 @@ class _HomeTabState extends State<_HomeTab>
     final converted = usdAmount * rate;
     if (decimals == 0) {
       // Arrondir au multiple de 1 000
-      final rounded = ((converted / 1000).round() * 1000);
+      final rounded = ((converted / 5000).round() * 5000);
       // Formater avec espaces insécables comme séparateurs de milliers
       final s = rounded.toString();
       final buf = StringBuffer();
@@ -1802,8 +1802,12 @@ class _HomeTabState extends State<_HomeTab>
             isFavorite: _favorites.contains(p.id),
             onFavorite: () => _toggleFavorite(p.id),
             selectedCountry: _country,
-            onTap: () => Navigator.push(ctx,
-                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+            onTap: () async {
+              await Navigator.push(ctx,
+                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+              // Recharger les annonces au retour pour mettre \u00e0 jour les vues
+              if (mounted) _loadData();
+            },
           );
         },
       ),
