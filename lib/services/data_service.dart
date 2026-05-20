@@ -78,6 +78,8 @@ class DataService {
     'price_unit_publication': 2.0,
     'price_monthly_sub': 2.0,
     'price_annual_sub': 20.0,
+    'home_title': 'Trouvez Votre\nMaison de Rêve',
+    'home_subtitle': 'Des milliers de propriétés à votre portée',
     'pack_3_discount': 5.0,
     'pack_5_discount': 10.0,
     'pack_10_discount': 15.0,
@@ -118,6 +120,28 @@ class DataService {
   bool get isPromoActive => systemSettings['promo_active'] == true;
   int get promoFreeAnnouncements =>
       (systemSettings['promo_free_announcements'] as num?)?.toInt() ?? 2;
+
+  /// Titre affiché dans le hero de la page d'accueil (configurable depuis l'admin)
+  String get homeTitle =>
+      systemSettings['home_title'] as String? ??
+      _prefs?.getString('home_title_cache') ??
+      'Trouvez Votre\nMaison de Rêve';
+
+  /// Sous-titre affiché dans le hero de la page d'accueil (configurable depuis l'admin)
+  String get homeSubtitle =>
+      systemSettings['home_subtitle'] as String? ??
+      _prefs?.getString('home_subtitle_cache') ??
+      'Des milliers de propriétés à votre portée';
+
+  /// Met à jour le texte d'accueil (titre + sous-titre)
+  Future<void> updateHomeText({required String title, required String subtitle}) async {
+    await updateSettings({
+      'home_title': title,
+      'home_subtitle': subtitle,
+    });
+    await _prefs?.setString('home_title_cache', title);
+    await _prefs?.setString('home_subtitle_cache', subtitle);
+  }
 
   Future<void> updateSettings(Map<String, dynamic> settings) async {
     final current = await _getSettings();

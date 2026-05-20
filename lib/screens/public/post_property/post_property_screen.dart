@@ -56,9 +56,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final _numberOfBedsCtrl  = TextEditingController();
   bool _hasBreakfast        = false;
   final _pricePerNightCtrl  = TextEditingController();
-  // Adresse exacte Chambre d'hôtel
-  final _avenueCtrl  = TextEditingController();
-  final _numeroCtrl  = TextEditingController();
+  // Adresse exacte (Chambre d'hôtel)
+  final _avenueCtrl     = TextEditingController();
+  final _numeroCtrl     = TextEditingController();
+  final _referenceCtrl  = TextEditingController(); // Référence — Chambre hôtel, Salle fêtes, Espace funéraire
   // Salle de fêtes / Espace Funéraire / Salle Polyvalente
   final _capacityCtrl    = TextEditingController();
   final _pricePerDayCtrl = TextEditingController();
@@ -162,7 +163,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _nomCtrl, _waNumberCtrl, _emailCtrl, _quartierCtrl,
       _descCtrl, _priceCtrl, _surfaceCtrl, _bedroomsCtrl, _bathroomsCtrl,
       _floorsCtrl, _numberOfBedsCtrl, _pricePerNightCtrl,
-      _avenueCtrl, _numeroCtrl,
+      _avenueCtrl, _numeroCtrl, _referenceCtrl,
       _capacityCtrl, _pricePerDayCtrl, _hectaresCtrl,
       _longueurCtrl, _largeurCtrl,
       _commissionPctCtrl,
@@ -187,6 +188,34 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   String get _fullWhatsApp => '$_waCountryCode${_waNumberCtrl.text.trim()}';
 
+  /// Construit l'adresse complète ordonnée selon :
+  /// Pays, Province, Ville, Commune, Quartier, Av. Avenue N°Numéro, Réf: Référence
+  String _buildFullAddress() {
+    final parts = <String>[];
+    if (_selectedCountry.isNotEmpty) parts.add(_selectedCountry);
+    if (_selectedProvince.isNotEmpty) parts.add(_selectedProvince);
+    if (_selectedCity.isNotEmpty && _selectedCity != _selectedProvince) parts.add(_selectedCity);
+    if (_selectedCommune.isNotEmpty) parts.add(_selectedCommune);
+    if (_quartierCtrl.text.trim().isNotEmpty) parts.add(_quartierCtrl.text.trim());
+
+    // Avenue + Numéro (sur la même ligne si les deux présents)
+    final avenue = _avenueCtrl.text.trim();
+    final numero = _numeroCtrl.text.trim();
+    if (avenue.isNotEmpty && numero.isNotEmpty) {
+      parts.add('Av. $avenue N°$numero');
+    } else if (avenue.isNotEmpty) {
+      parts.add('Av. $avenue');
+    } else if (numero.isNotEmpty) {
+      parts.add('N°$numero');
+    }
+
+    // Référence optionnelle
+    final ref = _referenceCtrl.text.trim();
+    if (ref.isNotEmpty) parts.add('Réf: $ref');
+
+    return parts.join(', ');
+  }
+
   bool _validateStep1() {
     final auth = context.read<AuthProvider>();
     final isLoggedIn = auth.isLoggedIn;
@@ -196,11 +225,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       if (_waNumberCtrl.text.trim().isEmpty) { _err('Numero WhatsApp requis'); return false; }
       if (_emailCtrl.text.trim().isEmpty) { _err('Email requis'); return false; }
     }
-    // Pour Chambre d'h\u00f4tel : quartier, avenue et num\u00e9ro obligatoires
+    // Pour Chambre d'h\u00f4tel : quartier, avenue, num\u00e9ro ET nombre de lits obligatoires
     if (_selectedType == 'Chambre d\'h\u00f4tel') {
       if (_quartierCtrl.text.trim().isEmpty) { _err('Quartier obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
       if (_avenueCtrl.text.trim().isEmpty)   { _err('Avenue obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
       if (_numeroCtrl.text.trim().isEmpty)   { _err('Num\u00e9ro obligatoire pour une Chambre d\'h\u00f4tel'); return false; }
+      if (_numberOfBedsCtrl.text.trim().isEmpty || int.tryParse(_numberOfBedsCtrl.text.trim()) == null) {
+        _err('Nombre de lits obligatoire pour une Chambre d\'h\u00f4tel'); return false;
+      }
     }
     if (_priceCtrl.text.trim().isEmpty) { _err('Prix requis'); return false; }
     // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
@@ -412,9 +444,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         city: _selectedCity,
         commune: _selectedCommune,
         quartier: _quartierCtrl.text.trim(),
-        address: _selectedType == 'Chambre d\'h\u00f4tel' && _avenueCtrl.text.trim().isNotEmpty
-            ? 'Av. ${_avenueCtrl.text.trim()} N°${_numeroCtrl.text.trim()}, ${_quartierCtrl.text.trim()}'
-            : _quartierCtrl.text.trim(),
+        address: _buildFullAddress(),
         surface: double.tryParse(_surfaceCtrl.text.trim()) ??
                  double.tryParse(_hectaresCtrl.text.trim()),
         longueurM: double.tryParse(_longueurCtrl.text.trim()),
@@ -482,16 +512,19 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           child: _buildStepIndicator(),
         ),
       ),
-      body: PageView(
-        controller: _pageCtrl,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _buildStep1(),
-          _buildStep2(),
-          _buildStep3(),
-          _buildStep4(),
-          _buildStep5(),
-        ],
+      body: SafeArea(
+        top: false, // AppBar already handles top safe area
+        child: PageView(
+          controller: _pageCtrl,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildStep1(),
+            _buildStep2(),
+            _buildStep3(),
+            _buildStep4(),
+            _buildStep5(),
+          ],
+        ),
       ),
     );
   }
@@ -518,13 +551,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isDone
-                              ? AppTheme.accentColor
+                              ? const Color(0xFFFFA726)
                               : isActive
-                                  ? Colors.white
+                                  ? const Color(0xFFFFA726)
                                   : Colors.white24,
-                          border: isActive
-                              ? Border.all(color: AppTheme.accentColor, width: 2)
-                              : null,
+                          border: null,
                         ),
                         child: Center(
                           child: isDone
@@ -532,7 +563,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                               : Text('${i+1}', style: TextStyle(
                                   fontSize: 12, fontWeight: FontWeight.w700,
                                   fontFamily: 'Poppins',
-                                  color: isActive ? AppTheme.accentColor : Colors.white54)),
+                                  color: isActive ? Colors.white : Colors.white54)),
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -682,6 +713,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             : _field(_priceCtrl, 'Prix *', Icons.attach_money, '0',
                 type: TextInputType.number, suffix: _currencyDropdown()),
 
+        // ── Description ────────────────────────────────────────────────────
+        _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
+            'Décrivez votre bien...', maxLines: 4),
+
         // ── Champs conditionnels selon la catégorie ─────────────────────────
         _buildCategoryFields(),
         const SizedBox(height: 20),
@@ -735,9 +770,45 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           Icons.holiday_village_outlined,
           'Ex: Matonge',
         ),
-        const SizedBox(height: 10),
-        _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
-            'Decrivez votre bien...', maxLines: 4),
+
+        // Adresse exacte pour Chambre d'h\u00f4tel, Salle de F\u00eates, Espace Fun\u00e9raire
+        if (_selectedType == 'Chambre d\'h\u00f4tel' ||
+            _selectedType == 'Salle de F\u00eates' ||
+            _selectedType == 'Espace Fun\u00e9raire' ||
+            _selectedType == 'Salle Polyvalente') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFA726).withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.35)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.location_on_rounded, color: Color(0xFFFFA726), size: 15),
+              const SizedBox(width: 8),
+              const Expanded(child: Text(
+                'Adresse compl\u00e8te requise',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: Color(0xFFFFA726), fontWeight: FontWeight.w600),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _field(_avenueCtrl,
+                _selectedType == 'Chambre d\'h\u00f4tel' ? 'Avenue *' : 'Avenue (optionnel)',
+                Icons.edit_road_rounded, 'Ex: Av. Kasa-Vubu')),
+            const SizedBox(width: 8),
+            SizedBox(width: 100, child: _field(_numeroCtrl,
+                _selectedType == 'Chambre d\'h\u00f4tel' ? 'N\u00b0 *' : 'N\u00b0',
+                Icons.tag_rounded, 'Ex: 12')),
+          ]),
+          const SizedBox(height: 4),
+          _field(_referenceCtrl, 'R\u00e9f\u00e9rence (optionnel)',
+              Icons.bookmark_outline_rounded, 'Ex: R\u00e9f. 004B'),
+        ],
+
         const SizedBox(height: 28),
 
         _navButtons(
@@ -935,33 +1006,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     // ── Chambre d'hôtel (Location uniquement) ─────────────────────────────────
     else if (type == 'Chambre d\'hôtel') {
       fields.addAll([
-        // Adresse exacte de l'h\u00f4tel
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          margin: const EdgeInsets.only(bottom: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFA726).withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.4)),
-          ),
-          child: Row(children: [
-            const Icon(Icons.location_on_rounded, color: Color(0xFFFFA726), size: 16),
-            const SizedBox(width: 8),
-            const Expanded(child: Text(
-              'Adresse exacte requise pour les h\u00f4tels',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                  color: Color(0xFFFFA726), fontWeight: FontWeight.w600),
-            )),
-          ]),
-        ),
-        const SizedBox(height: 4),
-        Row(children: [
-          Expanded(child: _field(_avenueCtrl, 'Avenue *', Icons.edit_road_rounded, 'Ex: Avenue Kasa-Vubu')),
-          const SizedBox(width: 8),
-          SizedBox(width: 100, child: _field(_numeroCtrl, 'Num\u00e9ro *', Icons.tag_rounded, 'Ex: 12')),
-        ]),
-        const SizedBox(height: 4),
-        _field(_numberOfBedsCtrl, 'Nombre de lits', Icons.single_bed_rounded,
+        _field(_numberOfBedsCtrl, 'Nombre de lits *', Icons.single_bed_rounded,
             '1',
             type: TextInputType.number),
         // Prix par nuit géré dans le champ global _priceCtrl (relabelé dynamiquement)
@@ -2691,6 +2736,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             _recapRow('Type',        _selectedType,      Icons.home_outlined),
             _recapRow('Transaction', _selectedTransaction, Icons.swap_horiz),
             _recapRow('Pays',        _selectedCountry,   Icons.public),
+            _recapRow('Province',    _selectedProvince,  Icons.map_outlined),
             _recapRow('Ville',       _selectedCity,      Icons.location_city),
             _recapRow('Commune',     _selectedCommune,   Icons.map_outlined),
             if (_quartierCtrl.text.isNotEmpty)
@@ -2698,7 +2744,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             if (_avenueCtrl.text.isNotEmpty)
               _recapRow('Avenue', _avenueCtrl.text, Icons.edit_road_rounded),
             if (_numeroCtrl.text.isNotEmpty)
-              _recapRow('Num\u00e9ro', _numeroCtrl.text, Icons.tag_rounded),
+              _recapRow('Numéro', _numeroCtrl.text, Icons.tag_rounded),
+            if (_referenceCtrl.text.isNotEmpty)
+              _recapRow('Référence', _referenceCtrl.text, Icons.bookmark_outline_rounded),
             const Divider(height: 20),
             _recapRow('Photos',
                 '${_imageUrls.isNotEmpty ? _imageUrls.length : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length} photo(s)',

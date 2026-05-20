@@ -69,7 +69,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
         ],
       ),
-      body: _loading
+      body: SafeArea(
+        top: false,
+        child: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : _favorites.isEmpty
               ? Center(
@@ -133,6 +135,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     },
                   ),
                 ),
+      ),
     );
   }
 }

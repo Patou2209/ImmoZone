@@ -33,6 +33,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ── Moyens de paiement ───────────────────────────────────────────────────────
   List<Map<String, dynamic>> _paymentMethods = [];
 
+  // ── Texte d'accueil (hero page d'accueil) ──────────────────────────────────
+  late TextEditingController _homeTitleCtrl;
+  late TextEditingController _homeSubtitleCtrl;
+  bool _isSavingHomeText = false;
+
   // ── Message officiel ─────────────────────────────────────────────────────────
   late TextEditingController _officialMsgCtrl;
 
@@ -69,12 +74,20 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _boostMonthCtrl  = TextEditingController();
     _quotaCtrl       = TextEditingController();
     _validityCtrl    = TextEditingController();
+    _homeTitleCtrl      = TextEditingController();
+    _homeSubtitleCtrl   = TextEditingController();
     _officialMsgCtrl    = TextEditingController();
     _waContactCtrl      = TextEditingController();
     _phoneContactCtrl   = TextEditingController();
     _emailContactCtrl   = TextEditingController();
     _promoQtyCtrl       = TextEditingController(text: '2');
     _promoReasonCtrl = TextEditingController(text: 'Promotion spéciale ImmoZone');
+
+    // Live preview listeners for home text
+    _homeTitleCtrl.addListener(() => setState(() {}));
+    _homeSubtitleCtrl.addListener(() => setState(() {}));
+    // Live preview listener for official message
+    _officialMsgCtrl.addListener(() => setState(() {}));
   }
 
   Future<void> _load() async {
@@ -89,6 +102,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _boostMonthCtrl.text  = (_settings['boost_month_price'] ?? 5.0).toString();
     _quotaCtrl.text       = (_settings['monthly_free_quota'] ?? 1).toString();
     _validityCtrl.text    = (_settings['announcement_validity_days'] ?? 30).toString();
+    _homeTitleCtrl.text    = _ds.homeTitle;
+    _homeSubtitleCtrl.text  = _ds.homeSubtitle;
     _officialMsgCtrl.text   = _ds.officialMessage;
     _waContactCtrl.text     = _ds.whatsappContactNumber;
     _phoneContactCtrl.text  = _ds.phoneContactNumber;
@@ -103,6 +118,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _tabCtrl.dispose();
     for (final c in [_priceUnitCtrl, _priceMonthCtrl, _priceAnnualCtrl,
         _boostWeekCtrl, _boostMonthCtrl, _quotaCtrl, _validityCtrl,
+        _homeTitleCtrl, _homeSubtitleCtrl,
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
         _promoQtyCtrl, _promoReasonCtrl]) {
       c.dispose();
@@ -134,6 +150,18 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   Future<void> _savePaymentMethods() async {
     await _ds.savePaymentMethods(_paymentMethods);
     _snackOk('✅ Moyens de paiement sauvegardés');
+  }
+
+  Future<void> _saveHomeText() async {
+    final title    = _homeTitleCtrl.text.trim();
+    final subtitle = _homeSubtitleCtrl.text.trim();
+    if (title.isEmpty) { _snackErr('Le titre d\'accueil ne peut pas être vide.'); return; }
+    setState(() => _isSavingHomeText = true);
+    await _ds.updateHomeText(title: title, subtitle: subtitle);
+    if (mounted) {
+      setState(() => _isSavingHomeText = false);
+      _snackOk('✅ Texte d\'accueil sauvegardé');
+    }
   }
 
   Future<void> _saveOfficialMessage() async {
@@ -1392,6 +1420,142 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            // ══ TEXTE D'ACCUEIL ═══════════════════════════════════════════════
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFA726).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.35)),
+              ),
+              child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Icon(Icons.home_rounded, color: Color(0xFFFFA726), size: 20),
+                  SizedBox(width: 8),
+                  Text('Texte d\'accueil (page principale)', style: TextStyle(
+                    fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xFFFFA726),
+                  )),
+                ]),
+                SizedBox(height: 6),
+                Text(
+                  'Le titre et le sous-titre s\'affichent dans la bannière hero de la page d\'accueil. '
+                  'Utilisez \\n pour créer un saut de ligne dans le titre.',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFFFFA726), height: 1.5),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            _sectionHeader('🏠 Titre principal'),
+            const SizedBox(height: 8),
+            _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(
+                controller: _homeTitleCtrl,
+                maxLines: 2,
+                maxLength: 80,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                    fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Ex: Trouvez Votre\\nMaison de Rêve',
+                  hintStyle: const TextStyle(fontFamily: 'Poppins', color: AppTheme.textHint, fontSize: 12),
+                  filled: true, fillColor: AppTheme.backgroundColor,
+                  helperText: 'Utilisez \\n pour un saut de ligne (ex: "Ligne 1\\nLigne 2")',
+                  helperStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: AppTheme.textHint),
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFFFA726), width: 2)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                ),
+              ),
+            ])),
+            const SizedBox(height: 12),
+
+            _sectionHeader('💬 Sous-titre'),
+            const SizedBox(height: 8),
+            _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(
+                controller: _homeSubtitleCtrl,
+                maxLines: 2,
+                maxLength: 120,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Ex: Des milliers de propriétés à votre portée',
+                  hintStyle: const TextStyle(fontFamily: 'Poppins', color: AppTheme.textHint, fontSize: 12),
+                  filled: true, fillColor: AppTheme.backgroundColor,
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFFFA726), width: 2)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                ),
+              ),
+            ])),
+            const SizedBox(height: 8),
+
+            // Aperçu live du hero
+            _sectionHeader('👁 Aperçu du hero'),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFB8D0F5), Color(0xFFCADCF8), Color(0xFFE8F1FD), Colors.white],
+                  stops: [0.0, 0.35, 0.70, 1.0],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.dividerColor),
+              ),
+              child: Column(children: [
+                Text(
+                  _homeTitleCtrl.text.isEmpty ? 'Titre ici' : _homeTitleCtrl.text,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                      fontSize: 20, color: AppTheme.textPrimary, height: 1.2),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _homeSubtitleCtrl.text.isEmpty ? 'Sous-titre ici' : _homeSubtitleCtrl.text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: _homeSubtitleCtrl.text.isEmpty ? AppTheme.textHint : AppTheme.textSecondary),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 4),
+            if (!_isSavingHomeText)
+              _saveBar('Sauvegarder le texte d\'accueil', _saveHomeText)
+            else
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 24),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: null,
+                    icon: const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                    label: const Text('Sauvegarde...',
+                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFA726),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+
+            const Divider(height: 32),
+
+            // ══ MESSAGE OFFICIEL ══════════════════════════════════════════════
 
             // Info banner
             Container(

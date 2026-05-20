@@ -1123,10 +1123,10 @@ class _HomeTabState extends State<_HomeTab>
         ),
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Column(children: [
-          const Text(
-            'Trouvez Votre\nMaison de R\u00eave',
+          Text(
+            _ds.homeTitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w800,
               fontSize: 24,
@@ -1135,10 +1135,10 @@ class _HomeTabState extends State<_HomeTab>
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Des milliers de propri\u00e9t\u00e9s \u00e0 votre port\u00e9e',
+          Text(
+            _ds.homeSubtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -1447,28 +1447,9 @@ class _HomeTabState extends State<_HomeTab>
               const Text('Prix', style: TextStyle(fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
               const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A3A8F).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text('USD', style: const TextStyle(fontFamily: 'Poppins',
-                    fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0A3A8F))),
-              ),
-              if (showConversion) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFA726).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text('≈ ${localCurrencyInfo['code']}',
-                      style: const TextStyle(fontFamily: 'Poppins',
-                          fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFFFA726))),
-                ),
-              ],
+              Text('(USD${showConversion ? " ≈ ${localCurrencyInfo!['code']}" : ""})',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                      fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
             ]),
 
             const SizedBox(height: 8),

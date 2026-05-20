@@ -123,7 +123,9 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // ── Barre de recherche ──────────────────────────────────────────────
           Container(
@@ -404,6 +406,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
           ),
         ],
+        ),
       ),
     );
   }
