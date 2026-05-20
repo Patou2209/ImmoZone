@@ -2923,16 +2923,16 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppTheme.primaryColor,
+          color: const Color(0xFFFFA726).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.accentColor, width: 1.5),
+          border: Border.all(color: const Color(0xFFFFA726), width: 1.5),
         ),
         child: Icon(icon, color: const Color(0xFFFFA726), size: 22),
       ),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(step, style: const TextStyle(
-          fontFamily: 'Poppins', fontSize: 12, color: AppTheme.accentColor,
+          fontFamily: 'Poppins', fontSize: 12, color: const Color(0xFFFFA726),
           fontWeight: FontWeight.w600,
         )),
         Text(title, style: const TextStyle(

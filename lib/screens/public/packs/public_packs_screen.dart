@@ -49,7 +49,9 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: _loading
+      body: SafeArea(
+        top: false,
+        child: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -347,6 +349,7 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                 const SizedBox(height: 32),
               ]),
             ),
+      ),
     );
   }
 

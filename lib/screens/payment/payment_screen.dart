@@ -83,9 +83,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(title: const Text('Paiement Mobile Money')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: _paymentCreated ? _buildConfirmation() : _buildPaymentForm(),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: _paymentCreated ? _buildConfirmation() : _buildPaymentForm(),
+        ),
       ),
     );
   }

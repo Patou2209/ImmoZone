@@ -394,6 +394,10 @@ class PropertyCard extends StatelessWidget {
                       else if (property.surface != null)
                         _featureChip(
                             Icons.square_foot, '${property.surface!.toInt()} m²'),
+                      if (property.type == 'Chambre d\'hôtel' &&
+                          property.numberOfBeds != null &&
+                          property.numberOfBeds! > 0)
+                        _featureChip(Icons.single_bed_rounded, '${property.numberOfBeds} Lit(s)'),
                     ],
                   ),
                   const SizedBox(height: 8),

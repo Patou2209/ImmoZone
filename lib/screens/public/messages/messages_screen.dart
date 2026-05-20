@@ -61,7 +61,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
             ),
         ],
       ),
-      body: msgProvider.isLoading
+      body: SafeArea(
+        top: false,
+        child: msgProvider.isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
           : conversations.isEmpty
               ? Center(
@@ -189,6 +191,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     },
                   ),
                 ),
+      ),
     );
   }
 

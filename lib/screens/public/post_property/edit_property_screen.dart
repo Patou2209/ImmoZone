@@ -293,7 +293,9 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             ),
         ],
       ),
-      body: Form(
+      body: SafeArea(
+        top: false,
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -479,6 +481,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
