@@ -1,5 +1,5 @@
 name: immo_zone
-description: ImmoZone - Application immobilière avec partie Administrative et Publique
+description: "ImmoZone - Plateforme immobilière Vente, Achat & Location"
 publish_to: 'none'
 version: 1.2.34+50
 

@@ -987,8 +987,11 @@ class DataService {
 
   String get officialMessage =>
       _prefs?.getString('official_message') ??
-      'ImmoZone — La plateforme immobilière de confiance en RDC. '
-      'Pour toute information, contactez-nous via WhatsApp ou email.';
+      'ImmoZone est une plateforme de mise en relation entre vendeurs, '
+      'bailleurs et acquéreurs. Nous facilitons le contact entre les parties '
+      'sans intervenir dans la suite de la procédure ni assumer aucune '
+      'responsabilité quant aux transactions conclues entre elles. '
+      'Vérifiez toujours l\'authenticité des documents avant toute transaction.';
 
   Future<void> saveOfficialMessage(String message) async {
     await _officialMsgDoc.set({'message': message});

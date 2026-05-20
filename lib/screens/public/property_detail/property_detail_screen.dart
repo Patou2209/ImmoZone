@@ -893,44 +893,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         ),
       ),
 
-      // Bottom bar (owner info panel only)
-      bottomNavigationBar: isOwner
-          ? Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, -3))
-                ],
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_pin_rounded,
-                          color: AppTheme.accentColor, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Votre annonce \u2014 g\u00e9rable depuis votre tableau de bord',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.accentColor),
-                      ),
-                    ]),
-              ),
-            )
-          : null,
     );
   }
 
