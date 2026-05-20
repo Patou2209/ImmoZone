@@ -43,19 +43,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   }
 
   /// Incrémente les vues dans Firestore puis relit la valeur réelle
+  /// Incrémente les vues — optimiste (+1 immédiat) puis confirme via Firestore
   Future<void> _incrementAndRefreshViews() async {
-    await _ds.incrementPropertyViews(widget.property.id);
-    // Relire le compteur réel depuis Firestore
-    try {
-      final fresh = await _ds.getPropertyById(widget.property.id);
-      if (fresh != null && mounted) {
-        setState(() => _views = fresh.views);
-      } else if (mounted) {
-        // Fallback : incrémenter localement si l'annonce n’est plus accessible
-        setState(() => _views = _views + 1);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _views = _views + 1);
+    // Affichage optimiste : +1 tout de suite pour UX fluide
+    if (mounted) setState(() => _views = _views + 1);
+    // Incrément Firestore (retourne la valeur réelle ou null si échec)
+    final newViews = await _ds.incrementPropertyViews(widget.property.id);
+    if (newViews != null && mounted) {
+      setState(() => _views = newViews);
     }
   }
 

@@ -476,13 +476,32 @@ class DataService {
   }
 
   /// Incrémente atomiquement le compteur de vues d'une annonce.
-  Future<void> incrementPropertyViews(String propertyId) async {
+  /// Retourne le nouveau total de vues, ou null en cas d'échec.
+  Future<int?> incrementPropertyViews(String propertyId) async {
     try {
+      // update() atomique — crée le champ s'il n'existe pas encore
       await _propertiesCol.doc(propertyId).update({
         'views': FieldValue.increment(1),
       });
-    } catch (_) {
-      // Silencieux si l'annonce n'existe plus
+      // Relire la valeur réelle après incrément
+      final snap = await _propertiesCol.doc(propertyId).get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>?;
+        return (data?['views'] as num?)?.toInt();
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Views] increment failed for $propertyId: $e');
+      // Tentative de création du champ via set merge si update a échoué
+      try {
+        final snap = await _propertiesCol.doc(propertyId).get();
+        if (snap.exists) {
+          final current = ((snap.data() as Map<String, dynamic>?)?['views'] as num?)?.toInt() ?? 0;
+          await _propertiesCol.doc(propertyId).set({'views': current + 1}, SetOptions(merge: true));
+          return current + 1;
+        }
+      } catch (_) {}
+      return null;
     }
   }
 

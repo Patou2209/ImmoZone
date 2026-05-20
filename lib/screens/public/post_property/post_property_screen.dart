@@ -470,7 +470,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor,
         title: const Text('Publier une annonce',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17)),
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17,
+              color: Colors.white)),
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -2877,7 +2879,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppTheme.accentColor, width: 1.5),
         ),
-        child: Icon(icon, color: AppTheme.accentColor, size: 22),
+        child: Icon(icon, color: const Color(0xFFFFA726), size: 22),
       ),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

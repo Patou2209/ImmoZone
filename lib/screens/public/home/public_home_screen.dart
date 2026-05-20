@@ -1470,12 +1470,7 @@ class _HomeTabState extends State<_HomeTab>
                 ),
               ],
             ]),
-            if (showConversion) ...[
-              const SizedBox(height: 3),
-              Text('1 USD ≈ ${_formatLocalAmount(1, localCurrencyInfo)} ${localCurrencyInfo['code']}',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                      color: Color(0xFFFFA726), fontStyle: FontStyle.italic)),
-            ],
+
             const SizedBox(height: 8),
             Row(children: [
               // Min — toujours affich\u00e9 (Location et Achat)
