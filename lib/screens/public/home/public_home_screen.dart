@@ -1687,12 +1687,14 @@ class _HomeTabState extends State<_HomeTab>
     400000, 500000, 750000, 1000000,
   ];
 
-  // Formate un montant USD pour l'affichage dans le dropdown (avec \u00e9quivalent local si dispo)
+
+  // Formate un montant pour le dropdown :
+  // • RDC  → "500 $"
+  // • Autre → uniquement le montant converti arrondi ex: "327 000 FCFA"
   String _formatPriceLabelFull(double v, Map<String, dynamic>? localCurrencyInfo) {
-    final usdLabel = _formatPriceLabel(v);
-    if (localCurrencyInfo == null) return usdLabel;
+    if (localCurrencyInfo == null) return _formatPriceLabel(v);
     final localStr = _formatLocalAmount(v, localCurrencyInfo);
-    return '$usdLabel ≈ $localStr ${localCurrencyInfo['code']}';
+    return '$localStr ${localCurrencyInfo["code"]}';
   }
 
   // Construit la liste compl\u00e8te des items pour un dropdown (N'importe + chaque prix)
@@ -1719,23 +1721,23 @@ class _HomeTabState extends State<_HomeTab>
     return currencyMap[country]; // null si pays non trouv\u00e9 (affiche USD seulement)
   }
 
-  // Formate un montant converti en monnaie locale
+  // Formate un montant converti, arrondi au multiple de 1 000 le plus proche
+  // Ex: 50 USD × 655 = 32 750 → arrondi → 33 000
   String _formatLocalAmount(double usdAmount, Map<String, dynamic> info) {
     final rate = (info['rate'] as double);
     final decimals = (info['decimals'] as int);
     final converted = usdAmount * rate;
     if (decimals == 0) {
-      // Formater avec s\u00e9parateurs de milliers
-      final intVal = converted.round();
-      if (intVal >= 1000000) {
-        return '${(intVal / 1000000).toStringAsFixed(1).replaceAll('.0', '')}M';
+      // Arrondir au multiple de 1 000
+      final rounded = ((converted / 1000).round() * 1000);
+      // Formater avec espaces insécables comme séparateurs de milliers
+      final s = rounded.toString();
+      final buf = StringBuffer();
+      for (int i = 0; i < s.length; i++) {
+        if (i > 0 && (s.length - i) % 3 == 0) buf.write('\u00a0');
+        buf.write(s[i]);
       }
-      if (intVal >= 1000) {
-        final k = intVal ~/ 1000;
-        final rem = intVal % 1000;
-        return rem == 0 ? '${k}K' : '$k ${rem.toString().padLeft(3, '0')}';
-      }
-      return intVal.toString();
+      return buf.toString();
     }
     return converted.toStringAsFixed(decimals);
   }

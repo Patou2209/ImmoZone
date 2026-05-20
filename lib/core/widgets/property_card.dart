@@ -41,16 +41,15 @@ class PropertyCard extends StatelessWidget {
     final converted = property.price * rate;
     String formatted;
     if (decimals == 0) {
-      final intVal = converted.round();
-      if (intVal >= 1000000) {
-        formatted = '${(intVal / 1000000).toStringAsFixed(1).replaceAll('.0', '')}M';
-      } else if (intVal >= 1000) {
-        final k = intVal ~/ 1000;
-        final rem = intVal % 1000;
-        formatted = rem == 0 ? '${k}K' : '${k} ${rem.toString().padLeft(3, '0')}';
-      } else {
-        formatted = intVal.toString();
+      // Arrondi au multiple de 1 000 le plus proche
+      final rounded = ((converted / 1000).round() * 1000);
+      final s = rounded.toString();
+      final buf = StringBuffer();
+      for (int i = 0; i < s.length; i++) {
+        if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+        buf.write(s[i]);
       }
+      formatted = buf.toString();
     } else {
       formatted = converted.toStringAsFixed(decimals);
     }
