@@ -407,6 +407,10 @@ class PropertyCard extends StatelessWidget {
                     children: [
                       // Garantie badge (Location only)
                       if (property.transactionType == 'Location' &&
+                          property.type != 'Chambre d\'hôtel' &&
+                          property.type != 'Salle de Fêtes' &&
+                          property.type != 'Espace Funéraire' &&
+                          property.type != 'Salle Polyvalente' &&
                           property.garantieMois != null &&
                           property.garantieMois! > 0)
                         Container(

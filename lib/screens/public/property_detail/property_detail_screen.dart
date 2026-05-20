@@ -549,12 +549,22 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             color: AppTheme.accentColor,
                             fontFamily: 'Poppins')),
                     if (p.transactionType == 'Location') ...[
-                      const Text('par mois',
-                          style: TextStyle(
+                      Text(
+                        p.type == 'Chambre d\'hôtel'
+                            ? 'par nuitée'
+                            : (p.type == 'Salle de Fêtes' ||
+                               p.type == 'Espace Funéraire' ||
+                               p.type == 'Salle Polyvalente')
+                                ? 'par jour'
+                                : 'par mois',
+                          style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,
                               fontFamily: 'Poppins')),
-                      ...[
+                      if (p.type != 'Chambre d\'hôtel' &&
+                          p.type != 'Salle de Fêtes' &&
+                          p.type != 'Espace Funéraire' &&
+                          p.type != 'Salle Polyvalente') ...[  
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -592,7 +602,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           ]),
                         ),
                       ],
-                      if (p.hasCommission) ...[
+                      if (p.hasCommission &&
+                          p.type != 'Chambre d\'hôtel' &&
+                          p.type != 'Salle de Fêtes' &&
+                          p.type != 'Espace Funéraire' &&
+                          p.type != 'Salle Polyvalente') ...[  
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
