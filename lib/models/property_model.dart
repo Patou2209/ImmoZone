@@ -45,6 +45,7 @@ class PropertyModel {
   // Champs conditionnels
   final double? pricePerNight;   // chambre d'hôtel
   final int? numberOfBeds;       // chambre d'hôtel
+  final String? establishmentName; // hôtel, fêtes, funéraire
   final bool? hasAirConditioning;
   final bool? hasBreakfast;
   final double? pricePerDay;     // salle de fête
@@ -103,6 +104,7 @@ class PropertyModel {
     this.longitude,
     this.pricePerNight,
     this.numberOfBeds,
+    this.establishmentName,
     this.hasAirConditioning,
     this.hasBreakfast,
     this.pricePerDay,
@@ -133,7 +135,7 @@ class PropertyModel {
     DateTime? createdAt, DateTime? updatedAt, DateTime? expiresAt,
     int? views, bool? isFeatured, DateTime? boostEnd, String? boostType,
     double? latitude, double? longitude,
-    double? pricePerNight, int? numberOfBeds, bool? hasAirConditioning,
+    double? pricePerNight, int? numberOfBeds, String? establishmentName, bool? hasAirConditioning,
     bool? hasBreakfast, double? pricePerDay, int? capacity,
     double? minLeaseDuration, int? garantieMois, bool? hasCommission, double? commissionPct,
     double? longueurM, double? largeurM,
@@ -166,6 +168,7 @@ class PropertyModel {
     latitude: latitude ?? this.latitude, longitude: longitude ?? this.longitude,
     pricePerNight: pricePerNight ?? this.pricePerNight,
     numberOfBeds: numberOfBeds ?? this.numberOfBeds,
+    establishmentName: establishmentName ?? this.establishmentName,
     hasAirConditioning: hasAirConditioning ?? this.hasAirConditioning,
     hasBreakfast: hasBreakfast ?? this.hasBreakfast,
     pricePerDay: pricePerDay ?? this.pricePerDay,
@@ -197,7 +200,7 @@ class PropertyModel {
     'views': views, 'isFeatured': isFeatured,
     'boostEnd': boostEnd?.toIso8601String(), 'boostType': boostType,
     'latitude': latitude, 'longitude': longitude,
-    'pricePerNight': pricePerNight, 'numberOfBeds': numberOfBeds,
+    'pricePerNight': pricePerNight, 'numberOfBeds': numberOfBeds, 'establishmentName': establishmentName,
     'hasAirConditioning': hasAirConditioning, 'hasBreakfast': hasBreakfast,
     'pricePerDay': pricePerDay, 'capacity': capacity,
     'minLeaseDuration': minLeaseDuration, 'garantieMois': garantieMois,
@@ -237,6 +240,7 @@ class PropertyModel {
     latitude: m['latitude']?.toDouble(), longitude: m['longitude']?.toDouble(),
     pricePerNight: m['pricePerNight']?.toDouble(),
     numberOfBeds: m['numberOfBeds'],
+    establishmentName: m['establishmentName'],
     hasAirConditioning: m['hasAirConditioning'],
     hasBreakfast: m['hasBreakfast'],
     pricePerDay: m['pricePerDay']?.toDouble(),
