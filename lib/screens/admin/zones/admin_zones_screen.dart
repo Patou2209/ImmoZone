@@ -275,8 +275,11 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Zones Géographiques',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16,
+                color: Colors.white)),
         backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.save_rounded, color: AppTheme.accentColor),
@@ -509,8 +512,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
             ]),
 
       // ── Bouton Sauvegarder ───────────────────────────────────────────────────
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: AppTheme.dividerColor.withValues(alpha: 0.5))),
@@ -534,6 +539,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
+        ),
         ),
       ),
     );

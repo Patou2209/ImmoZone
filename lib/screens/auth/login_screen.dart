@@ -72,25 +72,21 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 32),
 
-              // ── Logo officiel ImmoZone (fond blanc) ─────────────────
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Image.asset(
-                  'assets/images/immozone_logo.png',
-                  width: 220,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => RichText(
-                    text: const TextSpan(
-                      style: TextStyle(fontFamily: 'Poppins',
-                          fontSize: 30, fontWeight: FontWeight.w800),
-                      children: [
-                        TextSpan(text: 'Immo',
-                            style: TextStyle(color: AppTheme.primaryColor)),
-                        TextSpan(text: 'Zone',
-                            style: TextStyle(color: AppTheme.accentColor)),
-                      ],
-                    ),
+              // ── Logo officiel ImmoZone ─────────────────────────────
+              Image.asset(
+                'assets/images/immozone_logo.png',
+                width: 220,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => RichText(
+                  text: const TextSpan(
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontSize: 30, fontWeight: FontWeight.w800),
+                    children: [
+                      TextSpan(text: 'Immo',
+                          style: TextStyle(color: AppTheme.primaryColor)),
+                      TextSpan(text: 'Zone',
+                          style: TextStyle(color: AppTheme.accentColor)),
+                    ],
                   ),
                 ),
               ),

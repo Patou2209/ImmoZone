@@ -1974,7 +1974,7 @@ class _HomeTabState extends State<_HomeTab>
               style: TextStyle(fontFamily: 'Poppins',
                   fontWeight: FontWeight.w800,
                   fontSize: total ? 14 : 12,
-                  color: color)),
+                  color: Colors.white)),
         ),
       ]),
     );
@@ -2157,13 +2157,13 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
       appBar: AppBar(
         title: const Text('Mon Tableau de Bord',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                color: Color(0xFFFFA726))),
+                color: Colors.white)),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white70),
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
             onPressed: () async {
               await auth.logout();
               if (mounted) Navigator.of(context).pushReplacementNamed('/');
