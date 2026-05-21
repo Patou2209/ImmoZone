@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import '../../../providers/auth_provider.dart' as immo_auth;
 import '../../../providers/property_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_image.dart';
@@ -48,7 +49,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _validatePaymentFromDashboard(PaymentModel payment, bool approve) async {
-    final auth = context.read<AuthProvider>();
+    final auth = context.read<immo_auth.AuthProvider>();
     final wasApprove = approve; // capture avant tout rebuild
     final userName = payment.userName.isNotEmpty ? payment.userName : payment.userId;
     try {
@@ -184,9 +185,148 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
+  // ── Supprimer TOUTES les annonces (avec confirmation mot de passe) ─────────
+  Future<void> _deleteAllProperties() async {
+    final auth = context.read<immo_auth.AuthProvider>();
+    final adminEmail = auth.currentUser?.email ?? '';
+    final passwordCtrl = TextEditingController();
+    bool obscure = true;
+    String? errorMsg;
+
+    // Étape 1 — Confirmation initiale
+    final step1 = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.warning_rounded, color: Colors.red, size: 28),
+          SizedBox(width: 10),
+          Expanded(child: Text('Supprimer TOUT', style: TextStyle(
+              fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700,
+              color: Colors.red))),
+        ]),
+        content: const Text(
+          'Cette action va supprimer TOUTES les annonces. Cette operation est IRREVERSIBLE.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+              color: AppTheme.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.delete_forever, size: 16),
+            label: const Text('Continuer', style: TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red, foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (step1 != true || !mounted) return;
+
+    // Étape 2 — Confirmation mot de passe admin
+    final step2 = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(children: [
+            Icon(Icons.lock_outline_rounded, color: AppTheme.primaryColor, size: 24),
+            SizedBox(width: 10),
+            Text('Confirmer votre mot de passe', style: TextStyle(
+                fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w700)),
+          ]),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Entrez votre mot de passe admin pour confirmer la suppression de TOUTES les annonces.',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                    color: AppTheme.textSecondary, height: 1.4)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordCtrl,
+              obscureText: obscure,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Mot de passe',
+                labelStyle: const TextStyle(fontFamily: 'Poppins'),
+                prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.primaryColor),
+                suffixIcon: IconButton(
+                  icon: Icon(obscure ? Icons.visibility_off : Icons.visibility,
+                      color: AppTheme.textSecondary),
+                  onPressed: () => setStateDialog(() => obscure = !obscure),
+                ),
+                errorText: errorMsg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                ),
+              ),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
+            ElevatedButton(
+              onPressed: () async {
+                final pwd = passwordCtrl.text.trim();
+                if (pwd.isEmpty) {
+                  setStateDialog(() => errorMsg = 'Mot de passe requis');
+                  return;
+                }
+                // Ré-authentifier via Firebase
+                try {
+                  final credential = fb_auth.EmailAuthProvider.credential(
+                    email: adminEmail, password: pwd);
+                  await fb_auth.FirebaseAuth.instance.currentUser
+                      ?.reauthenticateWithCredential(credential);
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  setStateDialog(() => errorMsg = 'Mot de passe incorrect');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red, foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Confirmer', style: TextStyle(
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordCtrl.dispose();
+    if (step2 != true || !mounted) return;
+
+    // Exécution de la suppression
+    final provider = context.read<PropertyProvider>();
+    final all = provider.properties;
+    int deleted = 0;
+    for (final p in all) {
+      await _ds.deleteProperty(p.id);
+      deleted++;
+    }
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('🗑️ $deleted annonce(s) supprimée(s) définitivement',
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
+    final auth = context.watch<immo_auth.AuthProvider>();
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: _isLoading
@@ -501,7 +641,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   ),
                                 );
                                 if (confirm == true && mounted) {
-                                  await context.read<AuthProvider>().logout();
+                                  await context.read<immo_auth.AuthProvider>().logout();
                                   if (mounted) {
                                     Navigator.pushAndRemoveUntil(
                                       context,
@@ -643,6 +783,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ),
                     ),
                   ],
+
+                  // ── Zone dangereuse ────────────────────────────────────
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Zone Dangereuse',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                                  color: Colors.red, fontFamily: 'Poppins')),
+                        ]),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Supprimer toutes les annonces',
+                                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                                    fontSize: 14, color: Colors.red)),
+                            const SizedBox(height: 4),
+                            const Text('Supprime DÉFINITIVEMENT toutes les annonces de la plateforme. Nécessite la confirmation de votre mot de passe.',
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                                    color: AppTheme.textSecondary, height: 1.4)),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _deleteAllProperties,
+                                icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                                label: const Text('Supprimer toutes les annonces',
+                                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ]),
+                    ),
+                  ),
 
                   const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],

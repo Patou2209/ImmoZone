@@ -1123,15 +1123,25 @@ class _HomeTabState extends State<_HomeTab>
         ),
         padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
         child: Column(children: [
-          Text(
-            _ds.homeTitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w800,
-              fontSize: 24,
-              color: AppTheme.textPrimary,
-              height: 1.2,
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [
+                Color(0xFFFFA726), // orange vif
+                Color(0xFF0A3A8F), // bleu navy
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: Text(
+              _ds.homeTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                color: Colors.white, // requis pour ShaderMask
+                height: 1.2,
+              ),
             ),
           ),
           const SizedBox(height: 8),
