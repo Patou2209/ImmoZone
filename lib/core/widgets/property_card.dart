@@ -326,9 +326,15 @@ class PropertyCard extends StatelessWidget {
                                     ),
                                   ),
                                   if (property.transactionType == 'Location')
-                                    const Text(
-                                      '/mois',
-                                      style: TextStyle(
+                                    Text(
+                                      property.type == 'Chambre d\'hôtel'
+                                          ? '/nuitée'
+                                          : (property.type == 'Salle de Fêtes' ||
+                                             property.type == 'Espace Funéraire' ||
+                                             property.type == 'Salle Polyvalente')
+                                              ? '/jour'
+                                              : '/mois',
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
                                         color: AppTheme.textSecondary,
