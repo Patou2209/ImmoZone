@@ -37,6 +37,13 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
     'Luxe':           10,
   };
 
+  // ── Taux de conversion monnaies (admin-configurable) ─────────────────────
+  // Combien d'unites pour combien d'argent
+  // Exemple : 100 unites = 10 USD  →  usd_per_100_units = 10.0
+  double _usdPer100Units  = 10.0;   // 100 unites = 10 USD
+  double _cdfPer100Units  = 25000.0; // 100 unites = 25 000 CDF
+  double _fcfaPer100Units = 6550.0;  // 100 unites = 6 550 FCFA
+
   // Ordre fixe des zones
   static const List<String> _zoneNames = [
     'Standard', 'Intermediaire', 'Premium', 'Luxe',
@@ -69,17 +76,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
 
   // ── Getters ────────────────────────────────────────────────────────────────
   List<String> get _citiesForCountry {
-    if (_selectedCountry == 'Congo (Brazzaville)') {
-      final Set<String> all = {};
-      for (final p in AppConstants.provincesBrazzaville) {
-        all.addAll(AppConstants.getCitiesForProvince(_selectedCountry, p));
-      }
-      return all
-          .where((c) => AppConstants.getCommunesForCity(c).isNotEmpty)
-          .toList()
-        ..sort();
-    }
-    return AppConstants.cities
+    // BUG FIX: utiliser getCitiesForCountry() qui retourne des listes strictement
+    // separees par pays (RDC vs Brazzaville) — evite le melange de villes
+    final countrySpecificCities = AppConstants.getCitiesForCountry(_selectedCountry);
+    return countrySpecificCities
         .where((c) => AppConstants.getCommunesForCity(c).isNotEmpty)
         .toList()
       ..sort();
@@ -120,7 +120,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   Future<void> _load() async {
     setState(() => _isLoading = true);
 
-    // Charger config des zones (unites)
+    // Charger config des zones (unites + taux monnaies)
     final zonesConfig = _ds.zonesConfig;
     if (zonesConfig.isNotEmpty) {
       for (final name in _zoneNames) {
@@ -129,6 +129,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
           _zoneUnits[name] = (cfg['units'] as num?)?.toInt() ?? _zoneUnits[name]!;
         }
       }
+      // Charger taux de conversion
+      _usdPer100Units  = (zonesConfig['usd_per_100_units']  as num?)?.toDouble() ?? _usdPer100Units;
+      _cdfPer100Units  = (zonesConfig['cdf_per_100_units']  as num?)?.toDouble() ?? _cdfPer100Units;
+      _fcfaPer100Units = (zonesConfig['fcfa_per_100_units'] as num?)?.toDouble() ?? _fcfaPer100Units;
     }
 
     // Charger assignations communes
@@ -156,11 +160,15 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   Future<void> _saveAll() async {
     setState(() => _isSaving = true);
 
-    // Sauvegarder config zones
+    // Sauvegarder config zones + taux monnaies
     final zonesConfigMap = <String, dynamic>{};
     for (final name in _zoneNames) {
       zonesConfigMap[name] = {'units': _zoneUnits[name] ?? 1};
     }
+    // Inclure les taux de conversion
+    zonesConfigMap['usd_per_100_units']  = _usdPer100Units;
+    zonesConfigMap['cdf_per_100_units']  = _cdfPer100Units;
+    zonesConfigMap['fcfa_per_100_units'] = _fcfaPer100Units;
     await _ds.saveZonesConfig(zonesConfigMap);
 
     // Sauvegarder assignations communes (au format zone)
@@ -301,42 +309,8 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // Bandeau explicatif
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppTheme.accentColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: AppTheme.accentColor.withValues(alpha: 0.3)),
-          ),
-          child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(Icons.info_outline_rounded,
-                      color: AppTheme.accentColor, size: 18),
-                  SizedBox(width: 8),
-                  Text('Systeme de zones et unites',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: AppTheme.accentColor)),
-                ]),
-                SizedBox(height: 8),
-                Text(
-                  '10 USD = 100 unites  •  1 unite = 0,10 USD\n\n'
-                  'Chaque zone a un nombre d\'unites. Quand une commune est assignee a une zone, '
-                  'le cout de publication dans cette commune = les unites de sa zone.',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      color: AppTheme.accentColor,
-                      height: 1.5),
-                ),
-              ]),
-        ),
+        // Section : Convertisseur monnaies configurable
+        _buildCurrencyRatesSection(),
         const SizedBox(height: 20),
 
         // En-tete section
@@ -355,11 +329,205 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
     );
   }
 
+  // ── Section taux de conversion configurable ─────────────────────────────
+  Widget _buildCurrencyRatesSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.accentColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // En-tete
+        const Row(children: [
+          Icon(Icons.info_outline_rounded, color: AppTheme.accentColor, size: 18),
+          SizedBox(width: 8),
+          Text('Systeme de zones et unites',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppTheme.accentColor)),
+        ]),
+        const SizedBox(height: 6),
+        const Text(
+          'Chaque zone a un nombre d\'unites. Quand une commune est assignee a une zone, '
+          'le cout de publication dans cette commune = les unites de sa zone.',
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 11,
+              color: AppTheme.accentColor,
+              height: 1.5),
+        ),
+        const SizedBox(height: 14),
+        // Titre sous-section taux
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.accentColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(children: [
+            Icon(Icons.currency_exchange_rounded,
+                size: 13, color: AppTheme.accentColor),
+            SizedBox(width: 6),
+            Text('Taux de conversion (100 unites = ...)',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11,
+                    color: AppTheme.accentColor)),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        // Les 3 champs de taux
+        _buildRateField(
+          currency: 'USD',
+          flag: '\$',
+          value: _usdPer100Units,
+          onChanged: (v) => setState(() => _usdPer100Units = v),
+          color: const Color(0xFF1565C0),
+        ),
+        const SizedBox(height: 8),
+        _buildRateField(
+          currency: 'CDF',
+          flag: 'FC',
+          value: _cdfPer100Units,
+          onChanged: (v) => setState(() => _cdfPer100Units = v),
+          color: const Color(0xFF2E7D32),
+        ),
+        const SizedBox(height: 8),
+        _buildRateField(
+          currency: 'FCFA',
+          flag: 'XAF',
+          value: _fcfaPer100Units,
+          onChanged: (v) => setState(() => _fcfaPer100Units = v),
+          color: const Color(0xFF6A1B9A),
+        ),
+        const SizedBox(height: 10),
+        // Rappel dynamique du taux actuel USD pour 1 unite
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '1 unite = ${(_usdPer100Units / 100).toStringAsFixed(4)} USD'
+            '  |  ${(_cdfPer100Units / 100).toStringAsFixed(0)} CDF'
+            '  |  ${(_fcfaPer100Units / 100).toStringAsFixed(1)} FCFA',
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.accentColor),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildRateField({
+    required String currency,
+    required String flag,
+    required double value,
+    required ValueChanged<double> onChanged,
+    required Color color,
+  }) {
+    final ctrl = TextEditingController(text: value.toStringAsFixed(
+        currency == 'USD' ? 2 : 0));
+    return Row(children: [
+      // Badge monnaie
+      Container(
+        width: 54,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(children: [
+          Text(flag,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
+          Text(currency,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: color)),
+        ]),
+      ),
+      const SizedBox(width: 10),
+      // Label
+      Expanded(
+        child: Text('100 unites =',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary)),
+      ),
+      // Champ valeur
+      SizedBox(
+        width: 100,
+        child: TextField(
+          controller: ctrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              color: color),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            filled: true,
+            fillColor: color.withValues(alpha: 0.06),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    BorderSide(color: color.withValues(alpha: 0.3))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: color, width: 2)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    BorderSide(color: color.withValues(alpha: 0.3))),
+            suffixText: currency,
+            suffixStyle: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color.withValues(alpha: 0.7)),
+          ),
+          onChanged: (v) {
+            final parsed = double.tryParse(v);
+            if (parsed != null && parsed > 0) {
+              onChanged(parsed);
+            }
+          },
+        ),
+      ),
+    ]);
+  }
+
   Widget _buildZoneConfigCard(String zoneName) {
     final color = _zoneColors[zoneName] ?? Colors.grey;
     final icon = _zoneIcons[zoneName] ?? Icons.star_outline_rounded;
     final units = _zoneUnits[zoneName] ?? 1;
-    final usd = (units * 0.1).toStringAsFixed(2);
+    // Calcul dynamique du prix en USD base sur le taux configure
+    final usdValue = (units * _usdPer100Units / 100);
+    final usd = usdValue >= 1
+        ? usdValue.toStringAsFixed(2)
+        : usdValue.toStringAsFixed(3);
     final communeCount = _communeAssignments.values.where((v) {
       final m = v as Map<String, dynamic>;
       return (m['zone'] as String?) == zoneName;
@@ -667,7 +835,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                       children: [
                         Text(
                             c['code'] == 'Congo (RDC)' ? 'cd' : 'cg',
-                            style: const TextStyle(fontSize: 16)),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFFFFA726),
+                                fontWeight: FontWeight.w700)),
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(c['label']!,
@@ -915,7 +1086,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
         ? (_zoneColors[zoneName] ?? Colors.grey)
         : Colors.grey;
     final units = zoneName != null ? (_zoneUnits[zoneName] ?? 1) : 0;
-    final usd = (units * 0.1).toStringAsFixed(2);
+    final usdVal = units * _usdPer100Units / 100;
+    final usd = usdVal >= 1
+        ? usdVal.toStringAsFixed(2)
+        : usdVal.toStringAsFixed(3);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1066,7 +1240,10 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                   final c = _zoneColors[z] ?? Colors.grey;
                   final icon = _zoneIcons[z] ?? Icons.star_outline_rounded;
                   final units = _zoneUnits[z] ?? 1;
-                  final usd = (units * 0.1).toStringAsFixed(2);
+                  final usdDialVal = units * _usdPer100Units / 100;
+                  final usd = usdDialVal >= 1
+                      ? usdDialVal.toStringAsFixed(2)
+                      : usdDialVal.toStringAsFixed(3);
                   final isSelected = selectedZone == z;
 
                   return GestureDetector(
