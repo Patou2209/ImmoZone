@@ -1541,7 +1541,7 @@ class _HomeTabState extends State<_HomeTab>
         OutlinedButton.icon(
           onPressed: () => setState(() { _resetFilters(); _displayCount = 4; _hasSearched = false; }),
           icon: const Icon(Icons.clear_rounded, size: 16, color: AppTheme.accentColor),
-          label: const Text('Reinitialiser les filtres',
+          label: const Text('Réinitialiser les filtres',
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
                   fontSize: 12, color: AppTheme.accentColor)),
           style: OutlinedButton.styleFrom(
@@ -2379,7 +2379,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
                 fontSize: 15, color: AppTheme.textPrimary)),
         const SizedBox(height: 6),
-        const Text('Publiez votre premiere annonce pour commencer.',
+        const Text('Publiez votre première annonce pour commencer.',
             style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
                 color: AppTheme.textSecondary)),
       ]),

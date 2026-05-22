@@ -645,7 +645,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
           const SizedBox(height: 14),
 
           // ── Infos du bien ──────────────────────────────────────────────────
-          _section('🏠 Informations du bien', Column(children: [
+          _section('Informations du bien', Column(children: [
             _row('Titre',          property.title),
             _row('Type de propriété',   property.type),
             _row('Transaction',    property.transactionType),
@@ -660,7 +660,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
           const SizedBox(height: 14),
 
           // ── Adresse ────────────────────────────────────────────────────────
-          _section('📍 Adresse complète', Column(children: [
+          _section('Adresse complète', Column(children: [
             _row('Pays',      'Congo (RDC)'),
             _row('Province',  property.province),
             _row('Ville',     property.city),

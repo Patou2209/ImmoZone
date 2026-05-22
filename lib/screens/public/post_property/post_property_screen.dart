@@ -736,7 +736,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         const SizedBox(height: 20),
 
         // ── Adresse du bien ────────────────────────────────────────────────
-        _sectionLabel('Adresse complete du bien'),
+        _sectionLabel('Adresse complète du bien'),
         const SizedBox(height: 10),
 
         // Pays : selecteur (pas de saisie manuelle)
@@ -917,128 +917,60 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 ),
               ]),
               const SizedBox(height: 8),
-              // Tarif par durée
+              // Tarif par durée (chips interactifs)
               Row(children: [
-                _durationCostChip('7j', cost7,  color, _selectedDuration == 7),
+                _durationCostChip('7 Jours',  cost7,  color, _selectedDuration == 7,  7),
                 const SizedBox(width: 6),
-                _durationCostChip('15j', cost15, color, _selectedDuration == 15),
+                _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
                 const SizedBox(width: 6),
-                _durationCostChip('30j', cost30, color, _selectedDuration == 30),
+                _durationCostChip('30 Jours', cost30, color, _selectedDuration == 30, 30),
               ]),
             ],
           ),
         ),
 
-        const SizedBox(height: 10),
-
-        // ── Sélecteur de durée ───────────────────────────────────────────
-        Text(
-          'Durée de publication',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(children: [
-          _durationButton(7,  '7 jours',  cost7,  color),
-          const SizedBox(width: 8),
-          _durationButton(15, '15 jours', cost15, color),
-          const SizedBox(width: 8),
-          _durationButton(30, '30 jours', cost30, color),
-        ]),
       ],
     );
   }
 
-  Widget _durationCostChip(String label, int cost, Color color, bool selected) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: selected ? color : color.withValues(alpha: 0.25),
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Column(children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: selected ? color : color.withValues(alpha: 0.6),
-            ),
-          ),
-          Text(
-            '$cost u.',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: selected ? color : color.withValues(alpha: 0.7),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _durationButton(int days, String label, int cost, Color zoneColor) {
-    final selected = _selectedDuration == days;
+  Widget _durationCostChip(String label, int cost, Color color, bool selected, int days) {
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() {
           _selectedDuration = days;
-          // Reset credit check so step 3 re-evaluates with new duration
           _creditChecked = false;
         }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.primaryColor
-                : AppTheme.primaryColor.withValues(alpha: 0.06),
+            color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected
-                  ? AppTheme.primaryColor
-                  : AppTheme.primaryColor.withValues(alpha: 0.2),
+              color: selected ? color : color.withValues(alpha: 0.25),
               width: selected ? 2 : 1,
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : AppTheme.primaryColor,
-                ),
+          child: Column(children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: selected ? color : color.withValues(alpha: 0.6),
               ),
-              const SizedBox(height: 2),
-              Text(
-                '$cost unité${cost > 1 ? 's' : ''}',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: selected
-                      ? Colors.white.withValues(alpha: 0.85)
-                      : AppTheme.primaryColor.withValues(alpha: 0.65),
-                ),
+            ),
+            Text(
+              '$cost Unité${cost > 1 ? 's' : ''}',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: selected ? color : color.withValues(alpha: 0.7),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
       ),
     );

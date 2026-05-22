@@ -600,12 +600,13 @@ class DataService {
   // ─── QUOTAS ─────────────────────────────────────────────────────────────────
 
   Future<QuotaModel> getCurrentQuota(String userId) async {
-    final now = DateTime.now();
+    // Quota de bienvenue unique (non mensuel) : year=0, month=0
+    // Une fois attribué, jamais réinitialisé.
     try {
       final snap = await _quotasCol
           .where('userId', isEqualTo: userId)
-          .where('year', isEqualTo: now.year)
-          .where('month', isEqualTo: now.month)
+          .where('year', isEqualTo: 0)
+          .where('month', isEqualTo: 0)
           .limit(1)
           .get();
       if (snap.docs.isNotEmpty) {
@@ -613,27 +614,27 @@ class DataService {
       }
     } catch (_) {}
 
-    final settings = await _getSettings();
-    final newQuota = QuotaModel(
-      id: 'quota_${userId}_${now.year}_${now.month}',
+    // Créer le quota de bienvenue une seule fois (3 annonces, jamais réinitialisé)
+    final welcomeQuota = QuotaModel(
+      id: 'quota_${userId}_welcome',
       userId: userId,
-      year: now.year,
-      month: now.month,
-      freeQuota: (settings['monthly_free_quota'] as num?)?.toInt() ?? 3,
+      year: 0,   // marqueur «quota unique à vie»
+      month: 0,
+      freeQuota: 3,
       usedFreeQuota: 0,
-      resetDate: DateTime(now.year, now.month + 1, 1),
+      resetDate: DateTime(2099, 12, 31), // loin dans le futur — pas de réinitialisation
     );
-    await _quotasCol.doc(newQuota.id).set(newQuota.toMap());
-    return newQuota;
+    await _quotasCol.doc(welcomeQuota.id).set(welcomeQuota.toMap());
+    return welcomeQuota;
   }
 
   Future<void> consumeFreeQuota(String userId) async {
-    final now = DateTime.now();
+    // Consomme une unité du quota de bienvenue unique (year=0, month=0)
     try {
       final snap = await _quotasCol
           .where('userId', isEqualTo: userId)
-          .where('year', isEqualTo: now.year)
-          .where('month', isEqualTo: now.month)
+          .where('year', isEqualTo: 0)
+          .where('month', isEqualTo: 0)
           .limit(1)
           .get();
       if (snap.docs.isNotEmpty) {

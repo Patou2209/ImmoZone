@@ -657,7 +657,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               ]),
             ),
 
-            // Caracteristiques
+            // Caractéristiques
             const SizedBox(height: 12),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -673,7 +673,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 ],
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Caracteristiques',
+                const Text('Caractéristiques',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,

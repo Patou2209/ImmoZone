@@ -94,7 +94,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
                 const SizedBox(height: 20),
 
                 // ── Contacts visibles ────────────────────────────────────────
-                _sectionHeader('👁️ Contacts visibles (${visible.length})'),
+                _sectionHeader('Contacts visibles (${visible.length})'),
                 const SizedBox(height: 10),
                 if (visible.isEmpty)
                   _emptyCard('Aucun contact visible')
@@ -104,7 +104,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
 
                 // ── Contacts masqués ─────────────────────────────────────────
                 if (hidden.isNotEmpty) ...[
-                  _sectionHeader('🙈 Contacts masqués (${hidden.length})'),
+                  _sectionHeader('Contacts masqués (${hidden.length})'),
                   const SizedBox(height: 10),
                   ...hidden.map((c) => _contactCard(c, _contacts.indexOf(c))),
                 ],

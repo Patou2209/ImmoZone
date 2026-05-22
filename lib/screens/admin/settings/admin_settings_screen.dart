@@ -253,7 +253,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
         // ── MODE PLATEFORME ──────────────────────────────────────────────────
-        _sectionHeader('🔄 Mode de la plateforme'),
+        _sectionHeader('Mode de la plateforme'),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
@@ -345,13 +345,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         ),
         const SizedBox(height: 20),
         // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
-        _sectionHeader('🎁 Promotions — annonces gratuites'),
+        _sectionHeader('Promotions — annonces gratuites'),
         const SizedBox(height: 10),
         _card(_buildPromoSection()),
         const SizedBox(height: 20),
 
         // ── CONTACTS BOUTON CONTACT (WhatsApp + Téléphone + Email) ──────────
-        _sectionHeader('📞 Bouton "Contact" — Coordonnées'),
+        _sectionHeader('Bouton "Contact" — Coordonnées'),
         const SizedBox(height: 10),
         _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
@@ -514,7 +514,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         const SizedBox(height: 20),
 
         // ── CONTACTS ADMIN ────────────────────────────────────────────────────
-        _sectionHeader('📞 Gestion des contacts'),
+        _sectionHeader('Gestion des contacts'),
         const SizedBox(height: 10),
         _card(Column(children: [
           const Text(
@@ -1035,7 +1035,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildPacksTab() {
     final publications = _packs.where((p) => p['type'] != 'subscription').toList();
-    final abonnements  = _packs.where((p) => p['type'] == 'subscription').toList();
 
     return Column(children: [
       Expanded(
@@ -1062,14 +1061,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ),
             const SizedBox(height: 16),
 
-            // Abonnements mensuel/annuel
-            _sectionHeader('🗓️ Abonnements (Mensuel / Annuel)'),
-            const SizedBox(height: 10),
-            ...abonnements.asMap().entries.map((e) => _packCard(e.value, _packs.indexOf(e.value))),
-            const SizedBox(height: 16),
-
-            // Packs publications
-            _sectionHeader('📦 Packs de publications'),
+            // Packs de crédits
+            _sectionHeader('Packs de publications'),
             const SizedBox(height: 10),
             ...publications.asMap().entries.map((e) => _packCard(e.value, _packs.indexOf(e.value))),
             const SizedBox(height: 12),
@@ -1140,7 +1133,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ),
             const SizedBox(width: 8),
             if ((pack['qty'] ?? 0) > 0)
-              Text('${pack['qty']} publication(s)', style: const TextStyle(
+              Text('${pack['qty']} crédits', style: const TextStyle(
                 fontFamily: 'Poppins', fontSize: 11, color: AppTheme.textSecondary,
               )),
             if ((pack['qty'] ?? 0) == -1)
@@ -1446,72 +1439,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ONGLET 4 — ZONES GÉOGRAPHIQUES
   // ════════════════════════════════════════════════════════════════════════════
   Widget _buildZonesTab() {
-    final zones = _ds.geographicZones;
-    final configuredCount = zones.length;
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Stats zones
-        _sectionHeader('📍 Zones configurées'),
-        const SizedBox(height: 10),
-        _card(Column(children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.map_outlined, color: AppTheme.accentColor, size: 26),
-            ),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('$configuredCount commune${configuredCount > 1 ? 's' : ''} configurée${configuredCount > 1 ? 's' : ''}',
-                  style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                      fontSize: 18, color: AppTheme.textPrimary)),
-              const Text('avec un tarif de crédits spécifique',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                      color: AppTheme.textSecondary)),
-            ])),
-          ]),
-          const SizedBox(height: 14),
-          if (configuredCount > 0) ...[
-            const Divider(),
-            const SizedBox(height: 8),
-            ...zones.entries.take(5).map((e) {
-              final credits = (e.value['credits'] as num?)?.toInt() ?? 1;
-              final standing = e.value['standing'] as String? ?? 'Standard';
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(children: [
-                  const Icon(Icons.location_on, size: 14, color: AppTheme.accentColor),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(e.key, style: const TextStyle(
-                    fontFamily: 'Poppins', fontSize: 12, color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w600,
-                  ))),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text('$credits cr. • $standing',
-                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                            fontWeight: FontWeight.w700, color: Colors.white)),
-                  ),
-                ]),
-              );
-            }),
-            if (configuredCount > 5)
-              Text('+ ${configuredCount - 5} autre(s)...',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                      color: AppTheme.textHint)),
-          ],
-        ])),
-        const SizedBox(height: 16),
-
         // Bouton d'accès à l'écran complet
         SizedBox(
           width: double.infinity,
@@ -1572,7 +1502,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ),
             const SizedBox(height: 16),
 
-            _sectionHeader('🏠 Titre principal'),
+            _sectionHeader('Titre principal'),
             const SizedBox(height: 8),
             _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               TextField(
@@ -1599,7 +1529,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ])),
             const SizedBox(height: 12),
 
-            _sectionHeader('💬 Sous-titre'),
+            _sectionHeader('Sous-titre'),
             const SizedBox(height: 8),
             _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               TextField(
@@ -1624,7 +1554,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             const SizedBox(height: 8),
 
             // Aperçu live du hero
-            _sectionHeader('👁 Aperçu du hero'),
+            _sectionHeader('Aperçu du hero'),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -1708,7 +1638,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ),
             const SizedBox(height: 20),
 
-            _sectionHeader('✍️ Rédiger le message'),
+            _sectionHeader('Rédiger le message'),
             const SizedBox(height: 10),
             _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               TextField(
@@ -1761,7 +1691,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             const SizedBox(height: 16),
 
             // Modèles prédéfinis
-            _sectionHeader('📋 Modèles prédéfinis'),
+            _sectionHeader('Modèles prédéfinis'),
             const SizedBox(height: 10),
             _card(Column(children: [
               _templateBtn(
@@ -1775,7 +1705,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
               ),
               const Divider(height: 16),
               _templateBtn(
-                '📞 Contact support',
+                'Contact support',
                 'Pour toute réclamation ou assistance, contactez notre équipe via WhatsApp ou email. Nous répondons dans les 24h ouvrables.',
               ),
             ])),
