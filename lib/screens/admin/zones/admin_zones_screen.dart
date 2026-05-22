@@ -28,13 +28,15 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   bool _isLoading = true;
   bool _isSaving = false;
 
-  // ── Zone config : { 'Standard': {'units': 1, 'color': ...}, ... } ──────────
-  // Unites par zone (editables par l'admin)
-  Map<String, int> _zoneUnits = {
-    'Standard':       1,
-    'Intermediaire':  3,
-    'Premium':        5,
-    'Luxe':           10,
+  // ── Zone config : { zone: { days: units } } ───────────────────────
+  // Unites par zone ET par duree (7j / 15j / 30j), admin-configurable
+  static const List<int> _durations = [7, 15, 30];
+
+  Map<String, Map<int, int>> _zoneDurations = {
+    'Standard':      {7: 1,  15: 2,  30: 3},
+    'Intermediaire': {7: 3,  15: 5,  30: 8},
+    'Premium':       {7: 5,  15: 8,  30: 12},
+    'Luxe':          {7: 10, 15: 15, 30: 20},
   };
 
   // ── Taux de conversion monnaies (admin-configurable) ─────────────────────
@@ -125,8 +127,13 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
     if (zonesConfig.isNotEmpty) {
       for (final name in _zoneNames) {
         final cfg = zonesConfig[name];
-        if (cfg != null) {
-          _zoneUnits[name] = (cfg['units'] as num?)?.toInt() ?? _zoneUnits[name]!;
+        if (cfg is Map) {
+          final defaults = _zoneDurations[name]!;
+          _zoneDurations[name] = {
+            7:  (cfg['units_7d']  as num?)?.toInt() ?? defaults[7]!,
+            15: (cfg['units_15d'] as num?)?.toInt() ?? defaults[15]!,
+            30: (cfg['units_30d'] as num?)?.toInt() ?? defaults[30]!,
+          };
         }
       }
       // Charger taux de conversion
@@ -163,7 +170,12 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
     // Sauvegarder config zones + taux monnaies
     final zonesConfigMap = <String, dynamic>{};
     for (final name in _zoneNames) {
-      zonesConfigMap[name] = {'units': _zoneUnits[name] ?? 1};
+      final dur = _zoneDurations[name]!;
+      zonesConfigMap[name] = {
+        'units_7d':  dur[7]  ?? 1,
+        'units_15d': dur[15] ?? 1,
+        'units_30d': dur[30] ?? 1,
+      };
     }
     // Inclure les taux de conversion
     zonesConfigMap['usd_per_100_units']  = _usdPer100Units;
@@ -520,14 +532,9 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   }
 
   Widget _buildZoneConfigCard(String zoneName) {
-    final color = _zoneColors[zoneName] ?? Colors.grey;
-    final icon = _zoneIcons[zoneName] ?? Icons.star_outline_rounded;
-    final units = _zoneUnits[zoneName] ?? 1;
-    // Calcul dynamique du prix en USD base sur le taux configure
-    final usdValue = (units * _usdPer100Units / 100);
-    final usd = usdValue >= 1
-        ? usdValue.toStringAsFixed(2)
-        : usdValue.toStringAsFixed(3);
+    final color  = _zoneColors[zoneName] ?? Colors.grey;
+    final icon   = _zoneIcons[zoneName]  ?? Icons.star_outline_rounded;
+    final dur    = _zoneDurations[zoneName]!;
     final communeCount = _communeAssignments.values.where((v) {
       final m = v as Map<String, dynamic>;
       return (m['zone'] as String?) == zoneName;
@@ -539,12 +546,8 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
-        ],
+        boxShadow: [BoxShadow(
+            color: color.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -553,146 +556,140 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
           Row(children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(zoneName,
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: color)),
-                    Text(
-                      '$communeCount commune${communeCount > 1 ? 's' : ''} assignee${communeCount > 1 ? 's' : ''}',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: color.withValues(alpha: 0.7)),
-                    ),
-                  ]),
-            ),
-            // Badge unites actuelles
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(zoneName, style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w800, fontSize: 15, color: color)),
+              Text('$communeCount commune${communeCount > 1 ? "s" : ""} assignee${communeCount > 1 ? "s" : ""}',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                      color: color.withValues(alpha: 0.7))),
+            ])),
+            // Badge résumé 7j/15j/30j
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '$units unite${units > 1 ? 's' : ''}',
-                style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                    color: Colors.white),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
+              child: Text('${dur[7]}/${dur[15]}/${dur[30]} u.',
+                  style: const TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white)),
             ),
           ]),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const Divider(height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Ligne : slider + champ texte
-          Row(children: [
-            // Slider
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Unites par annonce',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textSecondary)),
-                          Text('$usd USD',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: color)),
-                        ]),
-                    const SizedBox(height: 4),
-                    SliderTheme(
+          // Titre "Unités par durée"
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(children: [
+              Icon(Icons.schedule_rounded, size: 13, color: color),
+              const SizedBox(width: 6),
+              Text('Unites par duree de publication',
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                      fontSize: 11, color: color)),
+            ]),
+          ),
+          const SizedBox(height: 12),
+
+          // 3 durées : 7j / 15j / 30j
+          ..._durations.map((days) {
+            final units    = dur[days] ?? 1;
+            final label    = days == 7 ? '7 jours' : days == 15 ? '15 jours' : '30 jours';
+            final usdVal   = units * _usdPer100Units / 100;
+            final usdStr   = usdVal >= 1 ? usdVal.toStringAsFixed(2) : usdVal.toStringAsFixed(3);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(label,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                              fontWeight: FontWeight.w700, color: color)),
+                    ),
+                  ]),
+                  Row(children: [
+                    Text('$units u.',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                            fontWeight: FontWeight.w800, color: color)),
+                    const SizedBox(width: 6),
+                    Text('= $usdStr USD',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                            color: color.withValues(alpha: 0.7))),
+                  ]),
+                ]),
+                const SizedBox(height: 6),
+                Row(children: [
+                  Expanded(
+                    child: SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: color,
                         inactiveTrackColor: color.withValues(alpha: 0.15),
                         thumbColor: color,
                         overlayColor: color.withValues(alpha: 0.1),
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 8),
+                        trackHeight: 3.5,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
                       ),
                       child: Slider(
                         value: units.toDouble().clamp(1, 50),
-                        min: 1,
-                        max: 50,
-                        divisions: 49,
-                        label: '$units',
-                        onChanged: (v) => setState(
-                            () => _zoneUnits[zoneName] = v.round()),
+                        min: 1, max: 50, divisions: 49, label: '$units',
+                        onChanged: (v) => setState(() {
+                          _zoneDurations[zoneName] = Map.from(dur)..[days] = v.round();
+                        }),
                       ),
                     ),
-                  ]),
-            ),
-            const SizedBox(width: 12),
-            // Champ numerique direct
-            SizedBox(
-              width: 70,
-              child: _ZoneUnitsField(
-                initialValue: units,
-                color: color,
-                onChanged: (v) =>
-                    setState(() => _zoneUnits[zoneName] = v),
-              ),
-            ),
-          ]),
-
-          // Boutons rapides
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            children: [1, 2, 3, 5, 10, 15, 20].map((v) {
-              final isSelected = units == v;
-              return GestureDetector(
-                onTap: () => setState(() => _zoneUnits[zoneName] = v),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? color
-                        : color.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: isSelected
-                            ? color
-                            : color.withValues(alpha: 0.25)),
                   ),
-                  child: Text('$v',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color:
-                              isSelected ? Colors.white : color)),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 62,
+                    child: _ZoneUnitsField(
+                      initialValue: units,
+                      color: color,
+                      onChanged: (v) => setState(() {
+                        _zoneDurations[zoneName] = Map.from(dur)..[days] = v;
+                      }),
+                    ),
+                  ),
+                ]),
+                // Boutons rapides
+                Wrap(
+                  spacing: 5,
+                  children: [1, 2, 3, 5, 8, 10, 15, 20].map((v) {
+                    final isSel = units == v;
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _zoneDurations[zoneName] = Map.from(dur)..[days] = v;
+                      }),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isSel ? color : color.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isSel ? color : color.withValues(alpha: 0.25)),
+                        ),
+                        child: Text('$v', style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isSel ? Colors.white : color)),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }).toList(),
-          ),
+              ]),
+            );
+          }),
         ]),
       ),
     );
@@ -730,7 +727,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
           }).length;
           if (count == 0) return const SizedBox.shrink();
           final color = _zoneColors[z] ?? Colors.grey;
-          final units = _zoneUnits[z] ?? 1;
+          final dur2 = _zoneDurations[z]!;
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Row(children: [
@@ -759,7 +756,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                 decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8)),
-                child: Text('$units u.',
+                child: Text('${dur2[7]}/${dur2[15]}/${dur2[30]} u.',
                     style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 10,
@@ -1085,7 +1082,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
     final color = zoneName != null
         ? (_zoneColors[zoneName] ?? Colors.grey)
         : Colors.grey;
-    final units = zoneName != null ? (_zoneUnits[zoneName] ?? 1) : 0;
+    final units = zoneName != null ? ((_zoneDurations[zoneName]?[30] ?? 1)) : 0;
     final usdVal = units * _usdPer100Units / 100;
     final usd = usdVal >= 1
         ? usdVal.toStringAsFixed(2)
@@ -1239,7 +1236,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                 ..._zoneNames.map((z) {
                   final c = _zoneColors[z] ?? Colors.grey;
                   final icon = _zoneIcons[z] ?? Icons.star_outline_rounded;
-                  final units = _zoneUnits[z] ?? 1;
+                  final units = (_zoneDurations[z]?[30] ?? 1);
                   final usdDialVal = units * _usdPer100Units / 100;
                   final usd = usdDialVal >= 1
                       ? usdDialVal.toStringAsFixed(2)
@@ -1372,7 +1369,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                   final c = _zoneColors[z] ?? Colors.grey;
                   final icon =
                       _zoneIcons[z] ?? Icons.star_outline_rounded;
-                  final units = _zoneUnits[z] ?? 1;
+                  final units = (_zoneDurations[z]?[30] ?? 1);
                   final isSelected = bulkZone == z;
 
                   return GestureDetector(

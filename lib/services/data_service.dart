@@ -806,32 +806,54 @@ class DataService {
   // Retourne le nombre d'unites pour une commune
   // Nouveau format : commune -> { zone: 'Standard' } + zones_config -> { Standard: { units: 1 } }
   // Ancien format  : commune -> { credits: 3, standing: 'Premium' }
-  int getCreditsForCommune(String commune) {
+  /// Retourne le nombre d'unites requis pour publier dans [commune] pendant [days] jours.
+  /// [days] doit etre 7, 15 ou 30 (defaut = 30).
+  int getCreditsForCommune(String commune, {int days = 30}) {
     final zones = geographicZones;
+    final cfg   = zonesConfig;
+
+    // Cle de la duree : 'units_7d' | 'units_15d' | 'units_30d'
+    final dKey = days == 7 ? 'units_7d' : days == 15 ? 'units_15d' : 'units_30d';
+
+    // Defaults par zone si pas encore configure
+    const Map<String, Map<int, int>> fallbackDurations = {
+      'Standard':      {7: 1,  15: 2,  30: 3},
+      'Intermediaire': {7: 3,  15: 5,  30: 8},
+      'Premium':       {7: 5,  15: 8,  30: 12},
+      'Luxe':          {7: 10, 15: 15, 30: 20},
+    };
+
     if (zones.containsKey(commune)) {
       final data = zones[commune] as Map<String, dynamic>;
       // Nouveau format : via zone
       if (data.containsKey('zone')) {
         final zoneName = data['zone'] as String? ?? 'Standard';
-        final cfg = zonesConfig;
         if (cfg.containsKey(zoneName)) {
-          return (cfg[zoneName]['units'] as num?)?.toInt() ?? 1;
+          final zoneCfg = cfg[zoneName];
+          if (zoneCfg is Map && zoneCfg.containsKey(dKey)) {
+            return (zoneCfg[dKey] as num?)?.toInt() ?? 1;
+          }
+          // Ancien format (un seul 'units') — compatibilite
+          if (zoneCfg is Map && zoneCfg.containsKey('units')) {
+            return (zoneCfg['units'] as num?)?.toInt() ?? 1;
+          }
         }
-        // Fallback defaults si zones_config pas encore charge
-        const defaults = {'Standard': 1, 'Intermediaire': 3, 'Premium': 5, 'Luxe': 10};
-        return defaults[zoneName] ?? 1;
+        return fallbackDurations[zoneName]?[days] ?? 1;
       }
       // Ancien format : credits direct
       if (data.containsKey('credits')) {
         return (data['credits'] as num?)?.toInt() ?? 1;
       }
     }
-    // Commune non configuree -> zone Standard par defaut (unites = 1 ou config Standard)
-    final cfg = zonesConfig;
+
+    // Commune non configuree -> zone Standard par defaut
     if (cfg.containsKey('Standard')) {
-      return (cfg['Standard']['units'] as num?)?.toInt() ?? 1;
+      final stdCfg = cfg['Standard'];
+      if (stdCfg is Map && stdCfg.containsKey(dKey)) {
+        return (stdCfg[dKey] as num?)?.toInt() ?? 1;
+      }
     }
-    return 1; // Valeur absolue par defaut = 1 unite (zone Standard)
+    return fallbackDurations['Standard']?[days] ?? 1;
   }
 
   String getZoneStanding(String commune) {
@@ -1296,7 +1318,8 @@ class DataService {
   // ─── DROITS DE PUBLICATION ──────────────────────────────────────────────────
   // Retourne: 'free_trial' | 'free_quota' | 'paid_credit' | 'no_right'
 
-  Future<String> checkPublicationRight(String userId, {String commune = ''}) async {
+  Future<String> checkPublicationRight(String userId,
+      {String commune = '', int days = 30}) async {
     // 1. Free trial activé globalement ?
     if (isFreeTrial) return 'free_trial';
 
@@ -1305,14 +1328,17 @@ class DataService {
     if (quota.usedFreeQuota < quota.freeQuota) return 'free_quota';
 
     // 3. Crédits payants disponibles ?
-    final required = commune.isNotEmpty ? getCreditsForCommune(commune) : 1;
+    final required = commune.isNotEmpty
+        ? getCreditsForCommune(commune, days: days)
+        : 1;
     final available = await getUserAvailableCredits(userId);
     if (available >= required) return 'paid_credit';
 
     return 'no_right';
   }
 
-  Future<void> consumePublicationRight(String userId, {String commune = ''}) async {
+  Future<void> consumePublicationRight(String userId,
+      {String commune = '', int days = 30}) async {
     // 1. Free trial : rien à consommer
     if (isFreeTrial) return;
 
@@ -1324,7 +1350,9 @@ class DataService {
     }
 
     // 3. Crédits payants
-    final required = commune.isNotEmpty ? getCreditsForCommune(commune) : 1;
+    final required = commune.isNotEmpty
+        ? getCreditsForCommune(commune, days: days)
+        : 1;
     await consumeCredits(userId, required);
   }
 

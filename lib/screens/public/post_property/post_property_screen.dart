@@ -83,6 +83,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final List<String> _imageUrls = [];
   final _imageUrlCtrl = TextEditingController();
 
+  // ── Durée de publication ──────────────────────────────────────────────────
+  int _selectedDuration = 30; // 7 | 15 | 30 jours
+
   // ── Etape 3 — Paiement ────────────────────────────────────────────────────
   Map<String, dynamic>? _selectedPack;
   Map<String, dynamic>? _selectedPaymentMethod;
@@ -346,11 +349,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     if (!auth.isLoggedIn) return;
     final ds = DataService();
     final userId = auth.currentUser!.id;
-    final required = ds.getCreditsForCommune(_selectedCommune);
+    final required = ds.getCreditsForCommune(_selectedCommune, days: _selectedDuration);
     // Count paid credits only (free quota handled separately via checkPublicationRight)
     final available = await ds.getUserAvailableCredits(userId);
     // Use the authoritative publication right check (free trial, free quota, paid credit, no right)
-    final right = await ds.checkPublicationRight(userId, commune: _selectedCommune);
+    final right = await ds.checkPublicationRight(userId, commune: _selectedCommune, days: _selectedDuration);
     // "enough" = free trial active, OR free monthly quota still available, OR sufficient paid credits
     final enough = (right == 'free_trial') || (right == 'free_quota') || (right == 'paid_credit');
     // Récupérer le quota gratuit disponible pour affichage dynamique
@@ -392,7 +395,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       // Consume the publication right (handles free trial, free quota, or paid credits)
       if (_hasEnoughCredits) {
         final ds = DataService();
-        await ds.consumePublicationRight(user.id, commune: _selectedCommune);
+        await ds.consumePublicationRight(user.id, commune: _selectedCommune, days: _selectedDuration);
       }
 
       // ── Convertir les fichiers locaux en base64 ──────────────────────────────
@@ -773,7 +776,15 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         if (_availableCommunes.isNotEmpty)
           _dropdown('Commune *', _selectedCommune, _availableCommunes,
               Icons.location_on_outlined,
-              (v) => setState(() => _selectedCommune = v ?? '')),
+              (v) => setState(() {
+                _selectedCommune = v ?? '';
+              })),
+
+        // ── Bannière zone + sélecteur de durée ──────────────────────────────
+        if (_selectedCommune.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildZoneDurationWidget(),
+        ],
 
         _field(
           _quartierCtrl,
@@ -828,6 +839,208 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         ),
         const SizedBox(height: 30),
       ]),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ZONE INFO BANNER + DURATION SELECTOR
+  // ══════════════════════════════════════════════════════════════════════════
+  Widget _buildZoneDurationWidget() {
+    final ds = DataService();
+    final zoneName = ds.getZoneStanding(_selectedCommune);
+
+    // Zone color mapping (same as admin)
+    final Map<String, Color> zoneColors = {
+      'Standard':      Colors.grey,
+      'Intermediaire': Colors.blue,
+      'Premium':       Colors.orange,
+      'Luxe':          Colors.purple,
+    };
+    final Map<String, String> zoneLabels = {
+      'Standard':      'Standard',
+      'Intermediaire': 'Intermédiaire',
+      'Premium':       'Premium',
+      'Luxe':          'Luxe',
+    };
+    final color = zoneColors[zoneName] ?? Colors.grey;
+    final label = zoneLabels[zoneName] ?? zoneName;
+
+    // Cost per duration
+    final cost7  = ds.getCreditsForCommune(_selectedCommune, days: 7);
+    final cost15 = ds.getCreditsForCommune(_selectedCommune, days: 15);
+    final cost30 = ds.getCreditsForCommune(_selectedCommune, days: 30);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Bannière zone ────────────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Zone name row
+              Row(children: [
+                Icon(Icons.layers_rounded, color: color, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  'Zone $label',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _selectedCommune,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              // Tarif par durée
+              Row(children: [
+                _durationCostChip('7j', cost7,  color, _selectedDuration == 7),
+                const SizedBox(width: 6),
+                _durationCostChip('15j', cost15, color, _selectedDuration == 15),
+                const SizedBox(width: 6),
+                _durationCostChip('30j', cost30, color, _selectedDuration == 30),
+              ]),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Sélecteur de durée ───────────────────────────────────────────
+        Text(
+          'Durée de publication',
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(children: [
+          _durationButton(7,  '7 jours',  cost7,  color),
+          const SizedBox(width: 8),
+          _durationButton(15, '15 jours', cost15, color),
+          const SizedBox(width: 8),
+          _durationButton(30, '30 jours', cost30, color),
+        ]),
+      ],
+    );
+  }
+
+  Widget _durationCostChip(String label, int cost, Color color, bool selected) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: selected ? color : color.withValues(alpha: 0.25),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: selected ? color : color.withValues(alpha: 0.6),
+            ),
+          ),
+          Text(
+            '$cost u.',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: selected ? color : color.withValues(alpha: 0.7),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _durationButton(int days, String label, int cost, Color zoneColor) {
+    final selected = _selectedDuration == days;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() {
+          _selectedDuration = days;
+          // Reset credit check so step 3 re-evaluates with new duration
+          _creditChecked = false;
+        }),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.primaryColor
+                : AppTheme.primaryColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected
+                  ? AppTheme.primaryColor
+                  : AppTheme.primaryColor.withValues(alpha: 0.2),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$cost unité${cost > 1 ? 's' : ''}',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.85)
+                      : AppTheme.primaryColor.withValues(alpha: 0.65),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
