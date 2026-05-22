@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -16,6 +20,13 @@ class EditPropertyScreen extends StatefulWidget {
 class _EditPropertyScreenState extends State<EditPropertyScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+
+  // ── Photos ────────────────────────────────────────────────────────────────
+  // null = utiliser les images existantes de la propriété (p.images)
+  XFile? _newMainPhoto;                       // nouvelle photo principale (remplace [0])
+  final List<XFile> _newSecondaryPhotos = []; // nouvelles photos secondaires (remplacent [1..3])
+  bool _photosChanged = false;                // true = re-encoder à la sauvegarde
+  final _picker = ImagePicker();
 
   // ── Champs principaux ──────────────────────────────────────────────────────
   late final TextEditingController _titleCtrl;
@@ -90,6 +101,37 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     super.dispose();
   }
 
+  // ── Photo helpers ─────────────────────────────────────────────────────────
+  Future<void> _pickMainPhoto() async {
+    final picked = await _picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 50);
+    if (picked != null) {
+      setState(() {
+        _newMainPhoto = picked;
+        _photosChanged = true;
+      });
+    }
+  }
+
+  Future<void> _pickSecondaryPhoto() async {
+    if (_newSecondaryPhotos.length >= 3) return;
+    final picked = await _picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 50);
+    if (picked != null) {
+      setState(() {
+        _newSecondaryPhotos.add(picked);
+        _photosChanged = true;
+      });
+    }
+  }
+
+  void _removeSecondaryPhoto(int index) {
+    setState(() {
+      _newSecondaryPhotos.removeAt(index);
+      _photosChanged = true;
+    });
+  }
+
   // ── Listes cascade ─────────────────────────────────────────────────────────
   List<String> get _provinces =>
       AppConstants.getProvincesForCountry(_selectedCountry);
@@ -106,6 +148,32 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     setState(() => _saving = true);
     try {
       final p = widget.property;
+
+      // ── Encoder les nouvelles photos si modifiées ─────────────────────────
+      List<String> finalImages = p.images; // conserver les anciennes par défaut
+      if (_photosChanged && !kIsWeb) {
+        final newImages = <String>[];
+        int totalBytes = 0;
+        const int maxDocBytes = 900000;
+        final allNew = [
+          if (_newMainPhoto != null) _newMainPhoto!,
+          ..._newSecondaryPhotos,
+        ];
+        if (allNew.isNotEmpty) {
+          for (final xfile in allNew) {
+            if (totalBytes >= maxDocBytes) break;
+            try {
+              final bytes = await File(xfile.path).readAsBytes();
+              if (totalBytes + bytes.length > maxDocBytes) break;
+              final b64 = base64Encode(bytes);
+              final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+              newImages.add('data:image/$ext;base64,$b64');
+              totalBytes += bytes.length;
+            } catch (_) {}
+          }
+          finalImages = newImages;
+        }
+      }
       // Build updated model — use PropertyModel constructor directly to allow
       // setting nullable fields to null (copyWith cannot reset nullable to null).
       final updated = PropertyModel(
@@ -139,8 +207,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         garantieMois:    _isLocation ? _garantieMois : null,
         // Preserve unchanged fields
         amenities:       p.amenities,
-        images:          p.images,
-        mainImageIndex:  p.mainImageIndex,
+        images:          finalImages,
+        mainImageIndex:  0,
         ownerId:         p.ownerId,
         ownerName:       p.ownerName,
         ownerPhone:      p.ownerPhone,
@@ -185,6 +253,233 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  // ── Photo editor ───────────────────────────────────────────────────────────
+  Widget _buildPhotoEditor() {
+    final existingImages = widget.property.images;
+
+    // Photo principale : nouvelle si choisie, sinon première image existante
+    Widget mainPhotoWidget;
+    if (_newMainPhoto != null) {
+      mainPhotoWidget = kIsWeb
+          ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              child: const Icon(Icons.image_rounded, size: 40, color: AppTheme.accentColor))
+          : Image.file(File(_newMainPhoto!.path), fit: BoxFit.cover);
+    } else if (existingImages.isNotEmpty) {
+      final src = existingImages[0];
+      if (src.startsWith('data:image')) {
+        final b64 = src.split(',').last;
+        mainPhotoWidget = Image.memory(base64Decode(b64), fit: BoxFit.cover);
+      } else {
+        mainPhotoWidget = Image.network(src, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded,
+                color: AppTheme.textHint));
+      }
+    } else {
+      mainPhotoWidget = const Icon(Icons.add_photo_alternate_outlined,
+          size: 40, color: AppTheme.textHint);
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Info
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.accentColor.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+        ),
+        child: const Row(children: [
+          Icon(Icons.info_outline, size: 14, color: AppTheme.accentColor),
+          SizedBox(width: 8),
+          Expanded(child: Text(
+            'Appuyez sur une photo pour la remplacer. Max 4 photos (1 principale + 3 secondaires).',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                color: AppTheme.accentColor),
+          )),
+        ]),
+      ),
+      const SizedBox(height: 12),
+
+      // Photo principale
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Main photo slot
+        GestureDetector(
+          onTap: _pickMainPhoto,
+          child: Stack(children: [
+            Container(
+              width: 110, height: 110,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _newMainPhoto != null
+                      ? AppTheme.accentColor
+                      : AppTheme.dividerColor,
+                  width: _newMainPhoto != null ? 2 : 1,
+                ),
+                color: AppTheme.primaryColor.withValues(alpha: 0.04),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: mainPhotoWidget,
+            ),
+            // Badge "Principale"
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.75),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(9),
+                    bottomRight: Radius.circular(9),
+                  ),
+                ),
+                child: const Center(child: Text('Principale',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                        color: Colors.white, fontWeight: FontWeight.w600))),
+              ),
+            ),
+            // Edit icon overlay
+            Positioned(
+              top: 4, right: 4,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.edit_rounded, size: 12,
+                    color: AppTheme.accentColor),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(width: 10),
+
+        // Secondary photos grid
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Photos secondaires',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                    color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              // Existing secondary photos (if no new ones chosen)
+              if (_newSecondaryPhotos.isEmpty && existingImages.length > 1)
+                ...List.generate(
+                  (existingImages.length - 1).clamp(0, 3),
+                  (i) {
+                    final src = existingImages[i + 1];
+                    Widget img;
+                    if (src.startsWith('data:image')) {
+                      img = Image.memory(base64Decode(src.split(',').last),
+                          fit: BoxFit.cover);
+                    } else {
+                      img = Image.network(src, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.broken_image_rounded, size: 18,
+                              color: AppTheme.textHint));
+                    }
+                    return GestureDetector(
+                      onTap: _pickSecondaryPhoto,
+                      child: Container(
+                        width: 70, height: 70,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.dividerColor),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: img,
+                      ),
+                    );
+                  },
+                ),
+
+              // New secondary photos chosen
+              ..._newSecondaryPhotos.asMap().entries.map((entry) {
+                final i = entry.key;
+                final xfile = entry.value;
+                return Stack(children: [
+                  Container(
+                    width: 70, height: 70,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppTheme.accentColor.withValues(alpha: 0.6)),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: kIsWeb
+                        ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                            child: const Icon(Icons.image_rounded,
+                                color: AppTheme.accentColor))
+                        : Image.file(File(xfile.path), fit: BoxFit.cover),
+                  ),
+                  Positioned(
+                    top: 2, right: 2,
+                    child: GestureDetector(
+                      onTap: () => _removeSecondaryPhoto(i),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded,
+                            size: 10, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ]);
+              }),
+
+              // Add button (if < 3 secondary)
+              if (_newSecondaryPhotos.length < 3 ||
+                  (_newSecondaryPhotos.isEmpty && existingImages.length < 4))
+                GestureDetector(
+                  onTap: _pickSecondaryPhoto,
+                  child: Container(
+                    width: 70, height: 70,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                          style: BorderStyle.solid),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.04),
+                    ),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate_outlined, size: 22,
+                            color: AppTheme.primaryColor),
+                        SizedBox(height: 2),
+                        Text('Ajouter', style: TextStyle(fontFamily: 'Poppins',
+                            fontSize: 9, color: AppTheme.primaryColor)),
+                      ],
+                    ),
+                  ),
+                ),
+            ]),
+          ]),
+        ),
+      ]),
+
+      // "Remplacer toutes" button when new photos chosen
+      if (_photosChanged) ...[
+        const SizedBox(height: 8),
+        Row(children: [
+          const Icon(Icons.check_circle_rounded, size: 14,
+              color: AppTheme.successColor),
+          const SizedBox(width: 6),
+          Text(
+            '${(_newMainPhoto != null ? 1 : 0) + _newSecondaryPhotos.length} nouvelle(s) photo(s) '
+            'sélectionnée(s) — seront enregistrées',
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                color: AppTheme.successColor),
+          ),
+        ]),
+      ],
+    ]);
   }
 
   // ── UI helpers ─────────────────────────────────────────────────────────────
@@ -274,9 +569,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
-        title: const Text('Modifier l\'annonce',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
-                fontSize: 16)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+            fontFamily: 'Poppins', fontWeight: FontWeight.w600,
+            fontSize: 16, color: Colors.white),
+        title: const Text('Modifier l\'annonce'),
         actions: [
           if (_saving)
             const Padding(
@@ -300,6 +597,11 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
           children: [
+            // ── Photos ─────────────────────────────────────────────────────
+            _section('Photos'),
+            _buildPhotoEditor(),
+            const SizedBox(height: 4),
+
             // ── Informations principales ────────────────────────────────────
             _section('Informations principales'),
             _field('Titre de l\'annonce', _titleCtrl,

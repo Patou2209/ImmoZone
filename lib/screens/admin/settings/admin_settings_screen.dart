@@ -19,7 +19,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   Map<String, dynamic> _settings = {};
   late TabController _tabCtrl;
 
-  late TextEditingController _validityCtrl;
 
   // ── Packs ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _packs = [];
@@ -57,7 +56,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   int _promoScopeIndex = 0;
   String? _promoTargetCountry;
   String? _promoTargetCity;
-  String? _promoTargetCommune;
+  String? _promoTargetZone; // Zone de publication : Standard / Intermédiaire / Premium / Luxe
 
   @override
   void initState() {
@@ -68,7 +67,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   }
 
   void _initControllers() {
-    _validityCtrl    = TextEditingController();
     _homeTitleCtrl      = TextEditingController();
     _homeSubtitleCtrl   = TextEditingController();
     _officialMsgCtrl    = TextEditingController();
@@ -90,7 +88,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _settings         = _ds.systemSettings;
     _isFreeTrial      = _settings['free_trial_enabled'] == true;
     _isPromoActive    = _ds.isPromoActive;
-    _validityCtrl.text    = (_settings['announcement_validity_days'] ?? 30).toString();
     _homeTitleCtrl.text    = _ds.homeTitle;
     _homeSubtitleCtrl.text  = _ds.homeSubtitle;
     _officialMsgCtrl.text   = _ds.officialMessage;
@@ -105,7 +102,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   @override
   void dispose() {
     _tabCtrl.dispose();
-    for (final c in [_validityCtrl,
+    for (final c in [
         _homeTitleCtrl, _homeSubtitleCtrl,
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
         _promoQtyCtrl, _promoReasonCtrl]) {
@@ -118,7 +115,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     setState(() => _isSaving = true);
     await _ds.updateSettings({
       'free_trial_enabled':        _isFreeTrial,
-      'announcement_validity_days': int.tryParse(_validityCtrl.text) ?? 30,
     });
     setState(() => _isSaving = false);
     _snackOk('✅ Paramètres plateforme sauvegardés');
@@ -348,51 +344,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ]),
         ),
         const SizedBox(height: 20),
-
-        // ── DURÉE DE VALIDATION ──────────────────────────────────────────────
-        _sectionHeader('⏱️ Durée de validation des annonces'),
-        const SizedBox(height: 10),
-        _card(Column(children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(children: [
-              Icon(Icons.info_outline, color: AppTheme.accentColor, size: 16),
-              SizedBox(width: 8),
-              Expanded(child: Text(
-                'Durée pendant laquelle une annonce approuvée reste visible sur la plateforme avant expiration.',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                    color: AppTheme.textSecondary, height: 1.4),
-              )),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          _numField('Durée de validité (jours)', _validityCtrl, Icons.timer_outlined, isInt: true),
-          // Boutons rapides
-          Wrap(spacing: 8, children: [7, 14, 30, 60, 90].map((days) => GestureDetector(
-            onTap: () => setState(() => _validityCtrl.text = '$days'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _validityCtrl.text == '$days'
-                    ? AppTheme.accentColor : AppTheme.primaryColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _validityCtrl.text == '$days'
-                      ? AppTheme.accentColor : AppTheme.dividerColor,
-                ),
-              ),
-              child: Text('$days jours', style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 11, fontWeight: FontWeight.w600,
-                color: _validityCtrl.text == '$days' ? Colors.white : AppTheme.textSecondary,
-              )),
-            ),
-          )).toList()),
-        ])),
-        const SizedBox(height: 20),
         // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
         _sectionHeader('🎁 Promotions — annonces gratuites'),
         const SizedBox(height: 10),
@@ -608,15 +559,15 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         final citiesForCountry = _promoTargetCountry != null
             ? AppConstants.getCitiesForCountry(_promoTargetCountry!)
             : <String>[];
-        final communesForCity = _promoTargetCity != null
-            ? AppConstants.getCommunesForCity(_promoTargetCity!)
-            : <String>[];
+        const zoneNames = ['Standard', 'Intermédiaire', 'Premium', 'Luxe'];
 
         String scopeLabel;
         if (_promoScopeIndex == 0) {
           scopeLabel = 'Tous les utilisateurs';
-        } else if (_promoTargetCommune != null) {
-          scopeLabel = 'Commune : $_promoTargetCommune';
+        } else if (_promoTargetZone != null) {
+          final cityPart = _promoTargetCity != null ? ' • Ville : $_promoTargetCity' : '';
+          final countryPart = _promoTargetCountry != null ? ' • $_promoTargetCountry' : '';
+          scopeLabel = 'Zone : $_promoTargetZone$cityPart$countryPart';
         } else if (_promoTargetCity != null) {
           scopeLabel = 'Ville : $_promoTargetCity';
         } else if (_promoTargetCountry != null) {
@@ -710,12 +661,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                   onChanged: (v) => setPromo(() {
                     _promoTargetCountry = v;
                     _promoTargetCity = null;
-                    _promoTargetCommune = null;
+                    _promoTargetZone = null;
                   }),
                 ),
                 const SizedBox(height: 10),
 
-                // Ville
+                // Ville (optionnel)
                 if (_promoTargetCountry != null) ...[
                   _promoDropdown<String>(
                     icon: Icons.location_city_outlined,
@@ -725,7 +676,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                     labelOf: (c) => c,
                     onChanged: (v) => setPromo(() {
                       _promoTargetCity = v;
-                      _promoTargetCommune = null;
+                      _promoTargetZone = null;
                     }),
                     nullable: true,
                     nullLabel: 'Tout le pays',
@@ -733,20 +684,18 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                   const SizedBox(height: 10),
                 ],
 
-                // Commune
-                if (_promoTargetCity != null && communesForCity.isNotEmpty) ...[
-                  _promoDropdown<String>(
-                    icon: Icons.map_outlined,
-                    hint: 'Choisir une commune (optionnel)',
-                    value: _promoTargetCommune,
-                    items: communesForCity,
-                    labelOf: (c) => c,
-                    onChanged: (v) => setPromo(() => _promoTargetCommune = v),
-                    nullable: true,
-                    nullLabel: 'Toute la ville',
-                  ),
-                  const SizedBox(height: 10),
-                ],
+                // Zone de publication (Standard / Intermédiaire / Premium / Luxe)
+                _promoDropdown<String>(
+                  icon: Icons.layers_rounded,
+                  hint: 'Choisir une zone (optionnel)',
+                  value: _promoTargetZone,
+                  items: zoneNames,
+                  labelOf: (z) => z,
+                  onChanged: (v) => setPromo(() => _promoTargetZone = v),
+                  nullable: true,
+                  nullLabel: 'Toutes les zones',
+                ),
+                const SizedBox(height: 10),
 
                 // Recap cible
                 Container(
@@ -845,7 +794,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           if (index == 0) {
             _promoTargetCountry = null;
             _promoTargetCity = null;
-            _promoTargetCommune = null;
+            _promoTargetZone = null;
           }
         }),
         child: Container(
@@ -927,12 +876,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     String scopeDesc;
     if (_promoScopeIndex == 0) {
       scopeDesc = 'TOUS les utilisateurs de la plateforme';
-    } else if (_promoTargetCommune != null) {
-      scopeDesc = 'Commune : $_promoTargetCommune';
+    } else if (_promoTargetZone != null) {
+      final cityPart = _promoTargetCity != null ? ' • Ville : $_promoTargetCity' : '';
+      final countryPart = _promoTargetCountry != null ? ' ($_promoTargetCountry)' : '';
+      scopeDesc = 'Zone : $_promoTargetZone$cityPart$countryPart';
     } else if (_promoTargetCity != null) {
-      scopeDesc = 'Ville : $_promoTargetCity (toutes communes)';
+      scopeDesc = 'Ville : $_promoTargetCity (toutes zones)';
     } else if (_promoTargetCountry != null) {
-      scopeDesc = 'Pays : $_promoTargetCountry (toutes villes)';
+      scopeDesc = 'Pays : $_promoTargetCountry (toutes zones)';
     } else {
       _snackErr('Selectionnez au moins un pays pour une promo par zone.');
       return;
@@ -1003,7 +954,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         reason: reason,
         targetCountry: _promoScopeIndex == 1 ? _promoTargetCountry : null,
         targetCity: _promoScopeIndex == 1 ? _promoTargetCity : null,
-        targetCommune: _promoScopeIndex == 1 ? _promoTargetCommune : null,
+        targetZone: _promoScopeIndex == 1 ? _promoTargetZone : null,
       );
       setState(() {
         _isPromoActive = true;

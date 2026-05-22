@@ -160,12 +160,14 @@ class DataService {
     String reason = 'Promotion administrative',
     String? targetCountry,
     String? targetCity,
-    String? targetCommune,
+    String? targetZone, // Zone de publication : Standard / Intermédiaire / Premium / Luxe
   }) async {
     // Build promo scope label
     String scope = 'global';
-    if (targetCommune != null && targetCommune.isNotEmpty) {
-      scope = 'commune:$targetCommune';
+    if (targetZone != null && targetZone.isNotEmpty) {
+      scope = 'zone:$targetZone';
+      if (targetCity != null && targetCity.isNotEmpty) scope += ':city:$targetCity';
+      else if (targetCountry != null && targetCountry.isNotEmpty) scope += ':country:$targetCountry';
     } else if (targetCity != null && targetCity.isNotEmpty) {
       scope = 'city:$targetCity';
     } else if (targetCountry != null && targetCountry.isNotEmpty) {
@@ -183,9 +185,14 @@ class DataService {
     int credited = 0;
     for (final user in users) {
       if (user.role == 'admin') continue;
-      // Zone filtering
-      if (targetCommune != null && targetCommune.isNotEmpty) {
-        if ((user.commune ?? '').toLowerCase() != targetCommune.toLowerCase()) continue;
+      // Zone-based filtering: match users whose commune belongs to targetZone
+      if (targetZone != null && targetZone.isNotEmpty) {
+        final userZone = getZoneStanding(user.commune ?? '');
+        if (userZone != targetZone) continue;
+        // Additionally filter by city if specified
+        if (targetCity != null && targetCity.isNotEmpty) {
+          if ((user.city ?? '').toLowerCase() != targetCity.toLowerCase()) continue;
+        }
       } else if (targetCity != null && targetCity.isNotEmpty) {
         if ((user.city ?? '').toLowerCase() != targetCity.toLowerCase()) continue;
       }
