@@ -19,13 +19,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   Map<String, dynamic> _settings = {};
   late TabController _tabCtrl;
 
-  // ── Tarifs ──────────────────────────────────────────────────────────────────
-  late TextEditingController _priceUnitCtrl;
-  late TextEditingController _priceMonthCtrl;
-  late TextEditingController _priceAnnualCtrl;
-  late TextEditingController _boostWeekCtrl;
-  late TextEditingController _boostMonthCtrl;
-  late TextEditingController _quotaCtrl;
   late TextEditingController _validityCtrl;
 
   // ── Packs ────────────────────────────────────────────────────────────────────
@@ -75,12 +68,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   }
 
   void _initControllers() {
-    _priceUnitCtrl   = TextEditingController();
-    _priceMonthCtrl  = TextEditingController();
-    _priceAnnualCtrl = TextEditingController();
-    _boostWeekCtrl   = TextEditingController();
-    _boostMonthCtrl  = TextEditingController();
-    _quotaCtrl       = TextEditingController();
     _validityCtrl    = TextEditingController();
     _homeTitleCtrl      = TextEditingController();
     _homeSubtitleCtrl   = TextEditingController();
@@ -103,12 +90,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _settings         = _ds.systemSettings;
     _isFreeTrial      = _settings['free_trial_enabled'] == true;
     _isPromoActive    = _ds.isPromoActive;
-    _priceUnitCtrl.text   = (_settings['price_unit_publication'] ?? 2.0).toString();
-    _priceMonthCtrl.text  = (_settings['price_monthly_sub'] ?? 2.0).toString();
-    _priceAnnualCtrl.text = (_settings['price_annual_sub'] ?? 20.0).toString();
-    _boostWeekCtrl.text   = (_settings['boost_week_price'] ?? 1.0).toString();
-    _boostMonthCtrl.text  = (_settings['boost_month_price'] ?? 5.0).toString();
-    _quotaCtrl.text       = (_settings['monthly_free_quota'] ?? 1).toString();
     _validityCtrl.text    = (_settings['announcement_validity_days'] ?? 30).toString();
     _homeTitleCtrl.text    = _ds.homeTitle;
     _homeSubtitleCtrl.text  = _ds.homeSubtitle;
@@ -124,8 +105,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   @override
   void dispose() {
     _tabCtrl.dispose();
-    for (final c in [_priceUnitCtrl, _priceMonthCtrl, _priceAnnualCtrl,
-        _boostWeekCtrl, _boostMonthCtrl, _quotaCtrl, _validityCtrl,
+    for (final c in [_validityCtrl,
         _homeTitleCtrl, _homeSubtitleCtrl,
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
         _promoQtyCtrl, _promoReasonCtrl]) {
@@ -138,12 +118,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     setState(() => _isSaving = true);
     await _ds.updateSettings({
       'free_trial_enabled':        _isFreeTrial,
-      'price_unit_publication':    double.tryParse(_priceUnitCtrl.text) ?? 2.0,
-      'price_monthly_sub':         double.tryParse(_priceMonthCtrl.text) ?? 2.0,
-      'price_annual_sub':          double.tryParse(_priceAnnualCtrl.text) ?? 20.0,
-      'boost_week_price':          double.tryParse(_boostWeekCtrl.text) ?? 1.0,
-      'boost_month_price':         double.tryParse(_boostMonthCtrl.text) ?? 5.0,
-      'monthly_free_quota':        int.tryParse(_quotaCtrl.text) ?? 1,
       'announcement_validity_days': int.tryParse(_validityCtrl.text) ?? 30,
     });
     setState(() => _isSaving = false);
@@ -419,20 +393,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           )).toList()),
         ])),
         const SizedBox(height: 20),
-
-        // ── TARIFS ────────────────────────────────────────────────────────────
-        _sectionHeader('💰 Tarifs de publication'),
-        const SizedBox(height: 10),
-        _card(Column(children: [
-          _numField('Publication unitaire (USD)', _priceUnitCtrl, Icons.article_outlined),
-          _numField('Abonnement mensuel (USD)', _priceMonthCtrl, Icons.calendar_month_outlined),
-          _numField('Abonnement annuel (USD)', _priceAnnualCtrl, Icons.calendar_today_outlined),
-          _numField('Boost 1 semaine (USD)', _boostWeekCtrl, Icons.rocket_launch_outlined),
-          _numField('Boost 1 mois (USD)', _boostMonthCtrl, Icons.rocket_launch_rounded),
-          _numField('Quota gratuit mensuel (annonces)', _quotaCtrl, Icons.free_breakfast_outlined, isInt: true),
-        ])),
-        const SizedBox(height: 20),
-
         // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
         _sectionHeader('🎁 Promotions — annonces gratuites'),
         const SizedBox(height: 10),
@@ -1537,58 +1497,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   Widget _buildZonesTab() {
     final zones = _ds.geographicZones;
     final configuredCount = zones.length;
-    final defaultCredits = (_settings['default_publication_credits'] ?? 1) as int;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-        // Bannière info
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppTheme.accentColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
-          ),
-          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.toll_outlined, color: AppTheme.accentColor, size: 18),
-              SizedBox(width: 8),
-              Text('Système de crédits par zone',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                      fontSize: 13, color: AppTheme.accentColor)),
-            ]),
-            SizedBox(height: 6),
-            Text(
-              '10 USD = 100 crédits  •  1 crédit = 0,10 USD\n'
-              'Définissez le nombre de crédits requis pour publier dans chaque commune. '
-              'Ce coût varie selon le standing géographique de la zone.',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                  color: AppTheme.accentColor, height: 1.5),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 16),
-
-        // Crédits par défaut
-        _sectionHeader('⚙️ Paramètre par défaut'),
-        const SizedBox(height: 10),
-        _card(Column(children: [
-          const Text(
-            'Nombre de crédits appliqué aux communes non configurées.',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                color: AppTheme.textSecondary, height: 1.5),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _numField('Crédits par défaut (communes non configurées)',
-                TextEditingController(text: '$defaultCredits'),
-                Icons.toll_outlined, isInt: true)),
-          ]),
-        ])),
-        const SizedBox(height: 16),
-
         // Stats zones
         _sectionHeader('📍 Zones configurées'),
         const SizedBox(height: 10),

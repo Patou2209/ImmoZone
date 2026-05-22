@@ -826,7 +826,12 @@ class DataService {
         return (data['credits'] as num?)?.toInt() ?? 1;
       }
     }
-    return (systemSettings['default_publication_credits'] as num?)?.toInt() ?? 1;
+    // Commune non configuree -> zone Standard par defaut (unites = 1 ou config Standard)
+    final cfg = zonesConfig;
+    if (cfg.containsKey('Standard')) {
+      return (cfg['Standard']['units'] as num?)?.toInt() ?? 1;
+    }
+    return 1; // Valeur absolue par defaut = 1 unite (zone Standard)
   }
 
   String getZoneStanding(String commune) {
