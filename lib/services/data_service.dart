@@ -35,6 +35,7 @@ class DataService {
   CollectionReference get _quotasCol => _db.collection('quotas');
   DocumentReference get _settingsDoc => _db.collection('config').doc('system_settings');
   DocumentReference get _zonesDoc => _db.collection('config').doc('geographic_zones');
+  DocumentReference get _zonesConfigDoc => _db.collection('config').doc('zones_config');
   DocumentReference get _paymentMethodsDoc => _db.collection('config').doc('payment_methods');
   DocumentReference get _packsDoc => _db.collection('config').doc('subscription_packs');
   DocumentReference get _contactsDoc => _db.collection('config').doc('admin_contacts');
@@ -777,10 +778,53 @@ class DataService {
     } catch (_) {}
   }
 
+  // ── Zones config (unites par zone) ──────────────────────────────────────────
+
+  Map<String, dynamic> get zonesConfig {
+    final raw = _prefs?.getString('zones_config_cache');
+    if (raw != null) {
+      try { return Map<String, dynamic>.from(jsonDecode(raw)); } catch (_) {}
+    }
+    return {};
+  }
+
+  Future<void> saveZonesConfig(Map<String, dynamic> config) async {
+    await _zonesConfigDoc.set(config);
+    await _prefs?.setString('zones_config_cache', jsonEncode(config));
+  }
+
+  Future<void> refreshZonesConfigCache() async {
+    try {
+      final snap = await _zonesConfigDoc.get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        await _prefs?.setString('zones_config_cache', jsonEncode(data));
+      }
+    } catch (_) {}
+  }
+
+  // Retourne le nombre d'unites pour une commune
+  // Nouveau format : commune -> { zone: 'Standard' } + zones_config -> { Standard: { units: 1 } }
+  // Ancien format  : commune -> { credits: 3, standing: 'Premium' }
   int getCreditsForCommune(String commune) {
     final zones = geographicZones;
     if (zones.containsKey(commune)) {
-      return (zones[commune]['credits'] as num?)?.toInt() ?? 1;
+      final data = zones[commune] as Map<String, dynamic>;
+      // Nouveau format : via zone
+      if (data.containsKey('zone')) {
+        final zoneName = data['zone'] as String? ?? 'Standard';
+        final cfg = zonesConfig;
+        if (cfg.containsKey(zoneName)) {
+          return (cfg[zoneName]['units'] as num?)?.toInt() ?? 1;
+        }
+        // Fallback defaults si zones_config pas encore charge
+        const defaults = {'Standard': 1, 'Intermediaire': 3, 'Premium': 5, 'Luxe': 10};
+        return defaults[zoneName] ?? 1;
+      }
+      // Ancien format : credits direct
+      if (data.containsKey('credits')) {
+        return (data['credits'] as num?)?.toInt() ?? 1;
+      }
     }
     return (systemSettings['default_publication_credits'] as num?)?.toInt() ?? 1;
   }
@@ -788,7 +832,11 @@ class DataService {
   String getZoneStanding(String commune) {
     final zones = geographicZones;
     if (zones.containsKey(commune)) {
-      return zones[commune]['standing'] as String? ?? 'Standard';
+      final data = zones[commune] as Map<String, dynamic>;
+      // Nouveau format
+      if (data.containsKey('zone')) return data['zone'] as String? ?? 'Standard';
+      // Ancien format
+      if (data.containsKey('standing')) return data['standing'] as String? ?? 'Standard';
     }
     return 'Standard';
   }
