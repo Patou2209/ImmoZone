@@ -157,27 +157,47 @@ class DataService {
   Future<Map<String, dynamic>> launchPromotion({
     required int freeAnnouncements,
     String reason = 'Promotion administrative',
+    String? targetCountry,
+    String? targetCity,
+    String? targetCommune,
   }) async {
+    // Build promo scope label
+    String scope = 'global';
+    if (targetCommune != null && targetCommune.isNotEmpty) {
+      scope = 'commune:$targetCommune';
+    } else if (targetCity != null && targetCity.isNotEmpty) {
+      scope = 'city:$targetCity';
+    } else if (targetCountry != null && targetCountry.isNotEmpty) {
+      scope = 'country:$targetCountry';
+    }
+
     await updateSettings({
       'promo_active': true,
       'promo_free_announcements': freeAnnouncements,
       'promo_reason': reason,
       'promo_launched_at': DateTime.now().toIso8601String(),
+      'promo_scope': scope,
     });
     final users = await getUsers();
     int credited = 0;
     for (final user in users) {
-      if (user.role != 'admin') {
-        await addCredit(CreditModel(
-          id: 'promo_${user.id}_${DateTime.now().millisecondsSinceEpoch}',
-          userId: user.id,
-          quantity: freeAnnouncements,
-          remaining: freeAnnouncements,
-          source: 'promo_admin',
-          createdAt: DateTime.now(),
-        ));
-        credited++;
+      if (user.role == 'admin') continue;
+      // Zone filtering
+      if (targetCommune != null && targetCommune.isNotEmpty) {
+        if ((user.commune ?? '').toLowerCase() != targetCommune.toLowerCase()) continue;
+      } else if (targetCity != null && targetCity.isNotEmpty) {
+        if ((user.city ?? '').toLowerCase() != targetCity.toLowerCase()) continue;
       }
+      // Note: country filter is informational only (users don't have country field yet)
+      await addCredit(CreditModel(
+        id: 'promo_${user.id}_${DateTime.now().millisecondsSinceEpoch}',
+        userId: user.id,
+        quantity: freeAnnouncements,
+        remaining: freeAnnouncements,
+        source: 'promo_admin',
+        createdAt: DateTime.now(),
+      ));
+      credited++;
     }
     return {'credited_users': credited, 'credits_per_user': freeAnnouncements};
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/data_service.dart';
+import '../../../core/constants/app_constants.dart';
 import '../contacts/admin_contacts_screen.dart';
 import '../zones/admin_zones_screen.dart';
 
@@ -57,6 +58,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   late TextEditingController _promoQtyCtrl;
   late TextEditingController _promoReasonCtrl;
   bool _isLaunchingPromo = false;
+
+  // ── Promotions — ciblage par zone ────────────────────────────────────────
+  // 0 = tous les utilisateurs, 1 = par zone
+  int _promoScopeIndex = 0;
+  String? _promoTargetCountry;
+  String? _promoTargetCity;
+  String? _promoTargetCommune;
 
   @override
   void initState() {
@@ -425,110 +433,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         ])),
         const SizedBox(height: 20),
 
-        // ── PROMOTIONS ────────────────────────────────────────────────────────
+        // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
         _sectionHeader('🎁 Promotions — annonces gratuites'),
         const SizedBox(height: 10),
-        _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Statut promo
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _isPromoActive
-                  ? AppTheme.successColor.withValues(alpha: 0.1)
-                  : AppTheme.errorColor.withValues(alpha: 0.07),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
-                width: 1.2,
-              ),
-            ),
-            child: Row(children: [
-              Icon(
-                _isPromoActive ? Icons.campaign_rounded : Icons.campaign_outlined,
-                color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: Text(
-                _isPromoActive
-                    ? 'Promotion en cours — les crédits offerts sont actifs'
-                    : 'Aucune promotion active',
-                style: TextStyle(
-                  fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
-                  color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
-                ),
-              )),
-              if (_isPromoActive)
-                TextButton(
-                  onPressed: _isLaunchingPromo ? null : _suspendPromotion,
-                  child: const Text('Suspendre',
-                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                          fontWeight: FontWeight.w700, color: AppTheme.errorColor)),
-                ),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          const Text(
-            'Offrir des annonces gratuites à TOUS les utilisateurs existants :',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                color: AppTheme.textSecondary, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _promoQtyCtrl,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Nb annonces gratuites',
-                  labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _promoReasonCtrl,
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'Raison / libellé',
-                  labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                  prefixIcon: const Icon(Icons.label_outline, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isLaunchingPromo ? null : _launchPromotion,
-              icon: _isLaunchingPromo
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send_rounded, size: 16, color: Colors.white),
-              label: Text(
-                _isLaunchingPromo ? 'Envoi en cours...' : 'Lancer la promotion',
-                style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                    fontSize: 13, color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B35),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
-        ])),
+        _card(_buildPromoSection()),
         const SizedBox(height: 20),
 
         // ── CONTACTS BOUTON CONTACT (WhatsApp + Téléphone + Email) ──────────
@@ -730,17 +638,346 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
 
   // ── MÉTHODES PROMOTION ─────────────────────────────────────────────────────
 
-  Future<void> _launchPromotion() async {
+  /// Construit le widget principal de la section Promotions.
+  /// Utilise StatefulBuilder pour que les dropdowns pays/ville/commune
+  /// se raffraichissent localement sans rebuild global.
+  Widget _buildPromoSection() {
+    return StatefulBuilder(
+      builder: (ctx, setPromo) {
+        final countries = AppConstants.countries;
+        final citiesForCountry = _promoTargetCountry != null
+            ? AppConstants.getCitiesForCountry(_promoTargetCountry!)
+            : <String>[];
+        final communesForCity = _promoTargetCity != null
+            ? AppConstants.getCommunesForCity(_promoTargetCity!)
+            : <String>[];
+
+        String scopeLabel;
+        if (_promoScopeIndex == 0) {
+          scopeLabel = 'Tous les utilisateurs';
+        } else if (_promoTargetCommune != null) {
+          scopeLabel = 'Commune : $_promoTargetCommune';
+        } else if (_promoTargetCity != null) {
+          scopeLabel = 'Ville : $_promoTargetCity';
+        } else if (_promoTargetCountry != null) {
+          scopeLabel = 'Pays : $_promoTargetCountry';
+        } else {
+          scopeLabel = 'Choisir une zone...';
+        }
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // ── Statut promo ────────────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _isPromoActive
+                  ? AppTheme.successColor.withValues(alpha: 0.1)
+                  : AppTheme.errorColor.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
+                width: 1.2,
+              ),
+            ),
+            child: Row(children: [
+              Icon(
+                _isPromoActive ? Icons.campaign_rounded : Icons.campaign_outlined,
+                color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(
+                _isPromoActive
+                    ? 'Promotion en cours'
+                    : 'Aucune promotion active',
+                style: TextStyle(
+                  fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
+                  color: _isPromoActive ? AppTheme.successColor : AppTheme.errorColor,
+                ),
+              )),
+              if (_isPromoActive)
+                TextButton(
+                  onPressed: _isLaunchingPromo ? null : _suspendPromotion,
+                  child: const Text('Suspendre',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          fontWeight: FontWeight.w700, color: AppTheme.errorColor)),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Toggle global / par zone ────────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.dividerColor),
+            ),
+            child: Row(children: [
+              _promoScopeBtn(setPromo, 0, Icons.public_rounded, 'Tous les users'),
+              _promoScopeBtn(setPromo, 1, Icons.location_on_rounded, 'Par zone'),
+            ]),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Selecteurs de zone (mode par zone) ─────────────────────────
+          if (_promoScopeIndex == 1) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.04),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.15)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Row(children: [
+                  Icon(Icons.filter_alt_outlined, size: 16, color: AppTheme.accentColor),
+                  SizedBox(width: 6),
+                  Text('Filtrer par zone',
+                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                          fontSize: 12, color: AppTheme.textPrimary)),
+                ]),
+                const SizedBox(height: 12),
+
+                // Pays
+                _promoDropdown<String>(
+                  icon: Icons.flag_outlined,
+                  hint: 'Selectionner un pays',
+                  value: _promoTargetCountry,
+                  items: countries,
+                  labelOf: (c) => c,
+                  onChanged: (v) => setPromo(() {
+                    _promoTargetCountry = v;
+                    _promoTargetCity = null;
+                    _promoTargetCommune = null;
+                  }),
+                ),
+                const SizedBox(height: 10),
+
+                // Ville
+                if (_promoTargetCountry != null) ...[
+                  _promoDropdown<String>(
+                    icon: Icons.location_city_outlined,
+                    hint: 'Choisir une ville (optionnel)',
+                    value: _promoTargetCity,
+                    items: citiesForCountry,
+                    labelOf: (c) => c,
+                    onChanged: (v) => setPromo(() {
+                      _promoTargetCity = v;
+                      _promoTargetCommune = null;
+                    }),
+                    nullable: true,
+                    nullLabel: 'Tout le pays',
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // Commune
+                if (_promoTargetCity != null && communesForCity.isNotEmpty) ...[
+                  _promoDropdown<String>(
+                    icon: Icons.map_outlined,
+                    hint: 'Choisir une commune (optionnel)',
+                    value: _promoTargetCommune,
+                    items: communesForCity,
+                    labelOf: (c) => c,
+                    onChanged: (v) => setPromo(() => _promoTargetCommune = v),
+                    nullable: true,
+                    nullLabel: 'Toute la ville',
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // Recap cible
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.my_location_rounded, size: 14, color: AppTheme.accentColor),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(
+                      'Cible : $scopeLabel',
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          fontWeight: FontWeight.w600, color: AppTheme.accentColor),
+                    )),
+                  ]),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // ── Quantite + raison ───────────────────────────────────────────
+          Row(children: [
+            Expanded(
+              flex: 2,
+              child: TextField(
+                controller: _promoQtyCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Nb annonces',
+                  labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                  prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _promoReasonCtrl,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Raison / libelle',
+                  labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                  prefixIcon: const Icon(Icons.label_outline, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+
+          // ── Bouton lancer ───────────────────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isLaunchingPromo
+                  ? null
+                  : () => _launchPromotion(setPromo),
+              icon: _isLaunchingPromo
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+              label: Text(
+                _isLaunchingPromo
+                    ? 'Envoi en cours...'
+                    : 'Lancer — $scopeLabel',
+                style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: Colors.white),
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF6B35),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ]);
+      },
+    );
+  }
+
+  Widget _promoScopeBtn(StateSetter setPromo, int index, IconData icon, String label) {
+    final selected = _promoScopeIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setPromo(() {
+          _promoScopeIndex = index;
+          if (index == 0) {
+            _promoTargetCountry = null;
+            _promoTargetCity = null;
+            _promoTargetCommune = null;
+          }
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.primaryColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, size: 15,
+                color: selected ? Colors.white : AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(
+              fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppTheme.textSecondary,
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _promoDropdown<T>({
+    required IconData icon,
+    required String hint,
+    required T? value,
+    required List<T> items,
+    required String Function(T) labelOf,
+    required ValueChanged<T?> onChanged,
+    bool nullable = false,
+    String nullLabel = 'Tous',
+  }) {
+    return DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        isDense: true,
+        prefixIcon: Icon(icon, size: 18, color: AppTheme.accentColor),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppTheme.dividerColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppTheme.accentColor, width: 2)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppTheme.dividerColor)),
+      ),
+      hint: Text(hint, style: const TextStyle(fontFamily: 'Poppins',
+          fontSize: 12, color: AppTheme.textHint)),
+      onChanged: onChanged,
+      items: [
+        if (nullable)
+          DropdownMenuItem<T>(
+            value: null,
+            child: Text(nullLabel, style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 12, color: AppTheme.textSecondary,
+                fontStyle: FontStyle.italic)),
+          ),
+        ...items.map((item) => DropdownMenuItem<T>(
+          value: item,
+          child: Text(labelOf(item), style: const TextStyle(
+              fontFamily: 'Poppins', fontSize: 12, color: AppTheme.textPrimary)),
+        )),
+      ],
+    );
+  }
+
+  Future<void> _launchPromotion([StateSetter? setPromo]) async {
     final qty = int.tryParse(_promoQtyCtrl.text.trim()) ?? 0;
     if (qty <= 0) {
-      _snackErr('Entrez un nombre valide d\'annonces gratuites (minimum 1)');
+      _snackErr("Entrez un nombre valide d'annonces gratuites (minimum 1)");
       return;
     }
     final reason = _promoReasonCtrl.text.trim().isEmpty
         ? 'Promotion administrative'
         : _promoReasonCtrl.text.trim();
 
-    // Confirmation
+    String scopeDesc;
+    if (_promoScopeIndex == 0) {
+      scopeDesc = 'TOUS les utilisateurs de la plateforme';
+    } else if (_promoTargetCommune != null) {
+      scopeDesc = 'Commune : $_promoTargetCommune';
+    } else if (_promoTargetCity != null) {
+      scopeDesc = 'Ville : $_promoTargetCity (toutes communes)';
+    } else if (_promoTargetCountry != null) {
+      scopeDesc = 'Pays : $_promoTargetCountry (toutes villes)';
+    } else {
+      _snackErr('Selectionnez au moins un pays pour une promo par zone.');
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -752,11 +989,32 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           Expanded(child: Text('Confirmer la promotion',
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 15))),
         ]),
-        content: Text(
-          'Vous allez offrir $qty annonce(s) gratuite(s) à TOUS les utilisateurs.\n\nCette action est irréversible pour les crédits déjà accordés.\n\nRaison : $reason',
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
-              color: AppTheme.textSecondary, height: 1.5),
-        ),
+        content: Column(mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Offrir $qty annonce(s) gratuite(s) aux utilisateurs :',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                  color: AppTheme.textSecondary)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF6B35).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFF6B35).withValues(alpha: 0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFFFF6B35)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(scopeDesc,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      fontWeight: FontWeight.w700, color: Color(0xFFFF6B35)))),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          Text('Raison : $reason',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: AppTheme.textHint)),
+        ]),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -765,10 +1023,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF6B35),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             child: const Text('Confirmer',
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                     color: Colors.white)),
@@ -780,20 +1036,26 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     if (confirmed != true) return;
 
     setState(() => _isLaunchingPromo = true);
+    if (setPromo != null) setPromo(() {});
     try {
       final result = await _ds.launchPromotion(
         freeAnnouncements: qty,
         reason: reason,
+        targetCountry: _promoScopeIndex == 1 ? _promoTargetCountry : null,
+        targetCity: _promoScopeIndex == 1 ? _promoTargetCity : null,
+        targetCommune: _promoScopeIndex == 1 ? _promoTargetCommune : null,
       );
       setState(() {
         _isPromoActive = true;
         _isLaunchingPromo = false;
       });
+      if (setPromo != null) setPromo(() {});
       final count = result['credited_users'] as int? ?? 0;
-      _snackOk('✅ Promotion lancée ! $count utilisateur(s) ont reçu $qty annonce(s) gratuite(s)');
+      _snackOk('Promotion lancee ! $count user(s) ont recu $qty annonce(s) gratuite(s)');
     } catch (e) {
       setState(() => _isLaunchingPromo = false);
-      _snackErr('Erreur lors du lancement de la promotion : $e');
+      if (setPromo != null) setPromo(() {});
+      _snackErr('Erreur lors du lancement : $e');
     }
   }
 

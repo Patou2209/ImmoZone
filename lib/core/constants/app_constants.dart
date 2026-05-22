@@ -220,17 +220,17 @@ class AppConstants {
     'Kinshasa':      ['Kinshasa'],
     'Kongo-Central': ['Matadi', 'Boma', 'Mbanza-Ngungu', 'Tshela'],
     'Kwango':        ['Kenge', 'Kasongo-Lunda'],
-    'Kwilu':         ['Bandundu', 'Kikwit', 'Idiofa'],
+    'Kwilu':         ['Bandundu', 'Kikwit', 'Idiofa', 'Gungu'],
     'Mai-Ndombe':    ['Inongo', 'Bolobo'],
     'Kasai':         ['Tshikapa', 'Ilebo'],
-    'Kasai-Central': ['Kananga', 'Mweka'],
+    'Kasai-Central': ['Kananga', 'Mweka', 'Dimbelenge'],
     'Kasai-Oriental':['Mbuji-Mayi', 'Kabinda'],
     'Lomami':        ['Kabalo', 'Kabinda', 'Ngandajika'],
     'Sankuru':       ['Lusambo', 'Kole'],
     'Maniema':       ['Kindu', 'Kailo'],
     'Sud-Kivu':      ['Bukavu', 'Uvira', 'Baraka', 'Fizi'],
     'Nord-Kivu':     ['Goma', 'Butembo', 'Beni', 'Lubero'],
-    'Ituri':         ['Bunia', 'Butembo', 'Mahagi'],
+    'Ituri':         ['Bunia', 'Mahagi'],
     'Haut-Uele':     ['Isiro', 'Wamba'],
     'Bas-Uele':      ['Buta', 'Aketi'],
     'Tshopo':        ['Kisangani', 'Ubundu'],
@@ -250,7 +250,7 @@ class AppConstants {
     'Brazzaville':   ['Brazzaville'],
     'Pointe-Noire':  ['Pointe-Noire'],
     'Pool':          ['Kinkala', 'Boko'],
-    'Bouenza':       ['Madingou', 'Nkayi'],
+    'Bouenza':       ['Madingou', 'Nkayi', 'Loudima'],
     'Niari':         ['Dolisie', 'Mossendjo'],
     'Lekoumou':      ['Sibiti', 'Komono'],
     'Kouilou':       ['Pointe-Noire', 'Loango'],
@@ -261,48 +261,58 @@ class AppConstants {
     'Likouala':      ['Impfondo', 'Epena'],
   };
 
-  // ── Communes par ville RDC ────────────────────────────────────────────────
+  // ── Communes par ville (RDC + Congo-Brazzaville) ────────────────────────
   static const Map<String, List<String>> communesByCity = {
+    // ── RDC ─────────────────────────────────────────────────────────────────
     'Kinshasa': [
-      'Gombe', 'Lingwala', 'Kinshasa', 'Barumbu', 'Ngiri-Ngiri',
-      'Kalamu', 'Lemba', 'Makala', 'Bandalungwa', 'Kintambo',
-      'Mont-Ngafula', 'Ngaliema', 'Kisenso', 'Matete', 'Ndjili',
-      'Masina', 'Nsele', 'Maluku', 'Selembao', 'Bumbu',
-      'Kasavubu', 'Limete', 'Quartier Industriel',
+      'Bandalungwa', 'Barumbu', 'Bumbu', 'Gombe', 'Kalamu',
+      'Kasa-Vubu', 'Kimbanseke', 'Kinshasa', 'Kintambo', 'Kisenso',
+      'Lemba', 'Limete', 'Lingwala', 'Makala', 'Maluku',
+      'Masina', 'Matete', 'Mont-Ngafula', 'Ndjili', 'Ngaba',
+      'Ngaliema', 'Ngiri-Ngiri', 'Nsele', 'Selembao',
     ],
     'Lubumbashi': [
-      'Kampemba', 'Kamalondo', 'Kenya', 'Katuba', 'Lubumbashi',
-      'Annexe', 'Ruashi',
-    ],
-    'Goma': [
-      'Goma', 'Karisimbi', 'Himbi', 'Mikeno', 'Nyiragongo',
-    ],
-    'Bukavu': [
-      'Ibanda', 'Kadutu', 'Bagira', 'Ndendere',
+      'Annexe', 'Kamalondo', 'Kampemba', 'Katuba', 'Kenya',
+      'Lubumbashi', 'Rwashi',
     ],
     'Mbuji-Mayi': [
-      'Diulu', 'Kanshi', 'Muya', 'Bipemba', 'Dibindi',
-    ],
-    'Kisangani': [
-      'Makiso', 'Tshopo', 'Kabondo', 'Mangobo', 'Lubunga',
+      'Bipemba', 'Dibindi', 'Diulu', 'Kanshi', 'Muya',
     ],
     'Kananga': [
-      'Kananga', 'Lukonga', 'Ndesha',
+      'Kananga', 'Katoka', 'Lukonga', 'Ndesha', 'Nganza',
+    ],
+    'Kisangani': [
+      'Kisangani', 'Kabondo', 'Lubunga', 'Tshopo', 'Mangobo', 'Makiso',
+    ],
+    'Bukavu': [
+      'Bagira', 'Ibanda', 'Kadutu', 'Kasha',
+    ],
+    'Goma': [
+      'Goma', 'Karisimbi',
     ],
     'Kolwezi': [
-      'Dilala', 'Manika', 'Musonoi',
+      'Dilala', 'Manika',
+    ],
+    'Likasi': [
+      'Kikula', 'Likasi', 'Panda', 'Shituru',
     ],
     'Matadi': [
       'Matadi', 'Mvuzi', 'Nzanza',
     ],
     'Boma': [
-      'Boma', 'Kalamu', 'Roba',
+      'Nzadi', 'Kabondo', 'Kalamu',
     ],
-    'Likasi': [
-      'Likasi', 'Shituru', 'Panda',
+    'Kikwit': [
+      'Kazamba', 'Lukemi', 'Lukolela', 'Nzinda',
+    ],
+    'Tshikapa': [
+      'Dibumba I', 'Dibumba II', 'Kanzala', 'Mabondo', 'Mbumba',
     ],
     'Butembo': [
-      'Butembo', 'Vulamba', 'Kimemi',
+      'Bulengera', 'Kimemi', 'Mususa', 'Vulamba',
+    ],
+    'Bunia': [
+      'Shari', 'Nyakasanza', 'Mbunya',
     ],
     'Uvira': [
       'Uvira', 'Mulongwe', 'Kalundu',
@@ -310,28 +320,35 @@ class AppConstants {
     'Mbandaka': [
       'Mbandaka', 'Wangata', 'Bikoro',
     ],
-    'Tshikapa': [
-      'Tshikapa', 'Mabondo',
-    ],
-    // Villes Congo Brazzaville
+    // ── Congo-Brazzaville ────────────────────────────────────────────────────
     'Brazzaville': [
-      'Bacongo', 'Makelelekele', 'Moungali', 'Ouenzé', 'Poto-Poto',
-      'Mfilou', 'Talangai', 'Madibou', 'Djiri',
+      'Makelelekele', 'Bacongo', 'Poto-Poto', 'Moungali', 'Ouenze',
+      'Talangai', 'Mfilou', 'Madibou', 'Djiri',
     ],
     'Pointe-Noire': [
-      'Lumumba', 'Mvou-Mvou', 'Ngoyo', 'Tié-Tié', 'Mongo-Mpoukou',
+      'Lumumba', 'Mvoumvou', 'Tie-Tie', 'Loandjili', 'Mongo-Mpoukou', 'Ngoyo',
     ],
-    'Dolisie': ['Dolisie Centre', 'Mvoumvou'],
-    'Owando':  ['Owando Centre'],
-    'Ouesso':  ['Ouesso Centre'],
-    'Impfondo':['Impfondo Centre'],
+    'Dolisie': [
+      'Arrondissement 1', 'Arrondissement 2',
+    ],
+    'Nkayi': [
+      'Mouana-nto', 'Soulouka',
+    ],
+    'Owando':   ['Owando Centre'],
+    'Ouesso':   ['Ouesso Centre'],
+    'Impfondo': ['Impfondo Centre'],
+    'Sibiti':   ['Sibiti Centre'],
+    'Djambala': ['Djambala Centre'],
   };
 
   // Toutes les villes (liste plate – compatibilite)
   static const List<String> cities = [
-    'Kinshasa', 'Lubumbashi', 'Goma', 'Bukavu', 'Mbuji-Mayi',
-    'Kisangani', 'Kananga', 'Kolwezi', 'Matadi', 'Boma',
-    'Likasi', 'Butembo', 'Uvira', 'Mbandaka', 'Tshikapa',
+    // RDC
+    'Kinshasa', 'Lubumbashi', 'Mbuji-Mayi', 'Kananga', 'Kisangani',
+    'Bukavu', 'Goma', 'Kolwezi', 'Likasi', 'Matadi', 'Boma',
+    'Kikwit', 'Tshikapa', 'Butembo', 'Bunia', 'Uvira', 'Mbandaka',
+    // Congo-Brazzaville
+    'Brazzaville', 'Pointe-Noire', 'Dolisie', 'Nkayi',
   ];
 
   // Communes de Kinshasa (compatibilite existante)
@@ -360,6 +377,26 @@ class AppConstants {
   // ── Helper : retourne les communes selon la ville ────────────────────────
   static List<String> getCommunesForCity(String city) {
     return communesByCity[city] ?? [];
+  }
+
+  // ── Helper : retourne les villes selon le pays ────────────────────────────
+  // Retourne toutes les villes qui ont des communes definies dans communesByCity,
+  // filtrees par pays (RDC ou Congo-Brazzaville).
+  static const List<String> _rdcCities = [
+    'Kinshasa', 'Lubumbashi', 'Mbuji-Mayi', 'Kananga', 'Kisangani',
+    'Bukavu', 'Goma', 'Kolwezi', 'Likasi', 'Matadi', 'Boma',
+    'Kikwit', 'Tshikapa', 'Butembo', 'Bunia',
+  ];
+
+  static const List<String> _brvCities = [
+    'Brazzaville', 'Pointe-Noire', 'Dolisie', 'Nkayi',
+  ];
+
+  static List<String> getCitiesForCountry(String country) {
+    if (country == 'Congo (Brazzaville)') return _brvCities;
+    if (country == 'Congo (RDC)') return _rdcCities;
+    // Pour les autres pays, liste vide (pas encore de donnees)
+    return [];
   }
 
   // ── Equipements ─────────────────────────────────────────────────────────
