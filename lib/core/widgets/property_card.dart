@@ -56,11 +56,11 @@ class PropertyCard extends StatelessWidget {
     return '≈ $formatted ${info['code']}';
   }
 
-  // Card dimensions: 400 × 500  (image 3/4 = 375px, description 1/4 = 125px)
+  // Card dimensions: 400 × 450  (image 65% = 293px, description 35% = 157px)
   static const double _cardWidth       = 400;
-  static const double _cardHeight      = 500;
-  static const double _imageHeight     = 375; // 3/4 of total
-  static const double _descHeight      = 125; // 1/4 of total
+  static const double _cardHeight      = 450;
+  static const double _imageHeight     = 293; // 65% of total
+  static const double _descHeight      = 157; // 35% of total
   static const double _cardRadius      = 18;
 
   @override
