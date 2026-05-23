@@ -50,7 +50,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   late TextEditingController _freeQuotaDaysCtrl;    // durée en jours
   bool _isSavingQuota = false;
 
-  // ── Promotions ───────────────────────────────────────────────────────────────
+  // ── Promotions — annonces gratuites (admin push) ────────────────────────
   bool _isPromoActive = false;
   late TextEditingController _promoQtyCtrl;
   late TextEditingController _promoReasonCtrl;
@@ -61,12 +61,22 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   int _promoScopeIndex = 0;
   String? _promoTargetCountry;
   String? _promoTargetCity;
-  String? _promoTargetZone; // Zone de publication : Standard / Intermédiaire / Premium / Luxe
+  String? _promoTargetZone;
+
+  // ── Promotions — paliers de recharge ─────────────────────────────────────
+  bool _isTiersPromoActive = false;
+  bool _isSavingTiers = false;
+  List<Map<String, dynamic>> _tiers = [];
+  final List<TextEditingController> _tierMinCtrl  = [];
+  final List<TextEditingController> _tierMaxCtrl  = [];
+  final List<TextEditingController> _tierPctCtrl  = [];
+  final List<int> _tierFreeAds = [2, 3, 5];
+  final List<String?> _tierTargetZone = [null, null, null];
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 5, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
     _initControllers();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
@@ -82,6 +92,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _promoReasonCtrl = TextEditingController(text: 'Promotion spéciale ImmoZone');
     _freeQuotaCountCtrl = TextEditingController(text: '3');
     _freeQuotaDaysCtrl  = TextEditingController(text: '30');
+    for (int i = 0; i < 3; i++) {
+      _tierMinCtrl.add(TextEditingController());
+      _tierMaxCtrl.add(TextEditingController());
+      _tierPctCtrl.add(TextEditingController());
+    }
 
     // Live preview listeners for home text
     _homeTitleCtrl.addListener(() => setState(() {}));
@@ -97,6 +112,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _freeQuotaCountCtrl.text = '${(_settings['free_quota_count'] as num?)?.toInt() ?? 3}';
     _freeQuotaDaysCtrl.text  = '${(_settings['free_quota_days']  as num?)?.toInt() ?? 30}';
     _isPromoActive    = _ds.isPromoActive;
+    _isTiersPromoActive = _ds.isRechargeTiersPromoActive;
     _homeTitleCtrl.text    = _ds.homeTitle;
     _homeSubtitleCtrl.text  = _ds.homeSubtitle;
     _officialMsgCtrl.text   = _ds.officialMessage;
@@ -105,7 +121,27 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _emailContactCtrl.text  = _ds.emailContact;
     _packs          = List<Map<String, dynamic>>.from(_ds.subscriptionPacks);
     _paymentMethods = List<Map<String, dynamic>>.from(_ds.paymentMethods);
+    final loadedTiers = await _ds.loadRechargeTiers();
+    _tiers = List<Map<String, dynamic>>.from(loadedTiers);
+    _initTierControllers();
     setState(() => _isLoading = false);
+  }
+
+  void _initTierControllers() {
+    const defaultMin  = [20.0, 50.0, 100.0];
+    const defaultMax  = [49.0, 99.0, -1.0];
+    const defaultPct  = [10,   25,    50  ];
+    const defaultFree = [2,    3,     5   ];
+    for (int i = 0; i < 3; i++) {
+      if (_tierMinCtrl.length <= i) continue;
+      final t = i < _tiers.length ? _tiers[i] : <String, dynamic>{};
+      _tierMinCtrl[i].text = ((t['minAmount'] as num?) ?? defaultMin[i]).toStringAsFixed(0);
+      final mx = (t['maxAmount'] as num?)?.toDouble() ?? defaultMax[i];
+      _tierMaxCtrl[i].text = mx < 0 ? '' : mx.toStringAsFixed(0);
+      _tierPctCtrl[i].text = '${(t['bonusCreditPct'] as num?)?.toInt() ?? defaultPct[i]}';
+      _tierFreeAds[i]      = (t['bonusFreeAds']    as num?)?.toInt() ?? defaultFree[i];
+      _tierTargetZone[i]   =  t['targetZone']      as String?;
+    }
   }
 
   @override
@@ -115,7 +151,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         _homeTitleCtrl, _homeSubtitleCtrl,
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
         _promoQtyCtrl, _promoReasonCtrl,
-        _freeQuotaCountCtrl, _freeQuotaDaysCtrl]) {
+        _freeQuotaCountCtrl, _freeQuotaDaysCtrl,
+        ..._tierMinCtrl, ..._tierMaxCtrl, ..._tierPctCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -240,6 +277,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             Tab(icon: Icon(Icons.phone_android, size: 16), text: 'Paiements'),
             Tab(icon: Icon(Icons.map_outlined, size: 16), text: 'Zones'),
             Tab(icon: Icon(Icons.campaign_rounded, size: 16), text: 'Message'),
+            Tab(icon: Icon(Icons.local_offer_rounded, size: 16), text: 'Promotions'),
           ],
         ),
       ),
@@ -253,6 +291,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                 _buildPaymentsTab(),
                 _buildZonesTab(),
                 _buildMessageTab(),
+                _buildPromotionsTab(),
               ],
             ),
     );
@@ -400,12 +439,6 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ]),
           _saveBar('Sauvegarder', _savePlatformSettings),
         ])),
-        const SizedBox(height: 20),
-
-        // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
-        _sectionHeader('Promotions — annonces gratuites'),
-        const SizedBox(height: 10),
-        _card(_buildPromoSection()),
         const SizedBox(height: 20),
 
         // ── CONTACTS BOUTON CONTACT (WhatsApp + Téléphone + Email) ──────────
@@ -1906,4 +1939,255 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: AppTheme.dividerColor)),
   );
+  // ════════════════════════════════════════════════════════════════════════════
+  // ONGLET 6 — PROMOTIONS (annonces gratuites + paliers de recharge)
+  // ════════════════════════════════════════════════════════════════════════════
+  Widget _buildPromotionsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+        // ── PROMOTION ANNONCES GRATUITES (push admin) ─────────────────────
+        _sectionHeader('Promotion — Annonces gratuites (push admin)'),
+        const SizedBox(height: 10),
+        _card(_buildPromoSection()),
+        const SizedBox(height: 24),
+
+        // ── PROMOTION PALIERS DE RECHARGE ─────────────────────────────────
+        _sectionHeader('Promotion — Bonus de recharge par paliers'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(11),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A3A8F).withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF0A3A8F).withValues(alpha: 0.2)),
+          ),
+          child: const Row(children: [
+            Icon(Icons.info_outline, color: Color(0xFF0A3A8F), size: 16),
+            SizedBox(width: 8),
+            Expanded(child: Text(
+              "Quand un utilisateur recharge, le palier correspondant s'applique automatiquement a la validation du paiement : credits bonus + annonces gratuites offerts.",
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF0A3A8F), height: 1.4),
+            )),
+          ]),
+        ),
+
+        // Toggle activer/désactiver
+        _card(Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Activer la promotion par paliers',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 13, color: AppTheme.textPrimary)),
+            Text(
+              _isTiersPromoActive ? 'Active — bonus appliqué à chaque recharge éligible' : 'Désactivée',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: _isTiersPromoActive ? AppTheme.successColor : AppTheme.textHint),
+            ),
+          ])),
+          Switch(
+            value: _isTiersPromoActive,
+            activeColor: AppTheme.successColor,
+            onChanged: (v) async {
+              setState(() => _isTiersPromoActive = v);
+              await _ds.setRechargeTiersPromoActive(v);
+              _snackOk(v ? 'Promotion paliers activée' : 'Promotion paliers désactivée');
+            },
+          ),
+        ])),
+        const SizedBox(height: 16),
+
+        // Les 3 paliers
+        ...List.generate(3, (i) => _buildTierCard(i)),
+        const SizedBox(height: 8),
+
+        // Bouton sauvegarder
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isSavingTiers ? null : _saveRechargeTiers,
+            icon: _isSavingTiers
+                ? const SizedBox(width: 14, height: 14,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Icon(Icons.save_rounded, color: Colors.white, size: 16),
+            label: Text(_isSavingTiers ? 'Sauvegarde...' : 'Sauvegarder les paliers',
+                style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 13, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+      ]),
+    );
+  }
+
+  Widget _buildTierCard(int i) {
+    const tierColors = [Color(0xFF1565C0), Color(0xFF6A1B9A), Color(0xFF2E7D32)];
+    const tierLabels = ['Palier 1', 'Palier 2', 'Palier 3'];
+    const tierIcons  = [Icons.looks_one_rounded, Icons.looks_two_rounded, Icons.looks_3_rounded];
+    const zoneNames  = ['Standard', 'Intermédiaire', 'Premium', 'Luxe'];
+    final color = tierColors[i];
+    final isLast = i == 2;
+    final freeAdsOptions = [0, 1, 2, 3, 4, 5];
+    final maxHint = isLast ? 'Illimité (pas de plafond)' : 'Max \$ (ex: 99)';
+
+    return StatefulBuilder(builder: (ctx, setTile) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Header
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(tierIcons[i], color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(tierLabels[i],
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 14, color: color))),
+          ]),
+          const SizedBox(height: 14),
+
+          // Seuils min / max
+          Row(children: [
+            Expanded(child: _tileField(_tierMinCtrl[i], 'Min \$ (ex: 20)',
+                Icons.arrow_downward_rounded, color)),
+            const SizedBox(width: 10),
+            Expanded(child: _tileField(_tierMaxCtrl[i], maxHint,
+                Icons.arrow_upward_rounded, color,
+                hint: isLast ? 'Laisser vide = illimité' : null)),
+          ]),
+          const SizedBox(height: 10),
+
+          // Bonus crédits %
+          _tileField(_tierPctCtrl[i], 'Bonus crédits % (0–100)',
+              Icons.percent_rounded, color),
+          const SizedBox(height: 10),
+
+          // Annonces gratuites — dropdown 0..5
+          Row(children: [
+            const Icon(Icons.confirmation_number_outlined, size: 18, color: AppTheme.accentColor),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Annonces gratuites offertes',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                    fontWeight: FontWeight.w600, color: AppTheme.textPrimary))),
+            DropdownButton<int>(
+              value: _tierFreeAds[i],
+              items: freeAdsOptions.map((v) => DropdownMenuItem(
+                value: v,
+                child: Text('$v', style: const TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+              )).toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _tierFreeAds[i] = v);
+                setTile(() {});
+              },
+            ),
+          ]),
+          const SizedBox(height: 10),
+
+          // Zone cible (optionnel)
+          DropdownButtonFormField<String>(
+            initialValue: _tierTargetZone[i],
+            isExpanded: true,
+            decoration: InputDecoration(
+              isDense: true,
+              prefixIcon: const Icon(Icons.layers_rounded, size: 18, color: AppTheme.accentColor),
+              labelText: 'Zone cible (optionnel)',
+              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+              filled: true, fillColor: AppTheme.backgroundColor,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppTheme.dividerColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: color, width: 2)),
+            ),
+            hint: const Text('Toutes les zones', style: TextStyle(fontFamily: 'Poppins',
+                fontSize: 12, color: AppTheme.textHint)),
+            items: [
+              const DropdownMenuItem<String>(value: null,
+                  child: Text('Toutes les zones', style: TextStyle(fontFamily: 'Poppins',
+                      fontSize: 12, fontStyle: FontStyle.italic, color: AppTheme.textSecondary))),
+              ...zoneNames.map((z) => DropdownMenuItem<String>(value: z,
+                  child: Text(z, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)))),
+            ],
+            onChanged: (v) {
+              setState(() => _tierTargetZone[i] = v);
+              setTile(() {});
+            },
+          ),
+        ]),
+      );
+    });
+  }
+
+  Widget _tileField(TextEditingController ctrl, String label, IconData icon, Color color,
+      {String? hint}) =>
+    TextField(
+      controller: ctrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11),
+        hintStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11, color: AppTheme.textHint),
+        prefixIcon: Icon(icon, color: color, size: 18),
+        filled: true, fillColor: AppTheme.backgroundColor,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppTheme.dividerColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: color, width: 2)),
+      ),
+    );
+
+  Future<void> _saveRechargeTiers() async {
+    setState(() => _isSavingTiers = true);
+    final tiers = <Map<String, dynamic>>[];
+    const defaultMin  = [20.0, 50.0, 100.0];
+    const defaultMax  = [49.0, 99.0, -1.0];
+    const defaultPct  = [10, 25, 50];
+    const tierLabels  = ['Palier 1', 'Palier 2', 'Palier 3'];
+    for (int i = 0; i < 3; i++) {
+      final minVal = double.tryParse(_tierMinCtrl[i].text.trim()) ?? defaultMin[i];
+      final maxTxt = _tierMaxCtrl[i].text.trim();
+      final maxVal = maxTxt.isEmpty ? -1.0 : (double.tryParse(maxTxt) ?? defaultMax[i]);
+      final pct    = int.tryParse(_tierPctCtrl[i].text.trim()) ?? defaultPct[i];
+      tiers.add({
+        'enabled': true,
+        'label': tierLabels[i],
+        'minAmount': minVal,
+        'maxAmount': maxVal,
+        'bonusCreditPct': pct.clamp(0, 100),
+        'bonusFreeAds': _tierFreeAds[i],
+        'targetZone': _tierTargetZone[i],
+      });
+    }
+    await _ds.saveRechargeTiers(tiers);
+    setState(() {
+      _tiers = tiers;
+      _isSavingTiers = false;
+    });
+    _snackOk('Paliers de recharge sauvegardés');
+  }
+
+
 }

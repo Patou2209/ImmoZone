@@ -2652,6 +2652,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       ),
       const SizedBox(height: 20),
 
+      // ── BANNIÈRE PROMO PALIERS (si active) ────────────────────────────
+      _buildRechargeTiersBanner(),
+
       // ── ETAPE A : Choisir le pack ─────────────────────────────────────
       _stepBadge('1', 'Choisissez une recharge de crédits'),
       const SizedBox(height: 4),
@@ -2747,6 +2750,60 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             color: AppTheme.textSecondary, height: 1.4)),
       ])),
     ]);
+  }
+
+  /// Bannière informative sur les promotions de recharge en cours
+  Widget _buildRechargeTiersBanner() {
+    final ds = DataService();
+    if (!ds.isRechargeTiersPromoActive) return const SizedBox.shrink();
+    final tiers = ds.rechargeTiers.where((t) => t['enabled'] == true).toList();
+    if (tiers.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6A1B9A), Color(0xFF1565C0)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: const Color(0xFF6A1B9A).withValues(alpha: 0.25),
+            blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.local_offer_rounded, color: Colors.white, size: 16),
+          SizedBox(width: 8),
+          Text('Offre promotionnelle en cours',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                  fontSize: 13, color: Colors.white)),
+        ]),
+        const SizedBox(height: 8),
+        ...tiers.map((t) {
+          final min  = (t['minAmount'] as num?)?.toInt() ?? 0;
+          final max  = (t['maxAmount'] as num?)?.toDouble() ?? -1;
+          final pct  = (t['bonusCreditPct'] as num?)?.toInt() ?? 0;
+          final free = (t['bonusFreeAds'] as num?)?.toInt() ?? 0;
+          final label = t['label'] as String? ?? '';
+          final rangeStr = max < 0 ? '$min \$ et plus' : '$min – ${max.toInt()} \$';
+          final bonusParts = <String>[];
+          if (pct > 0) bonusParts.add('+$pct% de crédits');
+          if (free > 0) bonusParts.add('$free annonce${free > 1 ? 's' : ''} gratuite${free > 1 ? 's' : ''}');
+          if (bonusParts.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(children: [
+              const Icon(Icons.arrow_right_rounded, color: Colors.white70, size: 18),
+              Expanded(child: Text(
+                '$label ($rangeStr) : ${bonusParts.join(' + ')}',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: Colors.white, height: 1.4),
+              )),
+            ]),
+          );
+        }),
+      ]),
+    );
   }
 
   // Badge numéroté pour les sous-étapes du formulaire de paiement

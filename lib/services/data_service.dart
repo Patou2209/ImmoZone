@@ -40,6 +40,7 @@ class DataService {
   DocumentReference get _packsDoc => _db.collection('config').doc('subscription_packs');
   DocumentReference get _contactsDoc => _db.collection('config').doc('admin_contacts');
   DocumentReference get _officialMsgDoc => _db.collection('config').doc('official_message');
+  DocumentReference get _rechargeTiersDoc => _db.collection('config').doc('recharge_promo_tiers');
 
   // ─── INIT ────────────────────────────────────────────────────────────────────
 
@@ -217,6 +218,109 @@ class DataService {
       'promo_active': false,
       'promo_suspended_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  // ─── PROMOTIONS PAR PALIERS DE RECHARGE ────────────────────────────────────
+
+  /// Paliers par défaut (3 niveaux configurables)
+  static List<Map<String, dynamic>> _defaultRechargeTiers() => [
+    {
+      'enabled': true,
+      'minAmount': 20.0,
+      'maxAmount': 49.0,  // -1 = pas de plafond (dernier palier)
+      'bonusCreditPct': 10,  // pourcentage de crédits bonus (0–100)
+      'bonusFreeAds': 2,     // annonces gratuites offertes (0–5)
+      'label': 'Palier 1',
+      'targetCountry': null,
+      'targetCity': null,
+      'targetZone': null,
+    },
+    {
+      'enabled': true,
+      'minAmount': 50.0,
+      'maxAmount': 99.0,
+      'bonusCreditPct': 25,
+      'bonusFreeAds': 3,
+      'label': 'Palier 2',
+      'targetCountry': null,
+      'targetCity': null,
+      'targetZone': null,
+    },
+    {
+      'enabled': true,
+      'minAmount': 100.0,
+      'maxAmount': -1.0,   // pas de plafond
+      'bonusCreditPct': 50,
+      'bonusFreeAds': 5,
+      'label': 'Palier 3',
+      'targetCountry': null,
+      'targetCity': null,
+      'targetZone': null,
+    },
+  ];
+
+  /// Retourne les paliers depuis le cache local (accès synchrone)
+  List<Map<String, dynamic>> get rechargeTiers {
+    final raw = _prefs?.getString('recharge_tiers_cache');
+    if (raw != null) {
+      try {
+        final list = jsonDecode(raw) as List;
+        return list.cast<Map<String, dynamic>>();
+      } catch (_) {}
+    }
+    return _defaultRechargeTiers();
+  }
+
+  /// Active / désactive la promo par paliers globalement
+  bool get isRechargeTiersPromoActive =>
+      systemSettings['recharge_tiers_promo_active'] == true;
+
+  /// Charge les paliers depuis Firestore et met à jour le cache
+  Future<List<Map<String, dynamic>>> loadRechargeTiers() async {
+    try {
+      final snap = await _rechargeTiersDoc.get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final list = (data['tiers'] as List?)?.cast<Map<String, dynamic>>()
+            ?? _defaultRechargeTiers();
+        await _prefs?.setString('recharge_tiers_cache', jsonEncode(list));
+        return list;
+      }
+    } catch (_) {}
+    return _defaultRechargeTiers();
+  }
+
+  /// Sauvegarde les paliers en Firestore + cache local
+  Future<void> saveRechargeTiers(List<Map<String, dynamic>> tiers) async {
+    await _rechargeTiersDoc.set({'tiers': tiers});
+    await _prefs?.setString('recharge_tiers_cache', jsonEncode(tiers));
+  }
+
+  /// Active ou désactive la promo par paliers
+  Future<void> setRechargeTiersPromoActive(bool active) async {
+    await updateSettings({'recharge_tiers_promo_active': active});
+  }
+
+  /// Retourne le palier correspondant au montant donné (null si aucun match ou promo inactive)
+  /// [userCommune] sert au filtrage optionnel par zone
+  Map<String, dynamic>? getMatchingTier(double amountUsd, {String userCommune = ''}) {
+    if (!isRechargeTiersPromoActive) return null;
+    final tiers = rechargeTiers;
+    for (final tier in tiers) {
+      if (tier['enabled'] != true) continue;
+      final min = (tier['minAmount'] as num?)?.toDouble() ?? 0;
+      final max = (tier['maxAmount'] as num?)?.toDouble() ?? -1;
+      if (amountUsd < min) continue;
+      if (max >= 0 && amountUsd > max) continue;
+      // Zone targeting (optional)
+      final tZone = tier['targetZone'] as String?;
+      if (tZone != null && tZone.isNotEmpty && userCommune.isNotEmpty) {
+        final zone = getZoneStanding(userCommune);
+        if (zone != tZone) continue;
+      }
+      return tier;
+    }
+    return null;
   }
 
   // ─── AUTH ───────────────────────────────────────────────────────────────────
@@ -1242,22 +1346,61 @@ class DataService {
             ? payment.creditsQty
             : _creditsForProduct(payment.productType);
         if (qty > 0) {
+          // ── Palier de recharge : bonus crédits + annonces gratuites ─────
+          final tier = getMatchingTier(payment.amount);
+          final bonusPct = tier != null ? (tier['bonusCreditPct'] as num?)?.toInt() ?? 0 : 0;
+          final bonusFreeAds = tier != null ? (tier['bonusFreeAds'] as num?)?.toInt() ?? 0 : 0;
+          final bonusCredits = bonusPct > 0 ? (qty * bonusPct / 100).round() : 0;
+          final totalCredits = qty + bonusCredits;
+
           await addCredit(CreditModel(
             id: 'credit_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: payment.userId,
-            quantity: qty,
-            remaining: qty,
+            quantity: totalCredits,
+            remaining: totalCredits,
             source: 'paiement_${payment.productType}',
             createdAt: DateTime.now(),
           ));
-          // Notification à l'utilisateur
+
+          // Bonus annonces gratuites via quota promo
+          if (bonusFreeAds > 0) {
+            final quota = await getCurrentQuota(payment.userId);
+            if (quota != null) {
+              await _quotasCol.doc(quota.id).update({
+                'freeQuota': quota.freeQuota + bonusFreeAds,
+              });
+            } else {
+              // Créer un quota promo (année spéciale = 9999)
+              final newQuota = QuotaModel(
+                id: 'quota_promo_${payment.userId}_${DateTime.now().millisecondsSinceEpoch}',
+                userId: payment.userId,
+                year: 9999,
+                month: 1,
+                freeQuota: bonusFreeAds,
+                usedFreeQuota: 0,
+                resetDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              await _quotasCol.doc(newQuota.id).set(newQuota.toMap());
+            }
+          }
+
+          // Notification détaillée avec bonus
+          String bonusMsg = '';
+          if (bonusCredits > 0 && bonusFreeAds > 0) {
+            bonusMsg = ' + $bonusCredits crédits bonus ($bonusPct%) + $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
+          } else if (bonusCredits > 0) {
+            bonusMsg = ' + $bonusCredits crédits bonus ($bonusPct%) offerts !';
+          } else if (bonusFreeAds > 0) {
+            bonusMsg = ' + $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
+          }
+
           await addNotification(AppNotification(
             id: 'notif_pay_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: payment.userId,
             type: 'paiement',
             title: 'Paiement confirmé ✓',
             body: 'Votre paiement a été validé par $adminName. '
-                '$qty crédit(s) ajouté(s) à votre compte.',
+                '$totalCredits crédit(s) ajouté(s) à votre compte.$bonusMsg',
             createdAt: DateTime.now(),
           ));
         }
