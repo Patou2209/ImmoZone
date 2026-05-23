@@ -56,34 +56,46 @@ class PropertyCard extends StatelessWidget {
     return '≈ $formatted ${info['code']}';
   }
 
+  // Card dimensions: 400 × 500  (image 3/4 = 375px, description 1/4 = 125px)
+  static const double _cardWidth       = 400;
+  static const double _cardHeight      = 500;
+  static const double _imageHeight     = 375; // 3/4 of total
+  static const double _descHeight      = 125; // 1/4 of total
+  static const double _cardRadius      = 18;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: SizedBox(
+        width: _cardWidth,
+        height: _cardHeight,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(_cardRadius),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(_cardRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+            // ── Image (3/4 of card height) ───────────────────────────────
             Stack(
               children: [
                 ClipRRect(
                   borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(18)),
+                      const BorderRadius.vertical(top: Radius.circular(_cardRadius)),
                   child: PropertyImage(
                     src: property.mainImage,
-                    height: 175,
+                    height: _imageHeight,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
@@ -278,11 +290,14 @@ class PropertyCard extends StatelessWidget {
                   ),
               ],
             ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(12),
+            // ── Description (1/4 of card height = 125px, no empty space) ──
+            SizedBox(
+              height: _descHeight,
+              child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   // Row 1: Title LEFT + Price RIGHT on the same line
                   Row(
@@ -359,7 +374,6 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 3),
                   // Row 2: Location
                   Row(
                     children: [
@@ -379,7 +393,6 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
                   // Row 3: Feature chips
                   Wrap(
                     spacing: 6,
@@ -406,7 +419,6 @@ class PropertyCard extends StatelessWidget {
                         _featureChip(Icons.single_bed_rounded, '${property.numberOfBeds} Lit(s)'),
                     ],
                   ),
-                  const SizedBox(height: 8),
                   // Row 4: Garantie badge LEFT + clock + views RIGHT
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -483,9 +495,12 @@ class PropertyCard extends StatelessWidget {
                 ],
               ),
             ),
+            ), // SizedBox description
           ],
-        ),
-      ),
+            ), // Column
+          ), // Container
+        ), // ClipRRect
+      ), // SizedBox 400×500
     );
   }
 

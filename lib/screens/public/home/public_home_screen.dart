@@ -1780,7 +1780,7 @@ class _HomeTabState extends State<_HomeTab>
         maxCrossAxisExtent: 400,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.80,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: items.map((p) {
