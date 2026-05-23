@@ -880,6 +880,16 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final color = zoneColors[zoneName] ?? Colors.grey;
     final label = zoneLabels[zoneName] ?? zoneName;
 
+    // Utilisateur avec quota gratuit de bienvenue : durée fixe, pas de choix
+    final isFreeQuotaUser = _publicationRight == 'free_quota';
+
+    // Si quota gratuit : forcer la durée au bonus configuré (pas de sélection)
+    if (isFreeQuotaUser && _selectedDuration != _freeQuotaDays) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedDuration = _freeQuotaDays);
+      });
+    }
+
     // Cost per duration
     final cost7  = ds.getCreditsForCommune(_selectedCommune, days: 7);
     final cost15 = ds.getCreditsForCommune(_selectedCommune, days: 15);
@@ -931,19 +941,44 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   ),
                 ),
               ]),
-              const SizedBox(height: 8),
-              // Tarif par durée (chips interactifs)
-              Row(children: [
-                _durationCostChip('7 Jours',  cost7,  color, _selectedDuration == 7,  7),
-                const SizedBox(width: 6),
-                _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
-                const SizedBox(width: 6),
-                _durationCostChip('30 Jours', cost30, color, _selectedDuration == 30, 30),
-              ]),
+              // Chips de durée : masqués pour les utilisateurs avec quota gratuit
+              if (!isFreeQuotaUser) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  _durationCostChip('7 Jours',  cost7,  color, _selectedDuration == 7,  7),
+                  const SizedBox(width: 6),
+                  _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
+                  const SizedBox(width: 6),
+                  _durationCostChip('30 Jours', cost30, color, _selectedDuration == 30, 30),
+                ]),
+              ] else ...[
+                const SizedBox(height: 8),
+                // Message informatif : durée fixe du bonus
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline,
+                        color: AppTheme.successColor, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Annonce gratuite — valable $_freeQuotaDays jours',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.successColor,
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
             ],
           ),
         ),
-
       ],
     );
   }

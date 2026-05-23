@@ -1776,26 +1776,27 @@ class _HomeTabState extends State<_HomeTab>
   Widget _buildGrid(BuildContext context, List<PropertyModel> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView.separated(
+      child: GridView.extent(
+        maxCrossAxisExtent: 400,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.78,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (ctx, i) {
-          final p = items[i];
+        children: items.map((p) {
           return PropertyCard(
             property: p,
             isFavorite: _favorites.contains(p.id),
             onFavorite: () => _toggleFavorite(p.id),
             selectedCountry: _country,
             onTap: () async {
-              await Navigator.push(ctx,
+              await Navigator.push(context,
                 MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-              // Recharger les annonces au retour pour mettre \u00e0 jour les vues
+              // Recharger les annonces au retour pour mettre à jour les vues
               if (mounted) _loadData();
             },
           );
-        },
+        }).toList(),
       ),
     );
   }
