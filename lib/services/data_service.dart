@@ -88,6 +88,8 @@ class DataService {
     'boost_week_price': 1.0,
     'boost_month_price': 5.0,
     'monthly_free_quota': 3,
+    'free_quota_count': 3,   // Nombre d'annonces gratuites offertes au nouvel utilisateur
+    'free_quota_days': 30,   // Durée (en jours) de validité de chaque annonce gratuite
     'max_photos': 5,
     'min_photos': 1,
     'announcement_validity_days': 30,
@@ -614,15 +616,18 @@ class DataService {
       }
     } catch (_) {}
 
-    // Créer le quota de bienvenue une seule fois (3 annonces, jamais réinitialisé)
+    // Créer le quota de bienvenue une seule fois — lit les réglages admin
+    final settings  = await _getSettings();
+    final quotaCount = (settings['free_quota_count'] as num?)?.toInt() ?? 3;
+    final quotaDays  = (settings['free_quota_days']  as num?)?.toInt() ?? 30;
     final welcomeQuota = QuotaModel(
       id: 'quota_${userId}_welcome',
       userId: userId,
       year: 0,   // marqueur «quota unique à vie»
       month: 0,
-      freeQuota: 3,
+      freeQuota: quotaCount,
       usedFreeQuota: 0,
-      resetDate: DateTime(2099, 12, 31), // loin dans le futur — pas de réinitialisation
+      resetDate: DateTime.now().add(Duration(days: quotaDays * quotaCount + 365)),
     );
     await _quotasCol.doc(welcomeQuota.id).set(welcomeQuota.toMap());
     return welcomeQuota;

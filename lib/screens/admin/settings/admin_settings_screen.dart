@@ -45,6 +45,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ── Mode plateforme ──────────────────────────────────────────────────────────
   bool _isFreeTrial = false;
 
+  // ── Quota de bienvenue (annonces gratuites pour nouveaux utilisateurs) ──────
+  late TextEditingController _freeQuotaCountCtrl;   // nb d’annonces
+  late TextEditingController _freeQuotaDaysCtrl;    // durée en jours
+  bool _isSavingQuota = false;
+
   // ── Promotions ───────────────────────────────────────────────────────────────
   bool _isPromoActive = false;
   late TextEditingController _promoQtyCtrl;
@@ -75,6 +80,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _emailContactCtrl   = TextEditingController();
     _promoQtyCtrl       = TextEditingController(text: '2');
     _promoReasonCtrl = TextEditingController(text: 'Promotion spéciale ImmoZone');
+    _freeQuotaCountCtrl = TextEditingController(text: '3');
+    _freeQuotaDaysCtrl  = TextEditingController(text: '30');
 
     // Live preview listeners for home text
     _homeTitleCtrl.addListener(() => setState(() {}));
@@ -87,6 +94,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     setState(() => _isLoading = true);
     _settings         = _ds.systemSettings;
     _isFreeTrial      = _settings['free_trial_enabled'] == true;
+    _freeQuotaCountCtrl.text = '${(_settings['free_quota_count'] as num?)?.toInt() ?? 3}';
+    _freeQuotaDaysCtrl.text  = '${(_settings['free_quota_days']  as num?)?.toInt() ?? 30}';
     _isPromoActive    = _ds.isPromoActive;
     _homeTitleCtrl.text    = _ds.homeTitle;
     _homeSubtitleCtrl.text  = _ds.homeSubtitle;
@@ -105,7 +114,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     for (final c in [
         _homeTitleCtrl, _homeSubtitleCtrl,
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
-        _promoQtyCtrl, _promoReasonCtrl]) {
+        _promoQtyCtrl, _promoReasonCtrl,
+        _freeQuotaCountCtrl, _freeQuotaDaysCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -113,8 +123,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
 
   Future<void> _savePlatformSettings() async {
     setState(() => _isSaving = true);
+    final count = int.tryParse(_freeQuotaCountCtrl.text.trim()) ?? 3;
+    final days  = int.tryParse(_freeQuotaDaysCtrl.text.trim())  ?? 30;
     await _ds.updateSettings({
-      'free_trial_enabled':        _isFreeTrial,
+      'free_trial_enabled': _isFreeTrial,
+      'free_quota_count':   count.clamp(0, 99),
+      'free_quota_days':    days.clamp(1, 365),
     });
     setState(() => _isSaving = false);
     _snackOk('✅ Paramètres plateforme sauvegardés');
@@ -344,6 +358,50 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ]),
         ),
         const SizedBox(height: 20),
+
+        // ── QUOTA DE BIENVENUE ────────────────────────────────────────────────
+        _sectionHeader('Annonces gratuites (nouveaux utilisateurs)'),
+        const SizedBox(height: 10),
+        _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: AppTheme.successColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.3)),
+            ),
+            child: const Row(children: [
+              Icon(Icons.info_outline, color: AppTheme.successColor, size: 16),
+              SizedBox(width: 8),
+              Expanded(child: Text(
+                'Chaque nouvel utilisateur reçoit ces annonces gratuites une seule fois, '
+                'valables pendant la durée configurée. Ces paramètres s\'appliquent uniquement '
+                'aux nouveaux comptes.',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: AppTheme.successColor, height: 1.4),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: _numField(
+              'Nombre d\'annonces gratuites',
+              _freeQuotaCountCtrl,
+              Icons.card_giftcard_outlined,
+              isInt: true,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _numField(
+              'Durée par annonce (jours)',
+              _freeQuotaDaysCtrl,
+              Icons.calendar_today_outlined,
+              isInt: true,
+            )),
+          ]),
+          _saveBar('Sauvegarder', _savePlatformSettings),
+        ])),
+        const SizedBox(height: 20),
+
         // ── PROMOTIONS ────────────────────────────────────────────────────────────────────
         _sectionHeader('Promotions — annonces gratuites'),
         const SizedBox(height: 10),

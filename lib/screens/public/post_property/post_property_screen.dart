@@ -94,6 +94,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   int _userAvailableCredits = 0;
   int _requiredCredits = 1;
   int _freeQuotaAvailable = 0; // nombre d'annonces gratuites disponibles
+  int _freeQuotaDays = 30;     // durée de validité de chaque annonce gratuite
   bool _hasEnoughCredits = false;
   bool _creditChecked = false;
   String _publicationRight = 'no_right'; // 'free_trial' | 'free_quota' | 'paid_credit' | 'no_right'
@@ -130,11 +131,22 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   @override
   void initState() {
     super.initState();
+    // Rafraîchir le cache zones + zones_config pour que les tarifs soient à jour
+    _refreshZonesCache();
     // Pre-remplir avec les infos de l'utilisateur connecte
     WidgetsBinding.instance.addPostFrameCallback((_) => _prefillUserInfo());
     // Rafraîchir l'aperçu L×l en temps réel
     _longueurCtrl.addListener(() => setState(() {}));
     _largeurCtrl.addListener(() => setState(() {}));
+  }
+
+  Future<void> _refreshZonesCache() async {
+    final ds = DataService();
+    await Future.wait([
+      ds.refreshZonesCache(),
+      ds.refreshZonesConfigCache(),
+    ]);
+    if (mounted) setState(() {});
   }
 
   void _prefillUserInfo() {
@@ -356,14 +368,17 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final right = await ds.checkPublicationRight(userId, commune: _selectedCommune, days: _selectedDuration);
     // "enough" = free trial active, OR free monthly quota still available, OR sufficient paid credits
     final enough = (right == 'free_trial') || (right == 'free_quota') || (right == 'paid_credit');
-    // Récupérer le quota gratuit disponible pour affichage dynamique
-    final quota = await ds.getCurrentQuota(userId);
+    // Récupérer le quota gratuit disponible + durée depuis les settings
+    final quota    = await ds.getCurrentQuota(userId);
     final freeLeft = quota.freeQuota - quota.usedFreeQuota;
+    final settings = ds.systemSettings;
+    final quotaDays = (settings['free_quota_days'] as num?)?.toInt() ?? 30;
     if (mounted) {
       setState(() {
         _requiredCredits = required;
         _userAvailableCredits = available;
         _freeQuotaAvailable = freeLeft.clamp(0, 999);
+        _freeQuotaDays = quotaDays;
         _hasEnoughCredits = enough;
         _publicationRight = right;
         _creditChecked = true;
@@ -2277,7 +2292,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         balanceIcon  = Icons.free_breakfast;
         break;
       case 'free_quota':
-        balanceLabel = '$_freeQuotaAvailable pub. gratuite${_freeQuotaAvailable > 1 ? 's' : ''}';
+        balanceLabel = '$_freeQuotaAvailable annonce${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}\n($_freeQuotaDays j. chacune)';
         balanceColor = AppTheme.successColor;
         balanceIcon  = Icons.card_giftcard;
         break;
@@ -2411,9 +2426,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // CAS 2 — FREE QUOTA : 1 publication gratuite mensuelle disponible
+    // CAS 2 — FREE QUOTA : annonces gratuites de bienvenue disponibles
     // ══════════════════════════════════════════════════════════════════
     if (_publicationRight == 'free_quota') {
+      final n = _freeQuotaAvailable;
+      final d = _freeQuotaDays;
       return [
         headerCard,
         const SizedBox(height: 16),
@@ -2424,31 +2441,33 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.35)),
           ),
-          child: Row(children: [
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: AppTheme.successColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.card_giftcard,
-                  color: AppTheme.successColor, size: 28),
+              child: const Icon(Icons.info_outline,
+                  color: AppTheme.successColor, size: 26),
             ),
             const SizedBox(width: 14),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$_freeQuotaAvailable publication${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''} disponible${_freeQuotaAvailable > 1 ? 's' : ''}',
+                  '$n annonce${n > 1 ? 's' : ''} gratuite${n > 1 ? 's' : ''} disponible${n > 1 ? 's' : ''}',
                   style: const TextStyle(fontFamily: 'Poppins',
                       fontWeight: FontWeight.w800, fontSize: 15,
                       color: AppTheme.successColor),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
-                  'Vous bénéficiez de $_freeQuotaAvailable publication${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}. Elle${_freeQuotaAvailable > 1 ? 's' : ''} sera${_freeQuotaAvailable > 1 ? 'ont' : ''} utilisée${_freeQuotaAvailable > 1 ? 's' : ''} pour vos prochaines annonces.',
+                  'Vous disposez de $n annonce${n > 1 ? 's' : ''} gratuite${n > 1 ? 's' : ''}, '
+                  'valable${n > 1 ? 's' : ''} $d jours chacune. '
+                  'Elles seront utilisées automatiquement pour vos prochaines publications.',
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                      color: AppTheme.textSecondary, height: 1.4),
+                      color: AppTheme.textSecondary, height: 1.5),
                 ),
               ],
             )),
@@ -2739,12 +2758,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.accentColor.withValues(alpha: isSelected ? 0.25 : 0.1),
+              color: isSelected
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : AppTheme.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               isCredits ? Icons.toll_outlined : Icons.inventory_2_outlined,
-              color: AppTheme.accentColor, size: 22,
+              color: isSelected ? Colors.white : AppTheme.primaryColor, size: 22,
             ),
           ),
           const SizedBox(width: 14),
@@ -2753,21 +2774,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 14,
               color: isSelected ? Colors.white : AppTheme.textPrimary,
             )),
-            if (isCredits)
-              Text('$credits crédits — 10\$ = 100 crédits', style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 11,
-                color: isSelected ? Colors.white70 : AppTheme.accentColor,
-                fontWeight: FontWeight.w600,
-              ))
-            else if (qty > 0)
-              Text('$qty crédit(s)', style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 11,
-                color: isSelected ? Colors.white70 : AppTheme.textSecondary,
-              )),
             if (desc != null)
               Text(desc, style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 10,
-                color: isSelected ? Colors.white54 : AppTheme.textHint,
+                fontFamily: 'Poppins', fontSize: 11,
+                color: isSelected ? Colors.white70 : AppTheme.textSecondary,
               )),
           ])),
           Container(
@@ -2919,7 +2929,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 Icons.photo_library_outlined),
             if (_hasEnoughCredits) ...[
               _recapRow('Paiement', 'Crédits disponibles ($_userAvailableCredits)', Icons.toll_outlined),
-              _recapRow('Coût', '$_requiredCredits crédit(s) débité(s)', Icons.check_circle_outline),
+              _recapRow('Coût', '$_requiredCredits crédit${_requiredCredits > 1 ? 's' : ''} débité${_requiredCredits > 1 ? 's' : ''}', Icons.check_circle_outline),
             ] else ...[
               _recapRow('Pack',      _selectedPack?['name'] ?? '—', Icons.inventory_2_outlined),
               _recapRow('Paiement',  _selectedPaymentMethod?['name'] ?? '—', Icons.payment),

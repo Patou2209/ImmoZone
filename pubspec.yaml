@@ -1,7 +1,7 @@
 name: immo_zone
 description: "ImmoZone - Plateforme immobilière Vente, Achat & Location"
 publish_to: 'none'
-version: 1.2.45+61
+version: 1.2.46+62
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
