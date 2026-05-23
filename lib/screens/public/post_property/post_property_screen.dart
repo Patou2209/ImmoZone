@@ -735,20 +735,18 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               availableTx, Icons.swap_horiz,
               (v) => setState(() => _selectedTransaction = v!));
         }),
-        // Prix affiché selon le type de bien (label adapté pour Chambre d'hôtel)
+        // Prix affiché selon le type de bien (label adapté selon type + transaction)
         _selectedType == 'Chambre d\'hôtel'
             ? _field(_priceCtrl, 'Prix par nuitée (USD) *', Icons.nights_stay_outlined, '0',
                 type: TextInputType.number, suffix: _currencyDropdown())
-            : _field(_priceCtrl, 'Prix *', Icons.attach_money, '0',
+            : _field(_priceCtrl,
+                _selectedTransaction == 'Location' ? 'Loyer *' : 'Prix *',
+                Icons.attach_money, '0',
                 type: TextInputType.number, suffix: _currencyDropdown()),
 
         // ── Description ────────────────────────────────────────────────────
         _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
             'Décrivez votre bien...', maxLines: 4),
-
-        // ── Champs conditionnels selon la catégorie ─────────────────────────
-        _buildCategoryFields(),
-        const SizedBox(height: 20),
 
         // ── Adresse du bien ────────────────────────────────────────────────
         _sectionLabel('Adresse complète du bien'),
@@ -846,7 +844,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               Icons.bookmark_outline_rounded, 'Ex: R\u00e9f. 004B'),
         ],
 
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+
+        // ── Champs conditionnels selon la catégorie ─────────────────────────
+        _buildCategoryFields(),
+        const SizedBox(height: 20),
 
         _navButtons(
           onNext: () { if (_validateStep1()) _goTo(1); },
@@ -949,7 +951,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   const SizedBox(width: 6),
                   _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
                   const SizedBox(width: 6),
-                  _durationCostChip('30 Jours', cost30, color, _selectedDuration == 30, 30),
+                  _durationCostChip('Trente Jours', cost30, color, _selectedDuration == 30, 30),
                 ]),
               ] else ...[
                 const SizedBox(height: 8),
@@ -3019,7 +3021,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             _recapRow('Photos',
                 '${_imageUrls.isNotEmpty ? _imageUrls.length : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length} photo(s)',
                 Icons.photo_library_outlined),
-            if (_hasEnoughCredits) ...[
+            if (_publicationRight == 'free_trial' || _publicationRight == 'free_quota') ...[
+              _recapRow('Paiement', 'Annonce gratuite', Icons.card_giftcard_outlined),
+            ] else if (_hasEnoughCredits) ...[
               _recapRow('Paiement', 'Crédits disponibles ($_userAvailableCredits)', Icons.toll_outlined),
               _recapRow('Coût', '$_requiredCredits crédit${_requiredCredits > 1 ? 's' : ''} débité${_requiredCredits > 1 ? 's' : ''}', Icons.check_circle_outline),
             ] else ...[

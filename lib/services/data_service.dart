@@ -200,17 +200,20 @@ class DataService {
         if ((user.city ?? '').toLowerCase() != targetCity.toLowerCase()) continue;
       }
       // Note: country filter is informational only (users don't have country field yet)
-      await addCredit(CreditModel(
-        id: 'promo_${user.id}_${DateTime.now().millisecondsSinceEpoch}',
+      // Create a promo quota (year=8888 = push admin promo marker)
+      final promoQuota = QuotaModel(
+        id: 'quota_push_${user.id}_${DateTime.now().millisecondsSinceEpoch}',
         userId: user.id,
-        quantity: freeAnnouncements,
-        remaining: freeAnnouncements,
-        source: 'promo_admin',
-        createdAt: DateTime.now(),
-      ));
+        year: 8888,   // marqueur «quota push admin»
+        month: 0,
+        freeQuota: freeAnnouncements,
+        usedFreeQuota: 0,
+        resetDate: DateTime.now().add(const Duration(days: 365)),
+      );
+      await _quotasCol.doc(promoQuota.id).set(promoQuota.toMap());
       credited++;
     }
-    return {'credited_users': credited, 'credits_per_user': freeAnnouncements};
+    return {'credited_users': credited, 'free_ads_per_user': freeAnnouncements};
   }
 
   Future<void> suspendPromotion() async {
@@ -1479,9 +1482,13 @@ class DataService {
     // 1. Free trial activé globalement ?
     if (isFreeTrial) return 'free_trial';
 
-    // 2. Quota gratuit mensuel disponible ?
+    // 2. Quota gratuit (bienvenue year=0, push promo year=8888, recharge promo year=9999)
     final quota = await getCurrentQuota(userId);
     if (quota.usedFreeQuota < quota.freeQuota) return 'free_quota';
+
+    // 2b. Quotas promo supplémentaires (push admin year=8888, recharge tier year=9999)
+    final promoQuota = await _getFirstAvailablePromoQuota(userId);
+    if (promoQuota != null) return 'free_quota';
 
     // 3. Crédits payants disponibles ?
     final required = commune.isNotEmpty
@@ -1493,15 +1500,41 @@ class DataService {
     return 'no_right';
   }
 
+  /// Retourne le premier quota promo disponible (year=8888 ou year=9999)
+  Future<QuotaModel?> _getFirstAvailablePromoQuota(String userId) async {
+    try {
+      for (final promoYear in [8888, 9999]) {
+        final snap = await _quotasCol
+            .where('userId', isEqualTo: userId)
+            .where('year', isEqualTo: promoYear)
+            .get();
+        for (final doc in snap.docs) {
+          final q = QuotaModel.fromMap(doc.data() as Map<String, dynamic>);
+          if (q.usedFreeQuota < q.freeQuota) return q;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> consumePublicationRight(String userId,
       {String commune = '', int days = 30}) async {
     // 1. Free trial : rien à consommer
     if (isFreeTrial) return;
 
-    // 2. Quota gratuit mensuel
+    // 2. Quota bienvenue (year=0)
     final quota = await getCurrentQuota(userId);
     if (quota.usedFreeQuota < quota.freeQuota) {
       await consumeFreeQuota(userId);
+      return;
+    }
+
+    // 2b. Quotas promo (year=8888 push admin, year=9999 recharge tier)
+    final promoQuota = await _getFirstAvailablePromoQuota(userId);
+    if (promoQuota != null) {
+      await _quotasCol.doc(promoQuota.id).update({
+        'usedFreeQuota': promoQuota.usedFreeQuota + 1,
+      });
       return;
     }
 

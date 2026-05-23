@@ -71,7 +71,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   final List<TextEditingController> _tierMaxCtrl  = [];
   final List<TextEditingController> _tierPctCtrl  = [];
   final List<int> _tierFreeAds = [2, 3, 5];
-  final List<String?> _tierTargetZone = [null, null, null];
+  final List<String?> _tierTargetZone    = [null, null, null];
+  final List<String?> _tierTargetCountry = [null, null, null];
+  final List<String?> _tierTargetCity    = [null, null, null];
 
   @override
   void initState() {
@@ -2031,6 +2033,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     const tierLabels = ['Palier 1', 'Palier 2', 'Palier 3'];
     const tierIcons  = [Icons.looks_one_rounded, Icons.looks_two_rounded, Icons.looks_3_rounded];
     const zoneNames  = ['Standard', 'Intermédiaire', 'Premium', 'Luxe'];
+    final countries  = AppConstants.countries;
     final color = tierColors[i];
     final isLast = i == 2;
     final freeAdsOptions = [0, 1, 2, 3, 4, 5];
@@ -2100,36 +2103,97 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ]),
           const SizedBox(height: 10),
 
-          // Zone cible (optionnel)
-          DropdownButtonFormField<String>(
-            initialValue: _tierTargetZone[i],
-            isExpanded: true,
-            decoration: InputDecoration(
-              isDense: true,
-              prefixIcon: const Icon(Icons.layers_rounded, size: 18, color: AppTheme.accentColor),
-              labelText: 'Zone cible (optionnel)',
-              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-              filled: true, fillColor: AppTheme.backgroundColor,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppTheme.dividerColor)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: color, width: 2)),
+          // ── Zone cible (optionnel) — UI complète pays + zone + cible ─────
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withValues(alpha: 0.15)),
             ),
-            hint: const Text('Toutes les zones', style: TextStyle(fontFamily: 'Poppins',
-                fontSize: 12, color: AppTheme.textHint)),
-            items: [
-              const DropdownMenuItem<String>(value: null,
-                  child: Text('Toutes les zones', style: TextStyle(fontFamily: 'Poppins',
-                      fontSize: 12, fontStyle: FontStyle.italic, color: AppTheme.textSecondary))),
-              ...zoneNames.map((z) => DropdownMenuItem<String>(value: z,
-                  child: Text(z, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)))),
-            ],
-            onChanged: (v) {
-              setState(() => _tierTargetZone[i] = v);
-              setTile(() {});
-            },
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Row(children: [
+                Icon(Icons.filter_alt_outlined, size: 15, color: AppTheme.accentColor),
+                SizedBox(width: 6),
+                Text('Zone cible (optionnel)',
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                        fontSize: 11, color: AppTheme.textPrimary)),
+              ]),
+              const SizedBox(height: 10),
+
+              // Pays
+              _promoDropdown<String>(
+                icon: Icons.flag_outlined,
+                hint: 'Selectionner un pays',
+                value: _tierTargetCountry[i],
+                items: countries,
+                labelOf: (c) => c,
+                onChanged: (v) {
+                  setState(() {
+                    _tierTargetCountry[i] = v;
+                    _tierTargetCity[i] = null;
+                    _tierTargetZone[i] = null;
+                  });
+                  setTile(() {});
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Ville (si pays choisi)
+              if (_tierTargetCountry[i] != null) ...[
+                _promoDropdown<String>(
+                  icon: Icons.location_city_outlined,
+                  hint: 'Choisir une ville (optionnel)',
+                  value: _tierTargetCity[i],
+                  items: AppConstants.getCitiesForCountry(_tierTargetCountry[i]!),
+                  labelOf: (c) => c,
+                  onChanged: (v) {
+                    setState(() {
+                      _tierTargetCity[i] = v;
+                      _tierTargetZone[i] = null;
+                    });
+                    setTile(() {});
+                  },
+                  nullable: true,
+                  nullLabel: 'Tout le pays',
+                ),
+                const SizedBox(height: 8),
+              ],
+
+              // Zone publication
+              _promoDropdown<String>(
+                icon: Icons.layers_rounded,
+                hint: 'Toutes les zones',
+                value: _tierTargetZone[i],
+                items: zoneNames,
+                labelOf: (z) => z,
+                onChanged: (v) {
+                  setState(() => _tierTargetZone[i] = v);
+                  setTile(() {});
+                },
+                nullable: true,
+                nullLabel: 'Toutes les zones',
+              ),
+              const SizedBox(height: 8),
+
+              // Cible recap
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.my_location_rounded, size: 13, color: AppTheme.accentColor),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    'Cible : ${_tierTargetZone[i] != null ? _tierTargetZone[i]! : 'Toutes les zones'}${_tierTargetCity[i] != null ? ' — ${_tierTargetCity[i]}' : ''}${_tierTargetCountry[i] != null ? ' (${_tierTargetCountry[i]})' : ''}',
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                        fontWeight: FontWeight.w600, color: AppTheme.accentColor),
+                  )),
+                ]),
+              ),
+            ]),
           ),
         ]),
       );
@@ -2178,6 +2242,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         'maxAmount': maxVal,
         'bonusCreditPct': pct.clamp(0, 100),
         'bonusFreeAds': _tierFreeAds[i],
+        'targetCountry': _tierTargetCountry[i],
+        'targetCity': _tierTargetCity[i],
         'targetZone': _tierTargetZone[i],
       });
     }
