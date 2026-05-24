@@ -2329,7 +2329,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         balanceIcon  = Icons.free_breakfast;
         break;
       case 'free_quota':
-        balanceLabel = '$_freeQuotaAvailable annonce${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}\n($_freeQuotaDays j. chacune)';
+        balanceLabel = '$_freeQuotaAvailable annonce${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}\n($_freeQuotaDays Jours chacune)';
         balanceColor = AppTheme.successColor;
         balanceIcon  = Icons.card_giftcard;
         break;

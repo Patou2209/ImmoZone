@@ -23,7 +23,10 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
     _load();
   }
 
-  void _load() {
+  Future<void> _load() async {
+    // Refresh packs from Firestore to ensure latest admin changes are visible
+    await _ds.refreshPacksFromFirestore();
+    if (!mounted) return;
     final settings = _ds.systemSettings;
     setState(() {
       _isFreeTrial = settings['free_trial_enabled'] == true;

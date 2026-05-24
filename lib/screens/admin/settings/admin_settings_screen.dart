@@ -48,6 +48,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ── Quota de bienvenue (annonces gratuites pour nouveaux utilisateurs) ──────
   late TextEditingController _freeQuotaCountCtrl;   // nb d’annonces
   late TextEditingController _freeQuotaDaysCtrl;    // durée en jours
+  // ignore: unused_field
   bool _isSavingQuota = false;
 
   // ── Promotions — annonces gratuites (admin push) ────────────────────────
@@ -72,8 +73,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   final List<TextEditingController> _tierPctCtrl  = [];
   final List<int> _tierFreeAds = [2, 3, 5];
   final List<String?> _tierTargetZone    = [null, null, null];
-  final List<String?> _tierTargetCountry = [null, null, null];
-  final List<String?> _tierTargetCity    = [null, null, null];
+
+  // ── Zone partagée pour tous les paliers ──────────────────────────────────
+  String? _sharedTierTargetCountry;
+  String? _sharedTierTargetCity;
+  String? _sharedTierTargetZone;
 
   @override
   void initState() {
@@ -143,6 +147,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       _tierPctCtrl[i].text = '${(t['bonusCreditPct'] as num?)?.toInt() ?? defaultPct[i]}';
       _tierFreeAds[i]      = (t['bonusFreeAds']    as num?)?.toInt() ?? defaultFree[i];
       _tierTargetZone[i]   =  t['targetZone']      as String?;
+    }
+    // Restaurer zone partagée depuis le premier palier (tous partagent la même)
+    if (_tiers.isNotEmpty) {
+      _sharedTierTargetCountry = _tiers[0]['targetCountry'] as String?;
+      _sharedTierTargetCity    = _tiers[0]['targetCity']    as String?;
+      _sharedTierTargetZone    = _tiers[0]['targetZone']    as String?;
     }
   }
 
@@ -2000,6 +2010,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         ])),
         const SizedBox(height: 16),
 
+        // ── Zone cible partagée pour tous les paliers ──────────────────────
+        _buildSharedTierZoneFilter(),
+        const SizedBox(height: 12),
+
         // Les 3 paliers
         ...List.generate(3, (i) => _buildTierCard(i)),
         const SizedBox(height: 8),
@@ -2028,12 +2042,113 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     );
   }
 
+  Widget _buildSharedTierZoneFilter() {
+    const zoneNames = ['Standard', 'Intermédiaire', 'Premium', 'Luxe'];
+    final countries  = AppConstants.countries;
+
+    String cibleLabel;
+    if (_sharedTierTargetZone != null) {
+      cibleLabel = _sharedTierTargetZone!;
+      if (_sharedTierTargetCity != null) cibleLabel += ' — $_sharedTierTargetCity';
+      if (_sharedTierTargetCountry != null) cibleLabel += ' ($_sharedTierTargetCountry)';
+    } else if (_sharedTierTargetCountry != null) {
+      cibleLabel = 'Tout le pays : $_sharedTierTargetCountry';
+    } else {
+      cibleLabel = 'Tous les utilisateurs';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.filter_alt_outlined, size: 16, color: AppTheme.accentColor),
+          SizedBox(width: 8),
+          Expanded(child: Text('Zone cible (commune aux 3 paliers)',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 12, color: AppTheme.textPrimary))),
+        ]),
+        const SizedBox(height: 3),
+        const Text("Laissez vide = s'applique a tous les utilisateurs",
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                color: AppTheme.textHint)),
+        const SizedBox(height: 12),
+
+        // Pays
+        _promoDropdown<String>(
+          icon: Icons.flag_outlined,
+          hint: 'Selectionner un pays',
+          value: _sharedTierTargetCountry,
+          items: countries,
+          labelOf: (c) => c,
+          onChanged: (v) => setState(() {
+            _sharedTierTargetCountry = v;
+            _sharedTierTargetCity = null;
+            _sharedTierTargetZone = null;
+          }),
+        ),
+        const SizedBox(height: 8),
+
+        // Ville (si pays choisi)
+        if (_sharedTierTargetCountry != null) ...[
+          _promoDropdown<String>(
+            icon: Icons.location_city_outlined,
+            hint: 'Choisir une ville (optionnel)',
+            value: _sharedTierTargetCity,
+            items: AppConstants.getCitiesForCountry(_sharedTierTargetCountry!),
+            labelOf: (c) => c,
+            onChanged: (v) => setState(() {
+              _sharedTierTargetCity = v;
+              _sharedTierTargetZone = null;
+            }),
+            nullable: true,
+            nullLabel: 'Tout le pays',
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        // Zone de publication
+        _promoDropdown<String>(
+          icon: Icons.layers_rounded,
+          hint: 'Toutes les zones',
+          value: _sharedTierTargetZone,
+          items: zoneNames,
+          labelOf: (z) => z,
+          onChanged: (v) => setState(() => _sharedTierTargetZone = v),
+          nullable: true,
+          nullLabel: 'Toutes les zones',
+        ),
+        const SizedBox(height: 10),
+
+        // Cible recap
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppTheme.accentColor.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(children: [
+            const Icon(Icons.my_location_rounded, size: 14, color: AppTheme.accentColor),
+            const SizedBox(width: 8),
+            Expanded(child: Text(
+              'Cible : $cibleLabel',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  fontWeight: FontWeight.w600, color: AppTheme.accentColor),
+            )),
+          ]),
+        ),
+      ]),
+    );
+  }
+
   Widget _buildTierCard(int i) {
     const tierColors = [Color(0xFF1565C0), Color(0xFF6A1B9A), Color(0xFF2E7D32)];
     const tierLabels = ['Palier 1', 'Palier 2', 'Palier 3'];
     const tierIcons  = [Icons.looks_one_rounded, Icons.looks_two_rounded, Icons.looks_3_rounded];
-    const zoneNames  = ['Standard', 'Intermédiaire', 'Premium', 'Luxe'];
-    final countries  = AppConstants.countries;
     final color = tierColors[i];
     final isLast = i == 2;
     final freeAdsOptions = [0, 1, 2, 3, 4, 5];
@@ -2103,98 +2218,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           ]),
           const SizedBox(height: 10),
 
-          // ── Zone cible (optionnel) — UI complète pays + zone + cible ─────
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: color.withValues(alpha: 0.15)),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Row(children: [
-                Icon(Icons.filter_alt_outlined, size: 15, color: AppTheme.accentColor),
-                SizedBox(width: 6),
-                Text('Zone cible (optionnel)',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                        fontSize: 11, color: AppTheme.textPrimary)),
-              ]),
-              const SizedBox(height: 10),
 
-              // Pays
-              _promoDropdown<String>(
-                icon: Icons.flag_outlined,
-                hint: 'Selectionner un pays',
-                value: _tierTargetCountry[i],
-                items: countries,
-                labelOf: (c) => c,
-                onChanged: (v) {
-                  setState(() {
-                    _tierTargetCountry[i] = v;
-                    _tierTargetCity[i] = null;
-                    _tierTargetZone[i] = null;
-                  });
-                  setTile(() {});
-                },
-              ),
-              const SizedBox(height: 8),
-
-              // Ville (si pays choisi)
-              if (_tierTargetCountry[i] != null) ...[
-                _promoDropdown<String>(
-                  icon: Icons.location_city_outlined,
-                  hint: 'Choisir une ville (optionnel)',
-                  value: _tierTargetCity[i],
-                  items: AppConstants.getCitiesForCountry(_tierTargetCountry[i]!),
-                  labelOf: (c) => c,
-                  onChanged: (v) {
-                    setState(() {
-                      _tierTargetCity[i] = v;
-                      _tierTargetZone[i] = null;
-                    });
-                    setTile(() {});
-                  },
-                  nullable: true,
-                  nullLabel: 'Tout le pays',
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Zone publication
-              _promoDropdown<String>(
-                icon: Icons.layers_rounded,
-                hint: 'Toutes les zones',
-                value: _tierTargetZone[i],
-                items: zoneNames,
-                labelOf: (z) => z,
-                onChanged: (v) {
-                  setState(() => _tierTargetZone[i] = v);
-                  setTile(() {});
-                },
-                nullable: true,
-                nullLabel: 'Toutes les zones',
-              ),
-              const SizedBox(height: 8),
-
-              // Cible recap
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.my_location_rounded, size: 13, color: AppTheme.accentColor),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(
-                    'Cible : ${_tierTargetZone[i] != null ? _tierTargetZone[i]! : 'Toutes les zones'}${_tierTargetCity[i] != null ? ' — ${_tierTargetCity[i]}' : ''}${_tierTargetCountry[i] != null ? ' (${_tierTargetCountry[i]})' : ''}',
-                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                        fontWeight: FontWeight.w600, color: AppTheme.accentColor),
-                  )),
-                ]),
-              ),
-            ]),
-          ),
         ]),
       );
     });
@@ -2242,9 +2266,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         'maxAmount': maxVal,
         'bonusCreditPct': pct.clamp(0, 100),
         'bonusFreeAds': _tierFreeAds[i],
-        'targetCountry': _tierTargetCountry[i],
-        'targetCity': _tierTargetCity[i],
-        'targetZone': _tierTargetZone[i],
+        'targetCountry': _sharedTierTargetCountry,
+        'targetCity': _sharedTierTargetCity,
+        'targetZone': _sharedTierTargetZone,
       });
     }
     await _ds.saveRechargeTiers(tiers);

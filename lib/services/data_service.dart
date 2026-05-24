@@ -46,6 +46,10 @@ class DataService {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    // Refresh settings and packs from Firestore at startup
+    await _refreshSettingsCache();
+    await _refreshPacksCache();
+    await _refreshRechargeTiersCache();
   }
 
   // ─── SESSION LOCALE (SharedPreferences) ─────────────────────────────────────
@@ -118,6 +122,35 @@ class DataService {
   Future<void> _refreshSettingsCache() async {
     final s = await _getSettings();
     await _prefs?.setString('system_settings_cache', jsonEncode(s));
+  }
+
+  Future<void> _refreshPacksCache() async {
+    try {
+      final snap = await _packsDoc.get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final packs = (data['packs'] as List?)?.cast<Map<String, dynamic>>();
+        if (packs != null && packs.isNotEmpty) {
+          await _prefs?.setString('packs_cache', jsonEncode(packs));
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Public method to refresh packs cache from Firestore (called when packs screen opens)
+  Future<void> refreshPacksFromFirestore() => _refreshPacksCache();
+
+  Future<void> _refreshRechargeTiersCache() async {
+    try {
+      final snap = await _rechargeTiersDoc.get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final tiers = (data['tiers'] as List?)?.cast<Map<String, dynamic>>();
+        if (tiers != null) {
+          await _prefs?.setString('recharge_tiers_cache', jsonEncode(tiers));
+        }
+      }
+    } catch (_) {}
   }
 
   bool get isFreeTrial => systemSettings['free_trial_enabled'] == true;
