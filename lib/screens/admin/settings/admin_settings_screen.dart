@@ -1065,7 +1065,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       });
       if (setPromo != null) setPromo(() {});
       final count = result['credited_users'] as int? ?? 0;
-      _snackOk('Promotion lancee ! $count user(s) ont recu $qty annonce(s) gratuite(s)');
+      _snackOk('Promotion lanc\u00e9e ! $count utilisateur(s) ont re\u00e7u $qty annonce(s) gratuite(s)');
     } catch (e) {
       setState(() => _isLaunchingPromo = false);
       if (setPromo != null) setPromo(() {});

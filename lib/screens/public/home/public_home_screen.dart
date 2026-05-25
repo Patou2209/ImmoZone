@@ -2376,7 +2376,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
           child: const Icon(Icons.home_work_outlined, size: 48, color: AppTheme.accentColor),
         ),
         const SizedBox(height: 16),
-        const Text('Aucune annonce publiee',
+        const Text('Aucune annonce publi\u00e9e',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
                 fontSize: 15, color: AppTheme.textPrimary)),
         const SizedBox(height: 6),

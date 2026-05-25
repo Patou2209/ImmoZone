@@ -387,11 +387,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.2),
+                          color: const Color(0xFFF57C00).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.verified_rounded,
-                            color: AppTheme.accentColor, size: 16),
+                            color: Color(0xFFF57C00), size: 16),
                       ),
                       const SizedBox(width: 10),
                       const Expanded(

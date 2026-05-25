@@ -3175,7 +3175,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Icon(Icons.info_outline, color: AppTheme.warningColor, size: 18),
             SizedBox(width: 10),
             Expanded(child: Text(
-              'Votre annonce sera examinee par l\'equipe ImmoZone. Apres validation de votre paiement, elle sera publiee en environ 1h.',
+              'Votre annonce sera examinée par l\'équipe ImmoZone. Après validation de votre paiement, elle sera publiée en environ 10 minutes.',
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
                   color: AppTheme.warningColor, height: 1.5),
             )),
@@ -3235,7 +3235,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             child: const Icon(Icons.check_circle_rounded, color: AppTheme.accentColor, size: 72),
           ),
           const SizedBox(height: 28),
-          const Text('Annonce soumise avec succes !',
+          const Text('Annonce soumise avec succès !',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
                 fontFamily: 'Poppins', color: AppTheme.textPrimary),
             textAlign: TextAlign.center,
@@ -3251,20 +3251,20 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             child: const Column(children: [
               _ConfirmStep(
                 icon: Icons.send_rounded, color: AppTheme.accentColor,
-                title: 'Annonce recue', isDone: true,
-                desc: 'Votre annonce a ete transmise a l\'equipe ImmoZone.',
+                title: 'Annonce reçue', isDone: true,
+                desc: 'Votre annonce a été transmise à l\'équipe ImmoZone.',
               ),
               SizedBox(height: 12),
               _ConfirmStep(
                 icon: Icons.payment_rounded, color: AppTheme.warningColor,
-                title: 'Verification du paiement', isDone: false,
-                desc: 'Nous verifions votre paiement Mobile Money (~1h).',
+                title: 'Vérification du paiement', isDone: false,
+                desc: 'Nous vérifions votre paiement Mobile Money (~10 min).',
               ),
               SizedBox(height: 12),
               _ConfirmStep(
                 icon: Icons.fact_check_rounded, color: AppTheme.primaryLight,
-                title: 'Moderation de l\'annonce', isDone: false,
-                desc: 'Notre equipe examine les photos et informations.',
+                title: 'Modération de l\'annonce', isDone: false,
+                desc: 'Notre équipe examine les photos et informations.',
               ),
               SizedBox(height: 12),
               _ConfirmStep(
@@ -3286,7 +3286,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               Icon(Icons.notifications_active_outlined, color: AppTheme.accentColor, size: 20),
               SizedBox(width: 10),
               Expanded(child: Text(
-                'Vous serez notifie(e) par email et WhatsApp des que votre annonce sera approuvee.',
+                'Vous serez notifié(e) par email et WhatsApp dès que votre annonce sera approuvée.',
                 style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
                     color: AppTheme.textSecondary, height: 1.5),
               )),
@@ -3307,7 +3307,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 ),
               ),
               icon: const Icon(Icons.home_rounded, color: AppTheme.accentColor),
-              label: const Text('Retour a l\'accueil',
+              label: const Text('Retour à l\'accueil',
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                     fontSize: 15, color: Colors.white)),
             ),

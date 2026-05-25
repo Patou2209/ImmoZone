@@ -244,6 +244,18 @@ class DataService {
         resetDate: DateTime.now().add(const Duration(days: 365)),
       );
       await _quotasCol.doc(promoQuota.id).set(promoQuota.toMap());
+
+      // Envoyer une notification à l'utilisateur avec les détails de la promotion
+      final annoncePlural = freeAnnouncements > 1 ? 's' : '';
+      await addNotification(AppNotification(
+        id: 'notif_promo_${user.id}_${DateTime.now().millisecondsSinceEpoch}',
+        userId: user.id,
+        type: 'promo',
+        title: 'Promotion ImmoZone !',
+        body: 'Félicitations ! Vous bénéficiez de $freeAnnouncements annonce$annoncePlural gratuite$annoncePlural offerte${annoncePlural.isEmpty ? '' : 's'} — $reason',
+        createdAt: DateTime.now(),
+      ));
+
       credited++;
     }
     return {'credited_users': credited, 'free_ads_per_user': freeAnnouncements};

@@ -403,7 +403,7 @@ class AppConstants {
   static const List<String> amenities = [
     'Piscine', 'Garage', 'Jardin', 'Terrasse', 'Gardiennage',
     'Ascenseur', 'Groupe electrogene', 'Eau courante', 'Climatisation',
-    'Internet', 'Cuisine equipee', 'Parquet', 'Carrelage',
+    'Internet', 'Cuisine \u00e9quip\u00e9e', 'Parquet', 'Carrelage',
     'Securite 24h/24', 'Parking', 'Cloture', 'Citerne d\'eau',
     'Panneaux solaires', 'Annexe', 'Espace de stockage',
   ];

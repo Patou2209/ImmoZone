@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import 'register_screen.dart';
@@ -22,6 +23,83 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _showForgotPassword() async {
+    final emailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Mot de passe oublié',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Saisissez votre adresse email pour recevoir un lien de réinitialisation.',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.accentColor),
+                hintText: 'votre@email.com',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annuler',
+                style: TextStyle(fontFamily: 'Poppins', color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) return;
+              Navigator.of(ctx).pop();
+              try {
+                await fb_auth.FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Email de réinitialisation envoyé à $email'),
+                    backgroundColor: AppTheme.successColor,
+                  ),
+                );
+              } on fb_auth.FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                final msg = e.code == 'user-not-found'
+                    ? 'Aucun compte trouvé avec cet email.'
+                    : 'Erreur : ${e.message}';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(msg),
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Envoyer',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    emailCtrl.dispose();
   }
 
   Future<void> _login() async {
@@ -166,7 +244,28 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? 'Mot de passe trop court'
                             : null,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _showForgotPassword,
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Mot de passe oublié ?',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
