@@ -99,6 +99,28 @@ class UserModel {
     };
   }
 
+  /// Convertit une valeur Firestore (Timestamp OU String ISO8601 OU null) en DateTime
+  static DateTime _parseDate(dynamic value, {DateTime? fallback}) {
+    if (value == null) return fallback ?? DateTime.now();
+    // Firestore Timestamp (cloud_firestore renvoie un objet avec .toDate())
+    if (value is DateTime) return value;
+    try {
+      // Utilise la réflexion duck-typing : Timestamp a une méthode toDate()
+      return (value as dynamic).toDate() as DateTime;
+    } catch (_) {}
+    // Sinon c'est une String ISO8601
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return fallback ?? DateTime.now();
+    }
+  }
+
+  static DateTime? _parseDateNullable(dynamic value) {
+    if (value == null) return null;
+    return _parseDate(value);
+  }
+
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       id: map['id'] ?? '',
@@ -113,8 +135,8 @@ class UserModel {
       address: map['address'],
       isActive: map['isActive'] ?? true,
       isVerified: map['isVerified'] ?? false,
-      createdAt: DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
-      lastLogin: map['lastLogin'] != null ? DateTime.parse(map['lastLogin']) : null,
+      createdAt: _parseDate(map['createdAt']),
+      lastLogin: _parseDateNullable(map['lastLogin']),
       totalProperties: map['totalProperties'] ?? 0,
       description: map['description'],
       whatsApp: map['whatsApp'],

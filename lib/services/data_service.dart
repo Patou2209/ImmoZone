@@ -399,7 +399,12 @@ class DataService {
       final user = UserModel.fromMap(snap.data() as Map<String, dynamic>);
       await _saveSession(user);
       return user;
-    } catch (_) {
+    } catch (e, st) {
+      // Log l'erreur réelle pour faciliter le diagnostic
+      if (kDebugMode) {
+        debugPrint('[DataService.loginById] Erreur: $e');
+        debugPrint('[DataService.loginById] Stack: $st');
+      }
       return null;
     }
   }
