@@ -450,12 +450,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _fillDemo(String role) {
     if (role == 'admin') {
-      // L'admin utilise l'e-mail virtuel dérivé de son numéro
-      // Pour démo : numéro admin stocké dans Firebase
       setState(() {
         _countryCode = '+243';
-        _phoneCtrl.text = '000000000';
-        _passwordCtrl.text = 'admin1234';
+        _phoneCtrl.text = '821908888';
+        _passwordCtrl.text = 'ImmoZone@2026!';
       });
     } else if (role == 'annonceur') {
       setState(() {
