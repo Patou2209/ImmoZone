@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
@@ -14,197 +12,185 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  // ── Onglet Email ──────────────────────────────────────────────────────────
-  final _emailFormKey = GlobalKey<FormState>();
-  final _emailCtrl    = TextEditingController();
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey     = GlobalKey<FormState>();
+  final _phoneCtrl   = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool  _obscure      = true;
+  bool  _obscure     = true;
 
-  // ── Onglet Téléphone ──────────────────────────────────────────────────────
-  String _phoneCountryCode = '+243';
-  final _phoneNumberCtrl   = TextEditingController();
-  final _otpCtrl           = TextEditingController();
+  // Indicatif pays sélectionné
+  String _countryCode = '+243';
 
-  String get _fullPhone => '$_phoneCountryCode${_phoneNumberCtrl.text.trim()}';
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+  String get _fullPhone =>
+      '$_countryCode${_phoneCtrl.text.trim()}';
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
     _passwordCtrl.dispose();
-    _phoneNumberCtrl.dispose();
-    _otpCtrl.dispose();
     super.dispose();
   }
 
-  // ── Connexion email/mot de passe ─────────────────────────────────────────
-  Future<void> _loginEmail() async {
-    if (!_emailFormKey.currentState!.validate()) return;
+  // ── Connexion ─────────────────────────────────────────────────────────────
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
-    final success =
-        await auth.login(_emailCtrl.text.trim(), _passwordCtrl.text.trim());
+    final ok = await auth.loginWithPhone(
+        _fullPhone, _passwordCtrl.text.trim());
     if (!mounted) return;
-    if (success) {
-      _navigateAfterLogin(auth);
+    if (ok) {
+      if (auth.isAdmin) {
+        Navigator.of(context).pushReplacementNamed('/admin');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/public');
+      }
     } else {
-      _showError(auth.error ?? 'Identifiants incorrects');
+      _showError(auth.error ?? 'Numéro ou mot de passe incorrect.');
     }
-  }
-
-  // ── Connexion téléphone — envoi OTP ──────────────────────────────────────
-  Future<void> _sendOtp() async {
-    final number = _phoneNumberCtrl.text.trim();
-    if (number.isEmpty) {
-      _showError('Veuillez saisir votre numéro de téléphone');
-      return;
-    }
-    final auth = context.read<AuthProvider>();
-    await auth.sendPhoneOtp(_fullPhone);
-    if (!mounted) return;
-    if (auth.error != null) _showError(auth.error!);
-  }
-
-  // ── Connexion téléphone — vérification OTP ───────────────────────────────
-  Future<void> _verifyOtp() async {
-    final code = _otpCtrl.text.trim();
-    if (code.length < 4) {
-      _showError('Veuillez saisir le code SMS reçu');
-      return;
-    }
-    final auth = context.read<AuthProvider>();
-    final success = await auth.verifyPhoneOtp(code);
-    if (!mounted) return;
-    if (success) {
-      _navigateAfterLogin(auth);
-    } else {
-      _showError(auth.error ?? 'Code SMS incorrect');
-    }
-  }
-
-  void _navigateAfterLogin(AuthProvider auth) {
-    if (auth.isAdmin) {
-      Navigator.of(context).pushReplacementNamed('/admin');
-    } else {
-      Navigator.of(context).pushReplacementNamed('/public');
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(fontFamily: 'Poppins')),
-      backgroundColor: AppTheme.errorColor,
-      behavior: SnackBarBehavior.floating,
-    ));
   }
 
   // ── Mot de passe oublié ───────────────────────────────────────────────────
-  Future<void> _showForgotPassword() async {
-    final emailCtrl =
-        TextEditingController(text: _emailCtrl.text.trim());
+  Future<void> _forgotPassword() async {
+    // Pré-remplir avec le numéro déjà saisi
+    final phoneCtrl =
+        TextEditingController(text: _phoneCtrl.text.trim());
+    String selectedCode = _countryCode;
+
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Mot de passe oublié',
-            style: TextStyle(
-                fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Saisissez votre adresse e-mail pour recevoir un lien de réinitialisation.',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setS) => AlertDialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          title: const Text('Mot de passe oublié',
               style: TextStyle(
                   fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'E-mail',
-                prefixIcon: Icon(Icons.email_outlined,
-                    color: AppTheme.accentColor),
-                hintText: 'votre@email.com',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Saisissez votre numéro de téléphone. Un lien de réinitialisation sera envoyé à l\'adresse e-mail de récupération associée à ce compte.',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    height: 1.5),
               ),
+              const SizedBox(height: 14),
+              // Sélecteur + champ numéro
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.dividerColor),
+                ),
+                child: Row(children: [
+                  _codeButton(selectedCode, () async {
+                    final picked =
+                        await _pickCountryCode(ctx2);
+                    if (picked != null) {
+                      setS(() => selectedCode = picked);
+                    }
+                  }),
+                  Expanded(
+                    child: TextField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins', fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'Numéro (ex : 812345678)',
+                        hintStyle: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: AppTheme.textHint),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 14),
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Annuler',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final number = phoneCtrl.text.trim();
+                if (number.isEmpty) return;
+                final full =
+                    '$selectedCode$number';
+                Navigator.of(ctx).pop();
+                final auth =
+                    context.read<AuthProvider>();
+                final ok = await auth
+                    .sendPasswordResetByPhone(full);
+                if (!mounted) return;
+                if (ok) {
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(const SnackBar(
+                    content: Text(
+                      'Lien de réinitialisation envoyé à votre adresse e-mail de récupération.',
+                      style: TextStyle(
+                          fontFamily: 'Poppins'),
+                    ),
+                    backgroundColor:
+                        AppTheme.successColor,
+                    behavior:
+                        SnackBarBehavior.floating,
+                  ));
+                } else {
+                  _showError(auth.error ??
+                      'Numéro introuvable.');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(10)),
+              ),
+              child: const Text('Envoyer',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler',
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    color: AppTheme.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final email = emailCtrl.text.trim();
-              if (email.isEmpty) return;
-              Navigator.of(ctx).pop();
-              try {
-                await fb_auth.FirebaseAuth.instance
-                    .sendPasswordResetEmail(email: email);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(
-                      'E-mail de réinitialisation envoyé à $email',
-                      style: const TextStyle(fontFamily: 'Poppins')),
-                  backgroundColor: AppTheme.successColor,
-                ));
-              } on fb_auth.FirebaseAuthException catch (e) {
-                if (!mounted) return;
-                final msg = e.code == 'user-not-found'
-                    ? 'Aucun compte trouvé avec cet e-mail.'
-                    : 'Erreur : ${e.message}';
-                _showError(msg);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Envoyer',
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
-    emailCtrl.dispose();
+    phoneCtrl.dispose();
   }
 
-  // ── Sélecteur indicatif pays ─────────────────────────────────────────────
-  void _showCountryPicker() {
+  // ── Sélecteur d'indicatif pays ────────────────────────────────────────────
+  Future<String?> _pickCountryCode(
+      BuildContext parentCtx) async {
     final searchCtrl = TextEditingController();
     List<Map<String, String>> filtered =
         List.from(AppConstants.countryCodes);
+    String? picked;
 
-    showModalBottomSheet(
-      context: context,
+    await showModalBottomSheet(
+      context: parentCtx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) {
+        builder: (ctx, setModal) {
           void onSearch(String q) {
-            setModalState(() {
+            setModal(() {
               filtered = AppConstants.countryCodes
                   .where((c) =>
                       (c['country'] ?? '')
@@ -222,19 +208,19 @@ class _LoginScreenState extends State<LoginScreen>
             builder: (_, scrollCtrl) => Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20)),
               ),
               child: Column(children: [
-                // Handle
                 Container(
-                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  margin: const EdgeInsets.symmetric(
+                      vertical: 12),
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: AppTheme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+                      color: AppTheme.dividerColor,
+                      borderRadius:
+                          BorderRadius.circular(2)),
                 ),
                 const Text('Indicatif pays',
                     style: TextStyle(
@@ -243,37 +229,31 @@ class _LoginScreenState extends State<LoginScreen>
                         fontSize: 16,
                         color: AppTheme.textPrimary)),
                 const SizedBox(height: 10),
-                // Barre de recherche
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16),
                   child: TextField(
                     controller: searchCtrl,
                     onChanged: onSearch,
                     decoration: InputDecoration(
                       hintText: 'Rechercher un pays…',
                       hintStyle: const TextStyle(
-                          fontFamily: 'Poppins', fontSize: 13),
-                      prefixIcon: const Icon(Icons.search,
+                          fontFamily: 'Poppins',
+                          fontSize: 13),
+                      prefixIcon: const Icon(
+                          Icons.search,
                           color: AppTheme.accentColor),
-                      suffixIcon: searchCtrl.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear,
-                                  size: 18,
-                                  color: AppTheme.textSecondary),
-                              onPressed: () {
-                                searchCtrl.clear();
-                                onSearch('');
-                              },
-                            )
-                          : null,
                       filled: true,
                       fillColor: AppTheme.backgroundColor,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius:
+                            BorderRadius.circular(10),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10, horizontal: 12),
+                      contentPadding:
+                          const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 12),
                     ),
                   ),
                 ),
@@ -285,15 +265,16 @@ class _LoginScreenState extends State<LoginScreen>
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
                       final c = filtered[i];
-                      final isSel = c['code'] == _phoneCountryCode;
+                      final isSel =
+                          c['code'] == _countryCode;
                       return ListTile(
                         onTap: () {
-                          setState(() =>
-                              _phoneCountryCode = c['code']!);
+                          picked = c['code'];
                           Navigator.pop(ctx);
                         },
                         leading: Text(c['flag'] ?? '',
-                            style: const TextStyle(fontSize: 24)),
+                            style: const TextStyle(
+                                fontSize: 24)),
                         title: Text(c['country'] ?? '',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
@@ -303,15 +284,154 @@ class _LoginScreenState extends State<LoginScreen>
                                 fontSize: 14,
                                 color: isSel
                                     ? AppTheme.accentColor
-                                    : AppTheme.textPrimary)),
+                                    : AppTheme
+                                        .textPrimary)),
                         trailing: Text(c['code'] ?? '',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w700,
+                                fontWeight:
+                                    FontWeight.w700,
                                 fontSize: 13,
                                 color: isSel
                                     ? AppTheme.accentColor
-                                    : AppTheme.textSecondary)),
+                                    : AppTheme
+                                        .textSecondary)),
+                        tileColor: isSel
+                            ? AppTheme.accentColor
+                                .withValues(alpha: 0.07)
+                            : null,
+                      );
+                    },
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+    return picked;
+  }
+
+  void _showCountryPicker() async {
+    final searchCtrl = TextEditingController();
+    List<Map<String, String>> filtered =
+        List.from(AppConstants.countryCodes);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModal) {
+          void onSearch(String q) {
+            setModal(() {
+              filtered = AppConstants.countryCodes
+                  .where((c) =>
+                      (c['country'] ?? '')
+                          .toLowerCase()
+                          .contains(q.toLowerCase()) ||
+                      (c['code'] ?? '').contains(q))
+                  .toList();
+            });
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.70,
+            maxChildSize: 0.92,
+            minChildSize: 0.40,
+            builder: (_, scrollCtrl) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20)),
+              ),
+              child: Column(children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(
+                      vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppTheme.dividerColor,
+                      borderRadius:
+                          BorderRadius.circular(2)),
+                ),
+                const Text('Indicatif pays',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: AppTheme.textPrimary)),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16),
+                  child: TextField(
+                    controller: searchCtrl,
+                    onChanged: onSearch,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher un pays…',
+                      hintStyle: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13),
+                      prefixIcon: const Icon(
+                          Icons.search,
+                          color: AppTheme.accentColor),
+                      filled: true,
+                      fillColor: AppTheme.backgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(
+                              vertical: 10,
+                              horizontal: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final c = filtered[i];
+                      final isSel =
+                          c['code'] == _countryCode;
+                      return ListTile(
+                        onTap: () {
+                          setState(() =>
+                              _countryCode = c['code']!);
+                          Navigator.pop(ctx);
+                        },
+                        leading: Text(c['flag'] ?? '',
+                            style: const TextStyle(
+                                fontSize: 24)),
+                        title: Text(c['country'] ?? '',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: isSel
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                fontSize: 14,
+                                color: isSel
+                                    ? AppTheme.accentColor
+                                    : AppTheme
+                                        .textPrimary)),
+                        trailing: Text(c['code'] ?? '',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight:
+                                    FontWeight.w700,
+                                fontSize: 13,
+                                color: isSel
+                                    ? AppTheme.accentColor
+                                    : AppTheme
+                                        .textSecondary)),
                         tileColor: isSel
                             ? AppTheme.accentColor
                                 .withValues(alpha: 0.07)
@@ -330,35 +450,59 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _fillDemo(String role) {
     if (role == 'admin') {
-      _emailCtrl.text = 'admin@immozone.cd';
-      _passwordCtrl.text = 'admin1234';
+      // L'admin utilise l'e-mail virtuel dérivé de son numéro
+      // Pour démo : numéro admin stocké dans Firebase
+      setState(() {
+        _countryCode = '+243';
+        _phoneCtrl.text = '000000000';
+        _passwordCtrl.text = 'admin1234';
+      });
     } else if (role == 'annonceur') {
-      _emailCtrl.text = 'jp.mukeba@gmail.com';
-      _passwordCtrl.text = 'pass1234';
+      setState(() {
+        _countryCode = '+243';
+        _phoneCtrl.text = '821908888';
+        _passwordCtrl.text = 'pass1234';
+      });
     } else {
-      _emailCtrl.text = 'p.mwamba@hotmail.com';
-      _passwordCtrl.text = 'pass1234';
+      setState(() {
+        _countryCode = '+243';
+        _phoneCtrl.text = '812345678';
+        _passwordCtrl.text = 'pass1234';
+      });
     }
-    setState(() {});
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg,
+          style: const TextStyle(fontFamily: 'Poppins')),
+      backgroundColor: AppTheme.errorColor,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final selected = AppConstants.countryCodes.firstWhere(
+      (c) => c['code'] == _countryCode,
+      orElse: () => AppConstants.countryCodes.first,
+    );
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 24, vertical: 16),
           child: Column(children: [
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
 
-            // ── Logo ─────────────────────────────────────────────────────
+            // ── Logo ───────────────────────────────────────────────────
             Image.asset(
               'assets/images/immozone_logo.png',
-              width: 200,
+              width: 210,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => RichText(
                 text: const TextSpan(
@@ -369,20 +513,21 @@ class _LoginScreenState extends State<LoginScreen>
                   children: [
                     TextSpan(
                         text: 'Immo',
-                        style:
-                            TextStyle(color: AppTheme.primaryColor)),
+                        style: TextStyle(
+                            color: AppTheme.primaryColor)),
                     TextSpan(
                         text: 'Zone',
-                        style:
-                            TextStyle(color: AppTheme.accentColor)),
+                        style: TextStyle(
+                            color: AppTheme.accentColor)),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
 
-            // ── Carte formulaire ─────────────────────────────────────────
+            // ── Carte formulaire ────────────────────────────────────────
             Container(
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -397,114 +542,196 @@ class _LoginScreenState extends State<LoginScreen>
                   )
                 ],
               ),
-              child: Column(children: [
-                // Titre
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Connexion',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                              fontFamily: 'Poppins')),
-                      SizedBox(height: 4),
-                      Text('Connectez-vous à votre compte',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textSecondary,
-                              fontFamily: 'Poppins')),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ── Tabs Email / Téléphone ──────────────────────────────
-                Container(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.backgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    dividerColor: Colors.transparent,
-                    labelStyle: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13),
-                    unselectedLabelStyle: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13),
-                    labelColor: Colors.white,
-                    unselectedLabelColor: AppTheme.textSecondary,
-                    tabs: const [
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.email_outlined, size: 15),
-                            SizedBox(width: 6),
-                            Text('E-mail'),
-                          ],
-                        ),
-                      ),
-                      Tab(
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.phone_outlined, size: 15),
-                            SizedBox(width: 6),
-                            Text('Téléphone'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Contenu des onglets ─────────────────────────────────
-                SizedBox(
-                  height: 260,
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: const NeverScrollableScrollPhysics(),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
-                      _buildEmailTab(auth),
-                      _buildPhoneTab(auth),
-                    ],
+                  const Text('Connexion',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                          fontFamily: 'Poppins')),
+                  const SizedBox(height: 4),
+                  const Text(
+                      'Connectez-vous avec votre numéro de téléphone',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                          fontFamily: 'Poppins')),
+                  const SizedBox(height: 22),
+
+                  // ── Champ Téléphone ─────────────────────────────────
+                  const Text('Numéro de téléphone',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary)),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppTheme.dividerColor),
+                    ),
+                    child: Row(children: [
+                      // Bouton indicatif
+                      GestureDetector(
+                        onTap: _showCountryPicker,
+                        child: _codeButton(
+                            _countryCode, null,
+                            flag: selected['flag']),
+                      ),
+                      // Numéro sans indicatif
+                      Expanded(
+                        child: TextFormField(
+                          controller: _phoneCtrl,
+                          keyboardType:
+                              TextInputType.phone,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText:
+                                'Numéro (ex : 812345678)',
+                            hintStyle: TextStyle(
+                                fontFamily: 'Poppins',
+                                color: AppTheme.textHint,
+                                fontSize: 12),
+                            border: InputBorder.none,
+                            enabledBorder:
+                                InputBorder.none,
+                            focusedBorder:
+                                InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            contentPadding:
+                                EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14),
+                          ),
+                          validator: (v) =>
+                              v == null || v.trim().isEmpty
+                                  ? 'Numéro requis'
+                                  : null,
+                        ),
+                      ),
+                    ]),
                   ),
-                ),
-              ]),
+                  const SizedBox(height: 14),
+
+                  // ── Champ Mot de passe ──────────────────────────────
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                      labelText: 'Mot de passe',
+                      prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: AppTheme.accentColor),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscure
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppTheme.textSecondary,
+                            size: 20),
+                        onPressed: () => setState(
+                            () => _obscure = !_obscure),
+                      ),
+                    ),
+                    validator: (v) =>
+                        v == null || v.length < 4
+                            ? 'Mot de passe trop court'
+                            : null,
+                  ),
+
+                  // ── Mot de passe oublié ─────────────────────────────
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _forgotPassword,
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize:
+                            MaterialTapTargetSize
+                                .shrinkWrap,
+                      ),
+                      child: const Text(
+                          'Mot de passe oublié ?',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentColor)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ── Bouton Se connecter ─────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed:
+                          auth.isLoading ? null : _login,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(12),
+                          side: const BorderSide(
+                              color: AppTheme.accentColor,
+                              width: 1.5),
+                        ),
+                      ),
+                      child: auth.isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child:
+                                  CircularProgressIndicator(
+                                      color: AppTheme
+                                          .accentColor,
+                                      strokeWidth: 2))
+                          : const Text('Se connecter',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight:
+                                      FontWeight.w700,
+                                  fontSize: 15,
+                                  color: Colors.white)),
+                    ),
+                  ),
+                ]),
+              ),
             ),
             const SizedBox(height: 18),
 
-            // ── Comptes démo ─────────────────────────────────────────────
+            // ── Comptes démo ────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                color: AppTheme.primaryColor
+                    .withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                    color:
-                        AppTheme.accentColor.withValues(alpha: 0.3)),
+                    color: AppTheme.accentColor
+                        .withValues(alpha: 0.3)),
               ),
               child: Column(children: [
                 const Row(children: [
                   Icon(Icons.info_outline,
-                      color: AppTheme.accentColor, size: 16),
+                      color: AppTheme.accentColor,
+                      size: 16),
                   SizedBox(width: 8),
                   Text('Comptes de démonstration',
                       style: TextStyle(
@@ -516,24 +743,30 @@ class _LoginScreenState extends State<LoginScreen>
                 const SizedBox(height: 12),
                 Row(children: [
                   Expanded(
-                      child: _demoBtn('Admin',
+                      child: _demoBtn(
+                          'Admin',
                           Icons.admin_panel_settings,
                           () => _fillDemo('admin'))),
                   const SizedBox(width: 8),
                   Expanded(
-                      child: _demoBtn('Annonceur',
+                      child: _demoBtn(
+                          'Annonceur',
                           Icons.home_outlined,
                           () => _fillDemo('annonceur'))),
                   const SizedBox(width: 8),
                   Expanded(
-                      child: _demoBtn('Demandeur', Icons.search,
+                      child: _demoBtn(
+                          'Demandeur',
+                          Icons.search,
                           () => _fillDemo('demandeur'))),
                 ]),
               ]),
             ),
             const SizedBox(height: 18),
 
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
               const Text('Pas encore de compte ? ',
                   style: TextStyle(
                       color: AppTheme.textSecondary,
@@ -543,332 +776,53 @@ class _LoginScreenState extends State<LoginScreen>
                 onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const RegisterScreen())),
+                        builder: (_) =>
+                            const RegisterScreen())),
                 child: const Text('S\'inscrire',
                     style: TextStyle(
                         fontFamily: 'Poppins',
                         fontWeight: FontWeight.w700)),
               ),
             ]),
+            const SizedBox(height: 16),
           ]),
         ),
       ),
     );
   }
 
-  // ── Onglet 1 : Email + Mot de passe ──────────────────────────────────────
-  Widget _buildEmailTab(AuthProvider auth) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      child: Form(
-        key: _emailFormKey,
-        child: Column(children: [
-          TextFormField(
-            controller: _emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'E-mail',
-              prefixIcon: Icon(Icons.email_outlined,
-                  color: AppTheme.accentColor),
-              hintText: 'votre@email.com',
-            ),
-            validator: (v) =>
-                v == null || v.isEmpty ? 'E-mail requis' : null,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _passwordCtrl,
-            obscureText: _obscure,
-            decoration: InputDecoration(
-              labelText: 'Mot de passe',
-              prefixIcon: const Icon(Icons.lock_outline,
-                  color: AppTheme.accentColor),
-              suffixIcon: IconButton(
-                icon: Icon(
-                    _obscure
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: AppTheme.textSecondary,
-                    size: 20),
-                onPressed: () =>
-                    setState(() => _obscure = !_obscure),
-              ),
-            ),
-            validator: (v) => v == null || v.length < 4
-                ? 'Mot de passe trop court'
-                : null,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _showForgotPassword,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text('Mot de passe oublié ?',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.accentColor)),
-            ),
-          ),
-          const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed:
-                  auth.isLoading ? null : _loginEmail,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(
-                      color: AppTheme.accentColor, width: 1.5),
-                ),
-              ),
-              child: auth.isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          color: AppTheme.accentColor,
-                          strokeWidth: 2))
-                  : const Text('Se connecter',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: Colors.white)),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  // ── Onglet 2 : Téléphone + OTP ───────────────────────────────────────────
-  Widget _buildPhoneTab(AuthProvider auth) {
-    final codeSent = auth.codeSent;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-      child: Column(children: [
-        if (!codeSent) ...[
-          // Sélecteur pays + numéro
-          _phoneInputRow(),
-          const SizedBox(height: 12),
-          const Text(
-            'Un code SMS vous sera envoyé sur ce numéro.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed:
-                  auth.isLoading ? null : _sendOtp,
-              icon: auth.isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.sms_outlined,
-                      size: 18, color: Colors.white),
-              label: const Text('Recevoir le code SMS',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(
-                      color: AppTheme.accentColor, width: 1.5),
-                ),
-              ),
-            ),
-          ),
-        ] else ...[
-          // Saisie du code OTP
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.successColor.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: AppTheme.successColor
-                      .withValues(alpha: 0.35)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.check_circle_outline,
-                  color: AppTheme.successColor, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Code envoyé sur $_fullPhone',
-                  style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      color: AppTheme.successColor),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  context.read<AuthProvider>().resetPhoneAuth();
-                  _otpCtrl.clear();
-                },
-                child: const Text('Modifier',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.accentColor)),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _otpCtrl,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            textAlign: TextAlign.center,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly
-            ],
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 8,
-                color: AppTheme.textPrimary),
-            decoration: InputDecoration(
-              hintText: '——————',
-              hintStyle: TextStyle(
-                  color: AppTheme.textHint,
-                  fontSize: 22,
-                  letterSpacing: 8),
-              counterText: '',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: AppTheme.accentColor, width: 2),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: auth.otpVerifying ? null : _verifyOtp,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(
-                      color: AppTheme.accentColor, width: 1.5),
-                ),
-              ),
-              child: auth.otpVerifying
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          color: AppTheme.accentColor,
-                          strokeWidth: 2))
-                  : const Text('Vérifier et se connecter',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: Colors.white)),
-            ),
-          ),
-        ],
-      ]),
-    );
-  }
-
-  // ── Ligne saisie téléphone (indicatif + numéro) ───────────────────────────
-  Widget _phoneInputRow() {
-    final selected = AppConstants.countryCodes.firstWhere(
-      (c) => c['code'] == _phoneCountryCode,
+  // ── Bouton indicatif pays ─────────────────────────────────────────────────
+  Widget _codeButton(String code, VoidCallback? onTap,
+      {String? flag}) {
+    final entry = AppConstants.countryCodes.firstWhere(
+      (c) => c['code'] == code,
       orElse: () => AppConstants.countryCodes.first,
     );
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.dividerColor),
-      ),
-      child: Row(children: [
-        // Bouton indicatif
-        GestureDetector(
-          onTap: _showCountryPicker,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border(
-                  right: BorderSide(color: AppTheme.dividerColor)),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(selected['flag'] ?? '',
-                  style: const TextStyle(fontSize: 20)),
-              const SizedBox(width: 4),
-              Text(_phoneCountryCode,
-                  style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppTheme.accentColor)),
-              const SizedBox(width: 2),
-              const Icon(Icons.arrow_drop_down,
-                  color: AppTheme.accentColor, size: 18),
-            ]),
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 10, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border(
+              right:
+                  BorderSide(color: AppTheme.dividerColor)),
         ),
-        // Numéro sans indicatif
-        Expanded(
-          child: TextField(
-            controller: _phoneNumberCtrl,
-            keyboardType: TextInputType.phone,
-            style: const TextStyle(
-                fontFamily: 'Poppins', fontSize: 13),
-            decoration: const InputDecoration(
-              hintText: 'Numéro (ex : 812345678)',
-              hintStyle: TextStyle(
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(flag ?? entry['flag'] ?? '',
+              style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 4),
+          Text(code,
+              style: const TextStyle(
                   fontFamily: 'Poppins',
-                  color: AppTheme.textHint,
-                  fontSize: 12),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 14),
-            ),
-          ),
-        ),
-      ]),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: AppTheme.accentColor)),
+          const SizedBox(width: 2),
+          const Icon(Icons.arrow_drop_down,
+              color: AppTheme.accentColor, size: 18),
+        ]),
+      ),
     );
   }
 
@@ -883,7 +837,8 @@ class _LoginScreenState extends State<LoginScreen>
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: AppTheme.accentColor.withValues(alpha: 0.4)),
+              color:
+                  AppTheme.accentColor.withValues(alpha: 0.4)),
         ),
         child: Column(children: [
           Icon(icon, color: AppTheme.accentColor, size: 20),

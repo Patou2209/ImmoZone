@@ -404,6 +404,20 @@ class DataService {
     }
   }
 
+  /// Cherche un utilisateur par numéro de téléphone (pour vérification doublon)
+  Future<UserModel?> findUserByPhone(String phone) async {
+    try {
+      final snap = await _usersCol
+          .where('phone', isEqualTo: phone)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return null;
+      return UserModel.fromMap(snap.docs.first.data() as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<UserModel?> register({
     required String name,
     required String email,

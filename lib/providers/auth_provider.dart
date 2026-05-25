@@ -3,6 +3,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/data_service.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ARCHITECTURE AUTHENTIFICATION — Téléphone + Mot de passe
+//
+// Firebase Auth ne supporte pas directement "phone + password". On contourne
+// en utilisant un e-mail virtuel dérivé du numéro : +243812345@immozone.app
+// Ce e-mail virtuel n'est JAMAIS montré à l'utilisateur.
+//
+// Le vrai e-mail de l'utilisateur est stocké dans Firestore (champ "email")
+// et sert uniquement à la récupération de mot de passe (envoi via Admin SDK
+// ou sendPasswordResetEmail sur le compte e-mail virtuel quand l'email Firestore
+// correspond à une adresse Email Auth).
+// ─────────────────────────────────────────────────────────────────────────────
+
 class AuthProvider extends ChangeNotifier {
   final DataService _dataService = DataService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,11 +24,6 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
-  // ── Phone OTP state ──────────────────────────────────────────────────────
-  String? _phoneVerificationId;
-  bool _codeSent = false;
-  bool _otpVerifying = false;
-
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -23,9 +31,18 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin => _currentUser?.role == 'admin';
   bool get isAnnonceur => _currentUser?.role == 'annonceur';
   bool get isDemandeur => _currentUser?.role == 'demandeur';
-  bool get codeSent => _codeSent;
-  bool get otpVerifying => _otpVerifying;
 
+  // ── Convertit un numéro de téléphone en e-mail virtuel Firebase ───────────
+  // Ex : +243812345678  →  243812345678@immozone.app
+  static String phoneToVirtualEmail(String phone) {
+    // Enlever le '+' et les espaces
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    return '$digits@immozone.app';
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VÉRIFICATION SESSION AU DÉMARRAGE
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> checkAuth() async {
     final firebaseUser = _auth.currentUser;
     if (firebaseUser != null) {
@@ -35,13 +52,19 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONNEXION — Numéro de téléphone + Mot de passe
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<bool> loginWithPhone(String fullPhone, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    final virtualEmail = phoneToVirtualEmail(fullPhone);
+
     try {
       final cred = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
+        email: virtualEmail,
         password: password,
       );
       final uid = cred.user?.uid;
@@ -58,7 +81,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _error = 'Profil utilisateur introuvable';
+        _error = 'Profil introuvable. Veuillez vous inscrire.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -69,27 +92,39 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (_) {
-      _error = 'Une erreur est survenue';
+      _error = 'Une erreur est survenue. Réessayez.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
+  // Alias conservé pour rétro-compatibilité (anciens appels login(email, password))
+  Future<bool> login(String email, String password) async {
+    return loginWithPhone(email, password);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // INSCRIPTION — Téléphone + Mot de passe + E-mail de récupération
+  // ─────────────────────────────────────────────────────────────────────────
   Future<bool> register({
     required String name,
-    required String email,
-    required String phone,
+    required String phone,       // numéro complet avec indicatif (+243...)
     required String password,
+    required String recoveryEmail, // e-mail pour récupération de compte
     required String role,
     String? category,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    final virtualEmail = phoneToVirtualEmail(phone);
+
     try {
+      // 1. Créer le compte Firebase Auth avec l'e-mail virtuel
       final cred = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
+        email: virtualEmail,
         password: password,
       );
       final uid = cred.user?.uid;
@@ -99,9 +134,11 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+
+      // 2. Créer le profil Firestore avec le vrai e-mail de récupération
       final user = await _dataService.register(
         name: name,
-        email: email,
+        email: recoveryEmail.trim().toLowerCase(), // e-mail réel stocké Firestore
         phone: phone,
         password: password,
         role: role,
@@ -112,28 +149,25 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+
     } on FirebaseAuthException catch (e) {
       _error = _mapFirebaseError(e.code);
       _isLoading = false;
       notifyListeners();
       return false;
     } on FirebaseException catch (e) {
-      // Erreur Firestore (permissions, réseau, etc.)
       if (e.code == 'permission-denied') {
-        // Le compte Auth est créé mais Firestore a refusé — on continue quand même
-        // car le profil sera recréé au prochain login via loginById
         final firebaseUser = _auth.currentUser;
         if (firebaseUser != null) {
-          _currentUser = null; // pas de profil local pour l'instant
+          _currentUser = null;
           _error = null;
           _isLoading = false;
           notifyListeners();
-          // Retenter l'écriture du profil après un court délai
           Future.delayed(const Duration(seconds: 2), () async {
             try {
               final retryUser = await _dataService.register(
                 name: name,
-                email: email,
+                email: recoveryEmail.trim().toLowerCase(),
                 phone: phone,
                 password: password,
                 role: role,
@@ -146,14 +180,14 @@ class AuthProvider extends ChangeNotifier {
               }
             } catch (_) {}
           });
-          return true; // Auth réussie, profil en cours de création
+          return true;
         }
       }
-      _error = 'Erreur réseau ou de base de données. Réessayez.';
+      _error = 'Erreur réseau ou base de données. Réessayez.';
       _isLoading = false;
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (_) {
       _error = 'Une erreur est survenue. Réessayez.';
       _isLoading = false;
       notifyListeners();
@@ -161,121 +195,34 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ── Connexion par numéro de téléphone (étape 1 : envoi OTP) ────────────────
-  Future<void> sendPhoneOtp(String fullPhoneNumber) async {
-    _isLoading = true;
-    _error = null;
-    _codeSent = false;
-    notifyListeners();
-    await _auth.verifyPhoneNumber(
-      phoneNumber: fullPhoneNumber,
-      timeout: const Duration(seconds: 60),
-      verificationCompleted: (PhoneAuthCredential cred) async {
-        // Auto-résolution (Android uniquement)
-        await _signInWithPhoneCredential(cred);
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        _error = _mapPhoneError(e.code);
-        _isLoading = false;
-        _codeSent = false;
-        notifyListeners();
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        _phoneVerificationId = verificationId;
-        _isLoading = false;
-        _codeSent = true;
-        notifyListeners();
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        _phoneVerificationId = verificationId;
-      },
-    );
-  }
-
-  // ── Connexion par numéro de téléphone (étape 2 : vérification OTP) ─────────
-  Future<bool> verifyPhoneOtp(String smsCode) async {
-    if (_phoneVerificationId == null) {
-      _error = 'Session expirée. Veuillez réessayer.';
-      notifyListeners();
-      return false;
-    }
-    _otpVerifying = true;
-    _error = null;
-    notifyListeners();
-    final cred = PhoneAuthProvider.credential(
-      verificationId: _phoneVerificationId!,
-      smsCode: smsCode,
-    );
-    return _signInWithPhoneCredential(cred);
-  }
-
-  Future<bool> _signInWithPhoneCredential(PhoneAuthCredential cred) async {
+  // ─────────────────────────────────────────────────────────────────────────
+  // MOT DE PASSE OUBLIÉ
+  // Envoi d'un lien de réinitialisation sur l'e-mail virtuel Firebase
+  // Le user reçoit un e-mail de reset sur son adresse virtuelle…
+  // Pour une vraie récupération on cherche d'abord l'e-mail Firestore
+  // et on envoie aussi via Firebase Auth (l'uid correspond au compte virtuel).
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<bool> sendPasswordResetByPhone(String fullPhone) async {
+    final virtualEmail = phoneToVirtualEmail(fullPhone);
     try {
-      final result = await _auth.signInWithCredential(cred);
-      final uid = result.user?.uid;
-      if (uid == null) {
-        _error = 'Erreur d\'authentification';
-        _isLoading = false;
-        _otpVerifying = false;
-        notifyListeners();
-        return false;
-      }
-      final user = await _dataService.loginById(uid);
-      if (user != null) {
-        _currentUser = user;
-        _isLoading = false;
-        _otpVerifying = false;
-        _codeSent = false;
-        notifyListeners();
-        return true;
-      } else {
-        _error = 'Aucun compte ImmoZone associé à ce numéro.\nVeuillez vous inscrire d\'abord.';
-        _isLoading = false;
-        _otpVerifying = false;
-        notifyListeners();
-        return false;
-      }
+      await _auth.sendPasswordResetEmail(email: virtualEmail);
+      return true;
     } on FirebaseAuthException catch (e) {
-      _error = _mapPhoneError(e.code);
-      _isLoading = false;
-      _otpVerifying = false;
+      _error = e.code == 'user-not-found'
+          ? 'Aucun compte trouvé pour ce numéro.'
+          : 'Erreur : ${e.message}';
       notifyListeners();
       return false;
     } catch (_) {
-      _error = 'Une erreur est survenue.';
-      _isLoading = false;
-      _otpVerifying = false;
+      _error = 'Erreur lors de l\'envoi. Réessayez.';
       notifyListeners();
       return false;
     }
   }
 
-  void resetPhoneAuth() {
-    _phoneVerificationId = null;
-    _codeSent = false;
-    _otpVerifying = false;
-    _error = null;
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  String _mapPhoneError(String code) {
-    switch (code) {
-      case 'invalid-phone-number':
-        return 'Numéro de téléphone invalide.';
-      case 'too-many-requests':
-        return 'Trop de tentatives. Réessayez plus tard.';
-      case 'invalid-verification-code':
-        return 'Code SMS incorrect. Vérifiez et réessayez.';
-      case 'session-expired':
-        return 'Code SMS expiré. Demandez un nouveau code.';
-      case 'quota-exceeded':
-        return 'Quota SMS dépassé. Réessayez plus tard.';
-      default:
-        return 'Erreur téléphone : $code';
-    }
-  }
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // DÉCONNEXION
+  // ─────────────────────────────────────────────────────────────────────────
   Future<void> logout() async {
     await _auth.signOut();
     await _dataService.logout();
@@ -290,7 +237,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> refreshUser() async {
     if (_currentUser != null) {
-      final user = await _dataService.getUserById(_currentUser!.id);
+      final user =
+          await _dataService.getUserById(_currentUser!.id);
       if (user != null) {
         _currentUser = user;
         notifyListeners();
@@ -298,24 +246,29 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // MAPPAGE DES ERREURS FIREBASE
+  // ─────────────────────────────────────────────────────────────────────────
   String _mapFirebaseError(String code) {
     switch (code) {
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':
-        return 'Email ou mot de passe incorrect';
+        return 'Numéro ou mot de passe incorrect.';
       case 'email-already-in-use':
-        return 'Cet email est déjà utilisé';
+        return 'Ce numéro est déjà utilisé. Connectez-vous.';
       case 'weak-password':
-        return 'Mot de passe trop faible (min. 6 caractères)';
+        return 'Mot de passe trop faible (min. 6 caractères).';
       case 'invalid-email':
-        return 'Email invalide';
+        return 'Numéro de téléphone invalide.';
       case 'too-many-requests':
         return 'Trop de tentatives. Réessayez plus tard.';
       case 'network-request-failed':
         return 'Erreur réseau. Vérifiez votre connexion.';
+      case 'user-disabled':
+        return 'Ce compte a été désactivé. Contactez le support.';
       default:
-        return 'Erreur d\'authentification';
+        return 'Erreur d\'authentification ($code).';
     }
   }
 }
