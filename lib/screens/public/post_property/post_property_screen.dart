@@ -23,7 +23,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final PageController _pageCtrl = PageController();
   bool _submitting = false;
 
-  // ── Etape 1 — Informations personnelles & adresse ─────────────────────────
+  // ── Étape 1 — Informations personnelles & adresse ─────────────────────────
   final _nomCtrl      = TextEditingController();
   // WhatsApp: indicatif pays + 9 chiffres
   String _waCountryCode = '+243';
@@ -74,7 +74,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   bool _hasCommission = false;
   final _commissionPctCtrl = TextEditingController();
 
-  // ── Etape 2 — Images ──────────────────────────────────────────────────────
+  // ── Étape 2 — Images ──────────────────────────────────────────────────────
   // Photo principale (obligatoire) + 3 photos secondaires (obligatoires) = 4 exactement
   XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
   final List<XFile> _secondaryPhotos = []; // max 3 photos secondaires
@@ -86,7 +86,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   // ── Durée de publication ──────────────────────────────────────────────────
   int _selectedDuration = 30; // 7 | 15 | 30 jours
 
-  // ── Etape 3 — Paiement ────────────────────────────────────────────────────
+  // ── Étape 3 — Paiement ────────────────────────────────────────────────────
   Map<String, dynamic>? _selectedPack;
   Map<String, dynamic>? _selectedPaymentMethod;
   final _transactionRefCtrl = TextEditingController();
@@ -105,7 +105,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   bool _submittingPayment = false; // loading while saving payment request
   String? _pendingPaymentId;       // ID of the pending payment for tracking
 
-  // ── Etape 4 — Confirmation ────────────────────────────────────────────────
+  // ── Étape 4 — Confirmation ────────────────────────────────────────────────
   bool _submitted = false;
   // ignore: unused_field
   String? _createdPropertyId;
@@ -650,7 +650,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 1 — Coordonnees + adresse du bien
+  // ÉTAPE 1 — Coordonnées + adresse du bien
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep1() {
     final auth    = context.watch<AuthProvider>();
@@ -660,10 +660,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Etape 1', 'Coordonnees & adresse du bien', Icons.person_pin_rounded),
+        _stepHeader('Étape 1', 'Coordonnées & adresse du bien', Icons.person_pin_rounded),
         const SizedBox(height: 20),
 
-        // ── Coordonnees annonceur ───────────────────────────────────────────
+        // ── Coordonnées annonceur ───────────────────────────────────────────
         if (isLoggedIn) ...[
           // Afficher les infos du compte : pas de saisie requise
           Container(
@@ -711,7 +711,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.4)),
                 ),
-                child: const Text('Connecte',
+                child: const Text('Connecté',
                     style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
                         fontWeight: FontWeight.w700, color: AppTheme.successColor)),
               ),
@@ -719,14 +719,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Vos coordonnees seront utilisees pour cette annonce.',
+            'Vos coordonnées seront utilisées pour cette annonce.',
             style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
                 color: AppTheme.textSecondary, fontStyle: FontStyle.italic),
           ),
           const SizedBox(height: 20),
         ] else ...[
-          // Non connecte : saisie des coordonnees
-          _sectionLabel('Vos coordonnees'),
+          // Non connecté : saisie des coordonnées
+          _sectionLabel('Vos coordonnées'),
           const SizedBox(height: 10),
           _field(_nomCtrl, 'Nom complet *', Icons.person_outline, 'Jean Dupont'),
           // WhatsApp avec selecteur d'indicatif
@@ -1802,7 +1802,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 2 — Photos du bien (exactement 4 : 1 principale + 3 secondaires)
+  // ÉTAPE 2 — Photos du bien (exactement 4 : 1 principale + 3 secondaires)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep2() {
     final bool hasSampleUrls = _imageUrls.isNotEmpty;
@@ -1814,7 +1814,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Etape 2', 'Photos du bien (4 photos requises)', Icons.photo_library_rounded),
+        _stepHeader('Étape 2', 'Photos du bien (4 photos requises)', Icons.photo_library_rounded),
         const SizedBox(height: 8),
 
         // Bannière info
@@ -2310,7 +2310,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 3 — Crédits / Paiement (intelligent)
+  // ÉTAPE 3 — Crédits / Paiement (intelligent)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep3() {
     final ds      = DataService();
@@ -2325,7 +2325,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Etape 3', 'Crédits & Paiement', Icons.toll_outlined),
+        _stepHeader('Étape 3', 'Crédits & Paiement', Icons.toll_outlined),
         const SizedBox(height: 16),
 
         if (!_creditChecked)
@@ -3096,7 +3096,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 4 — Envoi de l'annonce
+  // ÉTAPE 4 — Envoi de l'annonce
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep4() {
     final auth = context.watch<AuthProvider>();
@@ -3110,7 +3110,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Etape 4', 'Recapitulatif & Envoi', Icons.send_rounded),
+        _stepHeader('Étape 4', 'Récapitulatif & Envoi', Icons.send_rounded),
         const SizedBox(height: 20),
 
         Container(
@@ -3214,7 +3214,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ETAPE 5 — Confirmation
+  // ÉTAPE 5 — Confirmation
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep5() {
     // _submitted used implicitly to confirm submission

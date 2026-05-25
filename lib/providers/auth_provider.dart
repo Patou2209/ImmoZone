@@ -11,6 +11,11 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // ── Phone OTP state ──────────────────────────────────────────────────────
+  String? _phoneVerificationId;
+  bool _codeSent = false;
+  bool _otpVerifying = false;
+
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -18,6 +23,8 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin => _currentUser?.role == 'admin';
   bool get isAnnonceur => _currentUser?.role == 'annonceur';
   bool get isDemandeur => _currentUser?.role == 'demandeur';
+  bool get codeSent => _codeSent;
+  bool get otpVerifying => _otpVerifying;
 
   Future<void> checkAuth() async {
     final firebaseUser = _auth.currentUser;
@@ -151,6 +158,121 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  // ── Connexion par numéro de téléphone (étape 1 : envoi OTP) ────────────────
+  Future<void> sendPhoneOtp(String fullPhoneNumber) async {
+    _isLoading = true;
+    _error = null;
+    _codeSent = false;
+    notifyListeners();
+    await _auth.verifyPhoneNumber(
+      phoneNumber: fullPhoneNumber,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (PhoneAuthCredential cred) async {
+        // Auto-résolution (Android uniquement)
+        await _signInWithPhoneCredential(cred);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        _error = _mapPhoneError(e.code);
+        _isLoading = false;
+        _codeSent = false;
+        notifyListeners();
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        _phoneVerificationId = verificationId;
+        _isLoading = false;
+        _codeSent = true;
+        notifyListeners();
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _phoneVerificationId = verificationId;
+      },
+    );
+  }
+
+  // ── Connexion par numéro de téléphone (étape 2 : vérification OTP) ─────────
+  Future<bool> verifyPhoneOtp(String smsCode) async {
+    if (_phoneVerificationId == null) {
+      _error = 'Session expirée. Veuillez réessayer.';
+      notifyListeners();
+      return false;
+    }
+    _otpVerifying = true;
+    _error = null;
+    notifyListeners();
+    final cred = PhoneAuthProvider.credential(
+      verificationId: _phoneVerificationId!,
+      smsCode: smsCode,
+    );
+    return _signInWithPhoneCredential(cred);
+  }
+
+  Future<bool> _signInWithPhoneCredential(PhoneAuthCredential cred) async {
+    try {
+      final result = await _auth.signInWithCredential(cred);
+      final uid = result.user?.uid;
+      if (uid == null) {
+        _error = 'Erreur d\'authentification';
+        _isLoading = false;
+        _otpVerifying = false;
+        notifyListeners();
+        return false;
+      }
+      final user = await _dataService.loginById(uid);
+      if (user != null) {
+        _currentUser = user;
+        _isLoading = false;
+        _otpVerifying = false;
+        _codeSent = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = 'Aucun compte ImmoZone associé à ce numéro.\nVeuillez vous inscrire d\'abord.';
+        _isLoading = false;
+        _otpVerifying = false;
+        notifyListeners();
+        return false;
+      }
+    } on FirebaseAuthException catch (e) {
+      _error = _mapPhoneError(e.code);
+      _isLoading = false;
+      _otpVerifying = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _error = 'Une erreur est survenue.';
+      _isLoading = false;
+      _otpVerifying = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void resetPhoneAuth() {
+    _phoneVerificationId = null;
+    _codeSent = false;
+    _otpVerifying = false;
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  String _mapPhoneError(String code) {
+    switch (code) {
+      case 'invalid-phone-number':
+        return 'Numéro de téléphone invalide.';
+      case 'too-many-requests':
+        return 'Trop de tentatives. Réessayez plus tard.';
+      case 'invalid-verification-code':
+        return 'Code SMS incorrect. Vérifiez et réessayez.';
+      case 'session-expired':
+        return 'Code SMS expiré. Demandez un nouveau code.';
+      case 'quota-exceeded':
+        return 'Quota SMS dépassé. Réessayez plus tard.';
+      default:
+        return 'Erreur téléphone : $code';
     }
   }
 

@@ -336,66 +336,138 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _showPhoneCountryPicker() {
+    final searchCtrl = TextEditingController();
+    List<Map<String, String>> filtered =
+        List.from(AppConstants.countryCodes);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.65,
-        maxChildSize: 0.90,
-        minChildSize: 0.40,
-        builder: (_, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.dividerColor,
-                borderRadius: BorderRadius.circular(2),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          void onSearch(String q) {
+            setModalState(() {
+              filtered = AppConstants.countryCodes
+                  .where((c) =>
+                      (c['country'] ?? '')
+                          .toLowerCase()
+                          .contains(q.toLowerCase()) ||
+                      (c['code'] ?? '').contains(q))
+                  .toList();
+            });
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.70,
+            maxChildSize: 0.92,
+            minChildSize: 0.40,
+            builder: (_, scrollCtrl) => Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(20)),
               ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text('Indicatif pays',
-                  style: TextStyle(fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700, fontSize: 16,
-                      color: AppTheme.textPrimary)),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollCtrl,
-                itemCount: AppConstants.countryCodes.length,
-                itemBuilder: (_, i) {
-                  final c = AppConstants.countryCodes[i];
-                  final isSel = c['code'] == _phoneCountryCode;
-                  return ListTile(
-                    onTap: () {
-                      setState(() => _phoneCountryCode = c['code']!);
-                      Navigator.pop(context);
+              child: Column(children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Text('Indicatif pays',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: AppTheme.textPrimary)),
+                const SizedBox(height: 10),
+                // Barre de recherche
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: searchCtrl,
+                    onChanged: onSearch,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher un pays…',
+                      hintStyle: const TextStyle(
+                          fontFamily: 'Poppins', fontSize: 13),
+                      prefixIcon: const Icon(Icons.search,
+                          color: AppTheme.accentColor),
+                      suffixIcon: searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear,
+                                  size: 18,
+                                  color: AppTheme.textSecondary),
+                              onPressed: () {
+                                searchCtrl.clear();
+                                onSearch('');
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: AppTheme.backgroundColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10, horizontal: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final c = filtered[i];
+                      final isSel = c['code'] == _phoneCountryCode;
+                      return ListTile(
+                        onTap: () {
+                          setState(
+                              () => _phoneCountryCode = c['code']!);
+                          Navigator.pop(ctx);
+                        },
+                        leading: Text(c['flag'] ?? '',
+                            style:
+                                const TextStyle(fontSize: 24)),
+                        title: Text(c['country'] ?? '',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: isSel
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                fontSize: 14,
+                                color: isSel
+                                    ? AppTheme.accentColor
+                                    : AppTheme.textPrimary)),
+                        trailing: Text(c['code'] ?? '',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: isSel
+                                    ? AppTheme.accentColor
+                                    : AppTheme.textSecondary)),
+                        tileColor: isSel
+                            ? AppTheme.accentColor
+                                .withValues(alpha: 0.06)
+                            : null,
+                      );
                     },
-                    leading: Text(c['flag'] ?? '',
-                        style: const TextStyle(fontSize: 24)),
-                    title: Text(c['country'] ?? '',
-                        style: TextStyle(fontFamily: 'Poppins',
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
-                            fontSize: 14,
-                            color: isSel ? AppTheme.accentColor : AppTheme.textPrimary)),
-                    trailing: Text(c['code'] ?? '',
-                        style: TextStyle(fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w700, fontSize: 13,
-                            color: isSel ? AppTheme.accentColor : AppTheme.textSecondary)),
-                    tileColor: isSel ? AppTheme.accentColor.withValues(alpha: 0.06) : null,
-                  );
-                },
-              ),
+                  ),
+                ),
+              ]),
             ),
-          ]),
-        ),
+          );
+        },
       ),
     );
   }
