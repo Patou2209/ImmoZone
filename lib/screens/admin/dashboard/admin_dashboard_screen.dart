@@ -188,7 +188,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ── Supprimer TOUTES les annonces (avec confirmation mot de passe) ─────────
   Future<void> _deleteAllProperties() async {
     final auth = context.read<immo_auth.AuthProvider>();
-    final adminEmail = auth.currentUser?.email ?? '';
+    // Utiliser le virtual email dérivé du téléphone (pas l'email de récupération Firestore)
+    final adminPhone = auth.currentUser?.phone ?? '';
+    final adminEmail = adminPhone.isNotEmpty
+        ? immo_auth.AuthProvider.phoneToVirtualEmail(adminPhone)
+        : (fb_auth.FirebaseAuth.instance.currentUser?.email ?? '');
     final passwordCtrl = TextEditingController();
     bool obscure = true;
     String? errorMsg;
