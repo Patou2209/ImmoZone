@@ -1550,6 +1550,25 @@ class DataService {
     return null;
   }
 
+  /// Compte le total d'annonces promo disponibles (year=8888 push admin + year=9999 recharge)
+  Future<int> getAvailablePromoQuotaCount(String userId) async {
+    int total = 0;
+    try {
+      for (final promoYear in [8888, 9999]) {
+        final snap = await _quotasCol
+            .where('userId', isEqualTo: userId)
+            .where('year', isEqualTo: promoYear)
+            .get();
+        for (final doc in snap.docs) {
+          final q = QuotaModel.fromMap(doc.data() as Map<String, dynamic>);
+          final remaining = q.freeQuota - q.usedFreeQuota;
+          if (remaining > 0) total += remaining;
+        }
+      }
+    } catch (_) {}
+    return total;
+  }
+
   Future<void> consumePublicationRight(String userId,
       {String commune = '', int days = 30}) async {
     // 1. Free trial : rien à consommer

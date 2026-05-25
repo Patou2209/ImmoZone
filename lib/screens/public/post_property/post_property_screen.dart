@@ -93,11 +93,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   // Credit check state
   int _userAvailableCredits = 0;
   int _requiredCredits = 1;
-  int _freeQuotaAvailable = 0; // nombre d'annonces gratuites disponibles
+  int _freeQuotaAvailable = 0; // nombre d'annonces gratuites disponibles (welcome year=0)
+  int _promoQuotaAvailable = 0; // nombre d'annonces dispo via promo (year=8888/9999)
   int _freeQuotaDays = 30;     // durée de validité de chaque annonce gratuite
   bool _hasEnoughCredits = false;
   bool _creditChecked = false;
   String _publicationRight = 'no_right'; // 'free_trial' | 'free_quota' | 'paid_credit' | 'no_right'
+  bool _quotaIsPromo = false; // true = la source du droit gratuit est une promo (year=8888/9999)
   // Payment submission state (when balance insufficient)
   bool _paymentSubmitted = false;  // user submitted payment ref → waiting admin
   bool _submittingPayment = false; // loading while saving payment request
@@ -134,10 +136,35 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     // Rafraîchir le cache zones + zones_config pour que les tarifs soient à jour
     _refreshZonesCache();
     // Pre-remplir avec les infos de l'utilisateur connecte
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillUserInfo());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefillUserInfo();
+      // Charger les droits de publication dès l'étape 1 (zone bannière)
+      _preloadPublicationRight();
+    });
     // Rafraîchir l'aperçu L×l en temps réel
     _longueurCtrl.addListener(() => setState(() {}));
     _largeurCtrl.addListener(() => setState(() {}));
+  }
+
+  /// Pré-charge le droit de publication pour que la zone bannière (étape 1) soit informée
+  Future<void> _preloadPublicationRight() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) return;
+    final ds = DataService();
+    final userId = auth.currentUser!.id;
+    final right = await ds.checkPublicationRight(userId);
+    final quota = await ds.getCurrentQuota(userId);
+    final freeLeft = (quota.freeQuota - quota.usedFreeQuota).clamp(0, 999);
+    final promoLeft = await ds.getAvailablePromoQuotaCount(userId);
+    final bool isPromoSource = (right == 'free_quota') && (freeLeft == 0) && (promoLeft > 0);
+    if (mounted) {
+      setState(() {
+        _publicationRight = right;
+        _freeQuotaAvailable = freeLeft;
+        _promoQuotaAvailable = promoLeft;
+        _quotaIsPromo = isPromoSource;
+      });
+    }
   }
 
   Future<void> _refreshZonesCache() async {
@@ -368,22 +395,27 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final right = await ds.checkPublicationRight(userId, commune: _selectedCommune, days: _selectedDuration);
     // "enough" = free trial active, OR free monthly quota still available, OR sufficient paid credits
     final enough = (right == 'free_trial') || (right == 'free_quota') || (right == 'paid_credit');
-    // Récupérer le quota gratuit disponible + durée depuis les settings
+    // Récupérer le quota de bienvenue (year=0)
     final quota    = await ds.getCurrentQuota(userId);
-    final freeLeft = quota.freeQuota - quota.usedFreeQuota;
+    final freeLeft = (quota.freeQuota - quota.usedFreeQuota).clamp(0, 999);
+    // Récupérer les quotas promo disponibles (year=8888 push admin + year=9999 recharge)
+    final promoLeft = await ds.getAvailablePromoQuotaCount(userId);
+    // Déterminer la source du droit gratuit
+    final bool isPromoSource = (right == 'free_quota') && (freeLeft == 0) && (promoLeft > 0);
     final settings = ds.systemSettings;
     final quotaDays = (settings['free_quota_days'] as num?)?.toInt() ?? 30;
     if (mounted) {
       setState(() {
         _requiredCredits = required;
         _userAvailableCredits = available;
-        _freeQuotaAvailable = freeLeft.clamp(0, 999);
+        _freeQuotaAvailable = freeLeft;
+        _promoQuotaAvailable = promoLeft;
         _freeQuotaDays = quotaDays;
         _hasEnoughCredits = enough;
         _publicationRight = right;
+        _quotaIsPromo = isPromoSource;
         _creditChecked = true;
         // Reset payment submitted state when re-checking credits
-        // (e.g. admin just approved and user re-entered step 3)
         if (enough && _paymentSubmitted) {
           _paymentSubmitted = false;
           _pendingPaymentId = null;
@@ -943,19 +975,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   ),
                 ),
               ]),
-              // Chips de durée : masqués pour les utilisateurs avec quota gratuit
-              if (!isFreeQuotaUser) ...[
+              // Chips de durée ou message de droit gratuit
+              if (_publicationRight == 'free_trial') ...[
+                // ── Free Trial global ──────────────────────────────────────
                 const SizedBox(height: 8),
-                Row(children: [
-                  _durationCostChip('7 Jours',  cost7,  color, _selectedDuration == 7,  7),
-                  const SizedBox(width: 6),
-                  _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
-                  const SizedBox(width: 6),
-                  _durationCostChip('Trente Jours', cost30, color, _selectedDuration == 30, 30),
-                ]),
-              ] else ...[
-                const SizedBox(height: 8),
-                // Message informatif : durée fixe du bonus
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
@@ -963,20 +986,64 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(children: [
-                    Icon(Icons.info_outline,
-                        color: AppTheme.successColor, size: 14),
+                    Icon(Icons.free_breakfast, color: AppTheme.successColor, size: 14),
                     const SizedBox(width: 6),
                     Text(
-                      'Annonce gratuite — valable $_freeQuotaDays jours',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.successColor,
-                      ),
+                      'Mode gratuit actif — publication gratuite',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          fontWeight: FontWeight.w600, color: AppTheme.successColor),
                     ),
                   ]),
                 ),
+              ] else if (_publicationRight == 'free_quota' && _quotaIsPromo) ...[
+                // ── Promotion admin (year=8888) ou recharge (year=9999) ──
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF57C00).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFF57C00).withValues(alpha: 0.4)),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.campaign_outlined, color: Color(0xFFF57C00), size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text(
+                      'Promotion en cours — vous disposez de $_promoQuotaAvailable annonce${_promoQuotaAvailable > 1 ? 's' : ''} gratuite${_promoQuotaAvailable > 1 ? 's' : ''} offerte${_promoQuotaAvailable > 1 ? 's' : ''}',
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          fontWeight: FontWeight.w600, color: Color(0xFFF57C00)),
+                    )),
+                  ]),
+                ),
+              ] else if (_publicationRight == 'free_quota' && !_quotaIsPromo && _freeQuotaAvailable > 0) ...[
+                // ── Quota de bienvenue (welcome, year=0) ──────────────────
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.successColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline, color: AppTheme.successColor, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Annonce gratuite — valable $_freeQuotaDays jours',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          fontWeight: FontWeight.w600, color: AppTheme.successColor),
+                    ),
+                  ]),
+                ),
+              ] else ...[
+                // ── Utilisateur normal : choix de durée avec coût ─────────
+                const SizedBox(height: 8),
+                Row(children: [
+                  _durationCostChip('7 Jours',  cost7,  color, _selectedDuration == 7,  7),
+                  const SizedBox(width: 6),
+                  _durationCostChip('15 Jours', cost15, color, _selectedDuration == 15, 15),
+                  const SizedBox(width: 6),
+                  _durationCostChip('30 Jours', cost30, color, _selectedDuration == 30, 30),
+                ]),
               ],
             ],
           ),
@@ -2329,9 +2396,17 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         balanceIcon  = Icons.free_breakfast;
         break;
       case 'free_quota':
-        balanceLabel = '$_freeQuotaAvailable annonce${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}\n($_freeQuotaDays Jours chacune)';
-        balanceColor = AppTheme.successColor;
-        balanceIcon  = Icons.card_giftcard;
+        if (_quotaIsPromo) {
+          // Source : promo admin (year=8888) ou bonus recharge (year=9999)
+          balanceLabel = '$_promoQuotaAvailable annonce${_promoQuotaAvailable > 1 ? 's' : ''} promo\n(valable $_freeQuotaDays jours)';
+          balanceColor = const Color(0xFFF57C00); // orange promo
+          balanceIcon  = Icons.campaign_outlined;
+        } else {
+          // Source : quota de bienvenue (year=0)
+          balanceLabel = '$_freeQuotaAvailable annonce${_freeQuotaAvailable > 1 ? 's' : ''} gratuite${_freeQuotaAvailable > 1 ? 's' : ''}\n($_freeQuotaDays Jours chacune)';
+          balanceColor = AppTheme.successColor;
+          balanceIcon  = Icons.card_giftcard;
+        }
         break;
       case 'paid_credit':
         balanceLabel = '$_userAvailableCredits crédit${_userAvailableCredits != 1 ? 's' : ''}';
@@ -2463,9 +2538,59 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // CAS 2 — FREE QUOTA : annonces gratuites de bienvenue disponibles
+    // CAS 2A — FREE QUOTA PROMO : promotion admin/recharge disponible
     // ══════════════════════════════════════════════════════════════════
-    if (_publicationRight == 'free_quota') {
+    if (_publicationRight == 'free_quota' && _quotaIsPromo) {
+      final n = _promoQuotaAvailable;
+      final d = _freeQuotaDays;
+      return [
+        headerCard,
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF57C00).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFF57C00).withValues(alpha: 0.4)),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF57C00).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.campaign_outlined,
+                  color: Color(0xFFF57C00), size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Promotion en cours !',
+                  style: const TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w800, fontSize: 15,
+                      color: Color(0xFFF57C00)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Vous disposez de $n annonce${n > 1 ? 's' : ''} gratuite${n > 1 ? 's' : ''} offerte${n > 1 ? 's' : ''} par la promotion en cours, '
+                  'valable${n > 1 ? 's' : ''} $d jours chacune.',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: AppTheme.textSecondary, height: 1.5),
+                ),
+              ],
+            )),
+          ]),
+        ),
+      ];
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // CAS 2B — FREE QUOTA BIENVENUE : annonces gratuites de bienvenue
+    // ══════════════════════════════════════════════════════════════════
+    if (_publicationRight == 'free_quota' && !_quotaIsPromo) {
       final n = _freeQuotaAvailable;
       final d = _freeQuotaDays;
       return [
@@ -2485,7 +2610,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 color: AppTheme.successColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.info_outline,
+              child: const Icon(Icons.card_giftcard_outlined,
                   color: AppTheme.successColor, size: 26),
             ),
             const SizedBox(width: 14),
@@ -2500,9 +2625,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Vous disposez de $n annonce${n > 1 ? 's' : ''} gratuite${n > 1 ? 's' : ''}, '
+                  'Vous disposez de $n annonce${n > 1 ? 's' : ''} gratuite${n > 1 ? 's' : ''} offertes à l\'inscription, '
                   'valable${n > 1 ? 's' : ''} $d jours chacune. '
-                  'Elles seront utilisées automatiquement pour vos prochaines publications.',
+                  'Elles seront utilisées automatiquement.',
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
                       color: AppTheme.textSecondary, height: 1.5),
                 ),
@@ -3021,8 +3146,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             _recapRow('Photos',
                 '${_imageUrls.isNotEmpty ? _imageUrls.length : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length} photo(s)',
                 Icons.photo_library_outlined),
-            if (_publicationRight == 'free_trial' || _publicationRight == 'free_quota') ...[
-              _recapRow('Paiement', 'Annonce gratuite', Icons.card_giftcard_outlined),
+            if (_publicationRight == 'free_trial') ...[
+              _recapRow('Paiement', 'Mode gratuit actif', Icons.free_breakfast_outlined),
+            ] else if (_publicationRight == 'free_quota' && _quotaIsPromo) ...[
+              _recapRow('Paiement', 'Promotion — annonce gratuite offerte', Icons.campaign_outlined),
+            ] else if (_publicationRight == 'free_quota') ...[
+              _recapRow('Paiement', 'Annonce gratuite (bienvenue)', Icons.card_giftcard_outlined),
             ] else if (_hasEnoughCredits) ...[
               _recapRow('Paiement', 'Crédits disponibles ($_userAvailableCredits)', Icons.toll_outlined),
               _recapRow('Coût', '$_requiredCredits crédit${_requiredCredits > 1 ? 's' : ''} débité${_requiredCredits > 1 ? 's' : ''}', Icons.check_circle_outline),
