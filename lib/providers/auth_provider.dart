@@ -150,67 +150,111 @@ class AuthProvider extends ChangeNotifier {
         email: virtualEmail,
         password: password,
       );
-      final uid = cred.user?.uid;
-      if (uid == null) {
+      final firebaseUser = cred.user;
+      final uid = firebaseUser?.uid;
+      if (uid == null || firebaseUser == null) {
         _error = 'Erreur de création de compte';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // 2. Créer le profil Firestore avec le vrai e-mail de récupération
-      final user = await _dataService.register(
-        name: name,
-        email: recoveryEmail.trim().toLowerCase(), // e-mail réel stocké Firestore
-        phone: phone,
-        password: password,
-        role: role,
-        category: category,
-        uid: uid,
-      );
-      _currentUser = user;
+      // 2. CRITIQUE : forcer le refresh du token Firebase AVANT l'écriture Firestore.
+      //    Sans ça, les règles de sécurité reçoivent un token non propagé
+      //    et renvoient PERMISSION_DENIED même si l'auth est valide.
+      try {
+        await firebaseUser.getIdToken(true);
+      } catch (_) {
+        // non-bloquant si le refresh échoue — on tente quand même l'écriture
+      }
+
+      // 3. Créer le profil Firestore (avec retry automatique si permission-denied)
+      UserModel? user;
+      int attempts = 0;
+      Exception? lastError;
+
+      while (attempts < 3) {
+        attempts++;
+        try {
+          user = await _dataService.register(
+            name: name,
+            email: recoveryEmail.trim().toLowerCase(),
+            phone: phone,
+            password: password,
+            role: role,
+            category: category,
+            uid: uid,
+          );
+          lastError = null;
+          break; // succès → sortir de la boucle
+        } on FirebaseException catch (e) {
+          lastError = e;
+          if (e.code == 'permission-denied' && attempts < 3) {
+            // Attendre que le token se propage, puis re-refresh avant retry
+            await Future.delayed(Duration(seconds: attempts * 2));
+            try { await firebaseUser.getIdToken(true); } catch (_) {}
+          } else {
+            break; // autre erreur Firebase → ne pas réessayer
+          }
+        } catch (e) {
+          lastError = Exception(e.toString());
+          break; // erreur inattendue → ne pas réessayer
+        }
+      }
+
+      if (user != null) {
+        _currentUser = user;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      // Échec de l'écriture Firestore après tous les essais
+      if (kDebugMode) {
+        debugPrint('[AuthProvider.register] Échec Firestore après $attempts tentatives: $lastError');
+      }
+      // Le compte Firebase Auth a été créé mais le profil Firestore n'a pas pu être sauvegardé.
+      // On redirige quand même l'utilisateur (il est authentifié) mais on log l'erreur.
+      // Un background retry va tenter de créer le profil.
+      _currentUser = null;
       _isLoading = false;
       notifyListeners();
-      return true;
+
+      // Dernier recours : réessai en arrière-plan après 5s
+      Future.delayed(const Duration(seconds: 5), () async {
+        try {
+          final fbUser = _auth.currentUser;
+          if (fbUser != null) {
+            await fbUser.getIdToken(true);
+            final retryUser = await _dataService.register(
+              name: name,
+              email: recoveryEmail.trim().toLowerCase(),
+              phone: phone,
+              password: password,
+              role: role,
+              category: category,
+              uid: uid,
+            );
+            if (retryUser != null) {
+              _currentUser = retryUser;
+              notifyListeners();
+              if (kDebugMode) debugPrint('[AuthProvider.register] Background retry réussi pour uid=$uid');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[AuthProvider.register] Background retry échoué: $e');
+        }
+      });
+
+      return true; // Auth OK, profil en cours de création
 
     } on FirebaseAuthException catch (e) {
       _error = _mapFirebaseError(e.code);
       _isLoading = false;
       notifyListeners();
       return false;
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        final firebaseUser = _auth.currentUser;
-        if (firebaseUser != null) {
-          _currentUser = null;
-          _error = null;
-          _isLoading = false;
-          notifyListeners();
-          Future.delayed(const Duration(seconds: 2), () async {
-            try {
-              final retryUser = await _dataService.register(
-                name: name,
-                email: recoveryEmail.trim().toLowerCase(),
-                phone: phone,
-                password: password,
-                role: role,
-                category: category,
-                uid: firebaseUser.uid,
-              );
-              if (retryUser != null) {
-                _currentUser = retryUser;
-                notifyListeners();
-              }
-            } catch (_) {}
-          });
-          return true;
-        }
-      }
-      _error = 'Erreur réseau ou base de données. Réessayez.';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider.register] Erreur inattendue: $e');
       _error = 'Une erreur est survenue. Réessayez.';
       _isLoading = false;
       notifyListeners();

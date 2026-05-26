@@ -438,10 +438,12 @@ class DataService {
     // ── Forcer le refresh du token Firebase avant toute écriture Firestore.
     // Sans ça, les règles de sécurité reçoivent un token non encore propagé
     // et refusent l'écriture malgré un auth.currentUser valide.
+    // Le délai de 500ms laisse le temps au token de se propager côté serveur.
     try {
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser != null) {
         await firebaseUser.getIdToken(true); // force refresh
+        await Future.delayed(const Duration(milliseconds: 500)); // propagation token
       }
     } catch (_) {
       // non-bloquant si le refresh échoue
