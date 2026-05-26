@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/user_model.dart';
 import '../services/data_service.dart';
 
@@ -197,25 +199,106 @@ class AuthProvider extends ChangeNotifier {
 
   // ─────────────────────────────────────────────────────────────────────────
   // MOT DE PASSE OUBLIÉ
-  // Envoi d'un lien de réinitialisation sur l'e-mail virtuel Firebase
-  // Le user reçoit un e-mail de reset sur son adresse virtuelle…
-  // Pour une vraie récupération on cherche d'abord l'e-mail Firestore
-  // et on envoie aussi via Firebase Auth (l'uid correspond au compte virtuel).
+  //
+  // Flux :
+  // 1. Chercher l'utilisateur dans Firestore par son numéro de téléphone
+  // 2. Récupérer son e-mail de récupération réel (champ "email" Firestore)
+  // 3. Appeler l'API REST Firebase Auth (sendOobCode) avec le vrai email
+  //    → Firebase envoie le lien de reset directement à la vraie boîte mail
   // ─────────────────────────────────────────────────────────────────────────
+
+  // Clé API Android du projet Firebase (pour l'API REST Identity Toolkit)
+  static const String _firebaseApiKey = 'AIzaSyCPx_8e7-ecYA6amk-yu-8inbgJ0beme2g';
+
   Future<bool> sendPasswordResetByPhone(String fullPhone) async {
-    final virtualEmail = phoneToVirtualEmail(fullPhone);
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
     try {
-      await _auth.sendPasswordResetEmail(email: virtualEmail);
+      // Étape 1 : Trouver le profil Firestore par numéro de téléphone
+      final userProfile = await _dataService.findUserByPhone(fullPhone);
+      if (userProfile == null) {
+        _error = 'Aucun compte trouvé pour ce numéro.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final recoveryEmail = userProfile.email.trim().toLowerCase();
+
+      // Vérifier que l'email de récupération est un vrai email
+      if (recoveryEmail.isEmpty ||
+          !recoveryEmail.contains('@') ||
+          recoveryEmail.endsWith('@immozone.app')) {
+        _error = 'Aucun e-mail de récupération valide pour ce compte. '
+            'Contactez le support ImmoZone.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Étape 2 : Envoyer le lien via l'API REST Firebase Auth (sendOobCode)
+      // Cette API accepte n'importe quel email enregistré dans Auth OU
+      // permet d'envoyer à tout email via PASSWORD_RESET requestType.
+      // Firebase enverra le lien vers recoveryEmail.
+      final sent = await _sendResetViaRestApi(recoveryEmail);
+
+      if (!sent) {
+        _error = 'Impossible d\'envoyer l\'e-mail. '
+            'Contactez le support : +243821908888';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      _isLoading = false;
+      notifyListeners();
       return true;
+
     } on FirebaseAuthException catch (e) {
       _error = e.code == 'user-not-found'
           ? 'Aucun compte trouvé pour ce numéro.'
           : 'Erreur : ${e.message}';
+      _isLoading = false;
       notifyListeners();
       return false;
     } catch (_) {
       _error = 'Erreur lors de l\'envoi. Réessayez.';
+      _isLoading = false;
       notifyListeners();
+      return false;
+    }
+  }
+
+  // Appelle l'API REST Firebase Auth pour envoyer un lien de reset
+  // directement à l'email de récupération réel de l'utilisateur.
+  Future<bool> _sendResetViaRestApi(String recoveryEmail) async {
+    try {
+      final url = Uri.parse(
+          'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode'
+          '?key=$_firebaseApiKey');
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'requestType': 'PASSWORD_RESET',
+          'email': recoveryEmail,
+        }),
+      );
+
+      if (response.statusCode == 200) return true;
+
+      // Firebase retourne 400 si l'email n'existe pas dans Auth
+      // Dans ce cas : l'email de récupération n'est pas enregistré dans Firebase Auth
+      // On informe l'utilisateur (cas rare — email de récup jamais enregistré dans Auth)
+      if (kDebugMode) {
+        debugPrint('[AuthProvider] sendOobCode erreur: ${response.statusCode} ${response.body}');
+      }
+      return false;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider] _sendResetViaRestApi exception: $e');
       return false;
     }
   }
