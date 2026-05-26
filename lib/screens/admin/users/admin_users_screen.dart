@@ -18,6 +18,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
   List<UserModel> _users = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  String? _loadError;
 
   @override
   void initState() {
@@ -27,12 +28,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
   }
 
   Future<void> _loadUsers() async {
-    setState(() => _isLoading = true);
-    final users = await _dataService.getUsers();
     setState(() {
-      _users = users.where((u) => u.role != AppConstants.roleAdmin).toList();
-      _isLoading = false;
+      _isLoading = true;
+      _loadError = null;
     });
+    try {
+      final users = await _dataService.getUsers();
+      setState(() {
+        _users = users.where((u) => u.role != AppConstants.roleAdmin).toList();
+        _isLoading = false;
+        _loadError = null;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Erreur de chargement: $e';
+      });
+    }
   }
 
   List<UserModel> _filtered(String role) {
@@ -114,6 +126,32 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.accentColor))
+          : _loadError != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: AppTheme.errorColor),
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(_loadError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                color: AppTheme.textSecondary,
+                                fontSize: 12)),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadUsers,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Réessayer',
+                            style: TextStyle(fontFamily: 'Poppins')),
+                      ),
+                    ],
+                  ),
+                )
           : TabBarView(
               controller: _tabCtrl,
               children: [

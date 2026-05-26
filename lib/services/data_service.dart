@@ -494,13 +494,27 @@ class DataService {
     'whatsApp': u.whatsApp,
   };
 
+  /// Force-refresh du token Firebase Auth avant les lectures de collection admin.
+  /// Évite les erreurs PERMISSION_DENIED dues à un token expiré ou non propagé.
+  Future<void> _ensureFreshToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) await user.getIdToken(true);
+    } catch (_) {}
+  }
+
   Future<List<UserModel>> getUsers() async {
     try {
+      await _ensureFreshToken();
       final snap = await _usersCol.get();
       return snap.docs
           .map((d) => UserModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[DataService.getUsers] Erreur: $e');
+        debugPrint('[DataService.getUsers] Stack: $st');
+      }
       return [];
     }
   }
@@ -596,11 +610,13 @@ class DataService {
 
   Future<List<PropertyModel>> getProperties() async {
     try {
+      await _ensureFreshToken();
       final snap = await _propertiesCol.get();
       return snap.docs
           .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getProperties] Erreur: $e');
       return [];
     }
   }
@@ -1056,11 +1072,13 @@ class DataService {
 
   Future<List<MessageModel>> getMessages() async {
     try {
+      await _ensureFreshToken();
       final snap = await _messagesCol.get();
       return snap.docs
           .map((d) => MessageModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getMessages] Erreur: $e');
       return [];
     }
   }
@@ -1127,11 +1145,13 @@ class DataService {
 
   Future<List<PaymentModel>> getPayments() async {
     try {
+      await _ensureFreshToken();
       final snap = await _paymentsCol.get();
       return snap.docs
           .map((d) => PaymentModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getPayments] Erreur: $e');
       return [];
     }
   }
@@ -1514,13 +1534,15 @@ class DataService {
 
   Future<List<ReportModel>> getReports() async {
     try {
+      await _ensureFreshToken();
       final snap = await _reportsCol.get();
       final list = snap.docs
           .map((d) => ReportModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getReports] Erreur: $e');
       return [];
     }
   }
@@ -1632,6 +1654,7 @@ class DataService {
 
   Future<List<AuditLogModel>> getAuditLogs({int? limit}) async {
     try {
+      await _ensureFreshToken();
       final snap = await _logsCol.get();
       final list = snap.docs
           .map((d) => AuditLogModel.fromMap(d.data() as Map<String, dynamic>))
@@ -1641,7 +1664,8 @@ class DataService {
         return list.sublist(0, limit);
       }
       return list;
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getAuditLogs] Erreur: $e');
       return [];
     }
   }
