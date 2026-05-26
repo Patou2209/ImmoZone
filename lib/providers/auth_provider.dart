@@ -37,9 +37,30 @@ class AuthProvider extends ChangeNotifier {
   // ── Convertit un numéro de téléphone en e-mail virtuel Firebase ───────────
   // Ex : +243812345678  →  243812345678@immozone.app
   static String phoneToVirtualEmail(String phone) {
-    // Enlever le '+' et les espaces
     final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
     return '$digits@immozone.app';
+  }
+
+  // ── Normalise un numéro de téléphone au format +XXXXXXXXXXXX ──────────────
+  // Accepte tous les formats courants :
+  //   '+243823854273' → '+243823854273'  (déjà normalisé)
+  //   '243823854273'  → '+243823854273'  (pas de +)
+  //   '00243823854273'→ '+243823854273'  (préfixe 00)
+  //   '+243 823 854 273' → '+243823854273' (avec espaces)
+  // Retourne null si le numéro est trop court ou invalide.
+  static String? _normalizePhone(String phone) {
+    // Supprimer les espaces, tirets, parenthèses
+    String clean = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    // Remplacer le préfixe international 00 par +
+    if (clean.startsWith('00')) clean = '+${clean.substring(2)}';
+    // Ajouter + si absent et si ça commence par des chiffres
+    if (!clean.startsWith('+') && RegExp(r'^\d+$').hasMatch(clean)) {
+      clean = '+$clean';
+    }
+    // Valider : doit avoir au moins 8 chiffres après le +
+    final digits = clean.replaceAll('+', '').replaceAll(RegExp(r'[^\d]'), '');
+    if (digits.length < 8) return null;
+    return clean;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -216,8 +237,23 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Normalisation du numéro : garantit le format +XXXXXXXXXXXX
+      // Gère les cas : '823854273', '0823854273', '+243823854273', '243823854273'
+      final normalizedPhone = _normalizePhone(fullPhone);
+      if (normalizedPhone == null) {
+        _error = 'Numéro de téléphone invalide.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
       // Étape 1 : Trouver le profil Firestore par numéro de téléphone
-      final userProfile = await _dataService.findUserByPhone(fullPhone);
+      // Essaie le numéro normalisé ET le numéro brut (pour la compatibilité)
+      UserModel? userProfile = await _dataService.findUserByPhone(normalizedPhone);
+      // Fallback : chercher avec le numéro exact tel que saisi
+      if (userProfile == null && normalizedPhone != fullPhone.trim()) {
+        userProfile = await _dataService.findUserByPhone(fullPhone.trim());
+      }
       if (userProfile == null) {
         _error = 'Aucun compte trouvé pour ce numéro.';
         _isLoading = false;

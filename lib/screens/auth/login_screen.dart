@@ -129,9 +129,27 @@ class _LoginScreenState extends State<LoginScreen> {
             ElevatedButton(
               onPressed: () async {
                 final number = phoneCtrl.text.trim();
-                if (number.isEmpty) return;
-                final full =
-                    '$selectedCode$number';
+                if (number.isEmpty) {
+                  // Afficher une erreur visible dans le dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez saisir votre numéro de téléphone.',
+                          style: TextStyle(fontFamily: 'Poppins')),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                // Normalisation : si l'utilisateur a tapé le numéro complet
+                // avec indicatif (ex: +243823854273), on évite la duplication
+                final String full;
+                if (number.startsWith('+') || number.startsWith('00')) {
+                  // Numéro complet saisi directement → on l'utilise tel quel
+                  full = number.replaceAll(RegExp(r'^00'), '+');
+                } else {
+                  full = '$selectedCode$number';
+                }
                 Navigator.of(ctx).pop();
                 final auth =
                     context.read<AuthProvider>();
