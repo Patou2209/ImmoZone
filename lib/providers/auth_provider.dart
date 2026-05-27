@@ -77,44 +77,88 @@ class AuthProvider extends ChangeNotifier {
 
   // ─────────────────────────────────────────────────────────────────────────
   // CONNEXION — Numéro de téléphone + Mot de passe
+  //
+  // ARCHITECTURE HYBRIDE :
+  //   1. Essai Email virtuel (admin + anciens comptes)
+  //   2. Si échec → chercher dans Firestore par numéro (comptes Phone Auth OTP)
+  //      et vérifier le mot de passe manuellement
   // ─────────────────────────────────────────────────────────────────────────
   Future<bool> loginWithPhone(String fullPhone, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
-    final virtualEmail = phoneToVirtualEmail(fullPhone);
+    final normalizedPhone = _normalizePhone(fullPhone) ?? fullPhone.trim();
+    final virtualEmail    = phoneToVirtualEmail(normalizedPhone);
 
+    // ── Tentative 1 : Email virtuel Firebase Auth (admin + anciens comptes) ─
     try {
       final cred = await _auth.signInWithEmailAndPassword(
         email: virtualEmail,
         password: password,
       );
       final uid = cred.user?.uid;
-      if (uid == null) {
-        _error = 'Erreur d\'authentification';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-      final user = await _dataService.loginById(uid);
-      if (user != null) {
-        _currentUser = user;
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _error = 'Profil introuvable. Veuillez vous inscrire.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+      if (uid != null) {
+        final user = await _dataService.loginById(uid);
+        if (user != null) {
+          _currentUser = user;
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        }
       }
     } on FirebaseAuthException catch (e) {
-      _error = _mapFirebaseError(e.code);
+      // wrong-password / invalid-credential → mauvais mot de passe → erreur directe
+      if (e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'too-many-requests') {
+        _error = _mapFirebaseError(e.code);
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+      // user-not-found / invalid-email → compte email virtuel inexistant
+      // → continuer vers tentative 2 (compte Phone Auth)
+    } catch (_) {
+      // erreur réseau ou autre → continuer vers tentative 2
+    }
+
+    // ── Tentative 2 : Compte créé via OTP (Phone Auth) ──────────────────────
+    // Ces comptes n'ont pas d'email virtuel Firebase Auth.
+    // On vérifie le mot de passe directement dans Firestore.
+    try {
+      // Chercher le profil Firestore par numéro
+      UserModel? userProfile = await _dataService.findUserByPhone(normalizedPhone);
+      if (userProfile == null && normalizedPhone != fullPhone.trim()) {
+        userProfile = await _dataService.findUserByPhone(fullPhone.trim());
+      }
+
+      if (userProfile == null) {
+        _error = 'Aucun compte trouvé pour ce numéro. Inscrivez-vous.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Vérifier le mot de passe stocké dans Firestore
+      final storedPassword = await _dataService.getUserPassword(userProfile.id);
+      if (storedPassword == null || storedPassword != password) {
+        _error = 'Mot de passe incorrect.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Mot de passe OK → connecter sans Firebase Auth session
+      // (l'utilisateur Phone Auth n'a pas de session email)
+      _currentUser = userProfile;
+      await _dataService.saveSessionDirectly(userProfile);
       _isLoading = false;
       notifyListeners();
-      return false;
-    } catch (_) {
+      return true;
+
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider.loginWithPhone] Tentative 2 erreur: $e');
       _error = 'Une erreur est survenue. Réessayez.';
       _isLoading = false;
       notifyListeners();
@@ -406,6 +450,227 @@ class AuthProvider extends ChangeNotifier {
         _currentUser = user;
         notifyListeners();
       }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CHARGEMENT D'UN UTILISATEUR APRÈS SMS OTP
+  //
+  // PROBLÈME : L'app utilise un système "email virtuel" pour l'auth
+  // (numéro → 243821908888@immozone.app). Quand Firebase Phone Auth crée
+  // un nouveau compte via OTP, son UID est DIFFÉRENT de l'UID du compte
+  // email virtuel existant dans Firestore.
+  //
+  // SOLUTION : Chercher d'abord par UID (cas account linking ou numéro test),
+  // puis fallback par numéro de téléphone dans Firestore.
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<UserModel?> loadUserByUid(String uid) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      // Tentative 1 : chercher par UID Firebase direct
+      final user = await _dataService.getUserById(uid);
+      if (user != null) {
+        _currentUser = user;
+        _isLoading = false;
+        notifyListeners();
+        return user;
+      }
+      // Si non trouvé par UID → l'OTP a créé un nouveau compte Firebase
+      // sans profil Firestore (cas normal avec email virtuel). On retourne
+      // null ici ; le flux OTP appellera ensuite loadUserByPhone().
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider.loadUserByUid] $e');
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CHARGEMENT PAR NUMÉRO DE TÉLÉPHONE (fallback après OTP)
+  //
+  // Cherche le profil Firestore par numéro de téléphone.
+  // Utilisé quand le compte Phone Auth a un UID différent du compte
+  // email virtuel existant dans Firestore.
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<UserModel?> loadUserByPhone(String phoneNumber) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      // Normaliser le numéro
+      final normalized = _normalizePhone(phoneNumber);
+      UserModel? user;
+
+      // Chercher avec numéro normalisé
+      if (normalized != null) {
+        user = await _dataService.findUserByPhone(normalized);
+      }
+      // Fallback avec numéro brut si normalisé échoue
+      if (user == null && normalized != phoneNumber) {
+        user = await _dataService.findUserByPhone(phoneNumber);
+      }
+
+      _currentUser = user;
+      _isLoading = false;
+      notifyListeners();
+      return user;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider.loadUserByPhone] $e');
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // INSCRIPTION PAR OTP — Phone Auth uniquement
+  //
+  // Appelé depuis OtpRegisterScreen après que le code SMS a été vérifié.
+  // Le UserCredential est déjà signé dans Firebase Auth via verifyOtp().
+  // On crée uniquement le profil Firestore pour ce nouvel utilisateur.
+  // ─────────────────────────────────────────────────────────────────────────
+  Future<bool> registerWithPhoneCredential({
+    required UserCredential credential,
+    required String name,
+    required String phone,
+    required String password,
+    required String role,
+    String? category,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final firebaseUser = credential.user;
+    final uid = firebaseUser?.uid;
+
+    if (uid == null || firebaseUser == null) {
+      _error = 'Erreur d\'authentification OTP.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      // Vérifier si un profil Firestore existe déjà pour cet UID
+      final existing = await _dataService.getUserById(uid);
+      if (existing != null) {
+        // Compte déjà créé — on charge simplement le profil
+        _currentUser = existing;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      // Vérifier si le numéro est déjà utilisé par un autre compte
+      final byPhone = await _dataService.findUserByPhone(phone);
+      if (byPhone != null) {
+        _error = 'Ce numéro est déjà associé à un compte. Connectez-vous.';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      // Forcer refresh du token avant écriture Firestore
+      try {
+        await firebaseUser.getIdToken(true);
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (_) {}
+
+      // Créer le profil Firestore (email vide — architecture phone-only)
+      // isVerified: true car l'OTP a déjà prouvé que le numéro appartient au user
+      UserModel? user;
+      int attempts = 0;
+      Exception? lastError;
+
+      while (attempts < 3) {
+        attempts++;
+        try {
+          user = await _dataService.register(
+            name: name,
+            email: '',          // phone-only : pas d'email de récupération
+            phone: phone,
+            password: password, // stocké pour la connexion ultérieure
+            role: role,
+            category: category,
+            uid: uid,
+            isVerified: true,   // ✅ OTP validé = numéro vérifié
+          );
+          lastError = null;
+          break;
+        } on FirebaseException catch (e) {
+          lastError = e;
+          if (e.code == 'permission-denied' && attempts < 3) {
+            await Future.delayed(Duration(seconds: attempts * 2));
+            try { await firebaseUser.getIdToken(true); } catch (_) {}
+          } else {
+            break;
+          }
+        } catch (e) {
+          lastError = Exception(e.toString());
+          break;
+        }
+      }
+
+      if (user != null) {
+        _currentUser = user;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
+      if (kDebugMode) {
+        debugPrint('[AuthProvider.registerWithPhoneCredential] Échec Firestore après $attempts tentatives: $lastError');
+      }
+
+      // Retry en arrière-plan si Firestore a échoué mais Auth est OK
+      _currentUser = null;
+      _isLoading = false;
+      notifyListeners();
+
+      Future.delayed(const Duration(seconds: 5), () async {
+        try {
+          final fbUser = _auth.currentUser;
+          if (fbUser != null) {
+            await fbUser.getIdToken(true);
+            final retryUser = await _dataService.register(
+              name: name,
+              email: '',
+              phone: phone,
+              password: password,
+              role: role,
+              category: category,
+              uid: uid,
+              isVerified: true, // ✅ OTP validé = numéro vérifié
+            );
+            if (retryUser != null) {
+              _currentUser = retryUser;
+              notifyListeners();
+              if (kDebugMode) debugPrint('[AuthProvider.registerWithPhoneCredential] Background retry réussi uid=$uid');
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[AuthProvider.registerWithPhoneCredential] Background retry échoué: $e');
+        }
+      });
+
+      return true; // Auth OK, profil en cours de création en arrière-plan
+
+    } on FirebaseAuthException catch (e) {
+      _error = _mapFirebaseError(e.code);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[AuthProvider.registerWithPhoneCredential] Erreur: $e');
+      _error = 'Erreur lors de la création du compte. Réessayez.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 

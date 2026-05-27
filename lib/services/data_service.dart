@@ -432,6 +432,7 @@ class DataService {
     String? whatsApp,
     String? category,
     String? uid, // Firebase Auth UID
+    bool isVerified = false, // true pour les comptes vérifiés par OTP
   }) async {
     final userId = uid ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -458,10 +459,17 @@ class DataService {
       category: category,
       whatsApp: whatsApp ?? phone,
       createdAt: DateTime.now(),
+      isVerified: isVerified, // transmis depuis le flux d'inscription
     );
 
     // Écriture Firestore — on laisse remonter l'exception pour un vrai message d'erreur
-    await _usersCol.doc(userId).set(_userToFirestore(newUser));
+    final firestoreData = _userToFirestore(newUser);
+    // Stocker le mot de passe pour permettre la connexion aux comptes Phone Auth
+    // (ces comptes n'ont pas de session Firebase Auth email, la vérif se fait côté Firestore)
+    if (password.isNotEmpty) {
+      firestoreData['password'] = password;
+    }
+    await _usersCol.doc(userId).set(firestoreData);
     await _saveSession(newUser);
 
     // NOTE: Les 3 publications gratuites de bienvenue sont gérées exclusivement
@@ -472,6 +480,26 @@ class DataService {
 
   Future<void> logout() async {
     await _clearSession();
+  }
+
+  // ─── CONNEXION DIRECTE (comptes Phone Auth sans session Firebase email) ────
+  // Utilisé quand l'utilisateur s'est inscrit via OTP et n'a pas de compte
+  // email virtuel Firebase Auth. On sauvegarde la session localement.
+  Future<void> saveSessionDirectly(UserModel user) async {
+    await _saveSession(user);
+  }
+
+  // ─── RÉCUPÉRATION MOT DE PASSE DEPUIS FIRESTORE ───────────────────────────
+  // Permet de vérifier le mot de passe des comptes Phone Auth lors de la connexion.
+  Future<String?> getUserPassword(String userId) async {
+    try {
+      final doc = await _usersCol.doc(userId).get();
+      if (!doc.exists) return null;
+      final data = doc.data() as Map<String, dynamic>?;
+      return data?['password'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── USERS ──────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import 'register_screen.dart';
 
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -466,27 +467,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _fillDemo(String role) {
-    if (role == 'admin') {
-      setState(() {
-        _countryCode = '+243';
-        _phoneCtrl.text = '821908888';
-        _passwordCtrl.text = 'ImmoZone@2026!';
-      });
-    } else if (role == 'annonceur') {
-      setState(() {
-        _countryCode = '+243';
-        _phoneCtrl.text = '821908888';
-        _passwordCtrl.text = 'pass1234';
-      });
-    } else {
-      setState(() {
-        _countryCode = '+243';
-        _phoneCtrl.text = '812345678';
-        _passwordCtrl.text = 'pass1234';
-      });
-    }
-  }
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -732,54 +712,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 18),
 
-            // ── Comptes démo ────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor
-                    .withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: AppTheme.accentColor
-                        .withValues(alpha: 0.3)),
-              ),
-              child: Column(children: [
-                const Row(children: [
-                  Icon(Icons.info_outline,
-                      color: AppTheme.accentColor,
-                      size: 16),
-                  SizedBox(width: 8),
-                  Text('Comptes de démonstration',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          color: AppTheme.accentColor,
-                          fontFamily: 'Poppins')),
-                ]),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(
-                      child: _demoBtn(
-                          'Admin',
-                          Icons.admin_panel_settings,
-                          () => _fillDemo('admin'))),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: _demoBtn(
-                          'Annonceur',
-                          Icons.home_outlined,
-                          () => _fillDemo('annonceur'))),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: _demoBtn(
-                          'Demandeur',
-                          Icons.search,
-                          () => _fillDemo('demandeur'))),
-                ]),
-              ]),
-            ),
-            const SizedBox(height: 18),
-
             Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -842,31 +774,5 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _demoBtn(
-      String label, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color:
-                  AppTheme.accentColor.withValues(alpha: 0.4)),
-        ),
-        child: Column(children: [
-          Icon(icon, color: AppTheme.accentColor, size: 20),
-          const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.accentColor,
-                  fontFamily: 'Poppins')),
-        ]),
-      ),
-    );
-  }
+
 }
