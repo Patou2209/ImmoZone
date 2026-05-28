@@ -556,35 +556,103 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
-        title: const Text('Publier une annonce',
-          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17,
-              color: Colors.white)),
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+    // PopScope : intercepte le bouton retour Android pour éviter que la caméra
+    // ou la galerie (qui revient via "back") ne ferme toute la page de publication.
+    // - Sur les étapes > 0 : retour = étape précédente
+    // - Sur l'étape 0 : demande confirmation avant de quitter
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_step > 0) {
+          // Retour à l'étape précédente (ne quitte PAS la page)
+          _goTo(_step - 1);
+        } else {
+          // Étape 0 : confirmer avant de quitter
+          final leave = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              title: const Text('Quitter la publication ?',
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+              content: const Text('Votre annonce en cours de création sera perdue.',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Continuer', style: TextStyle(fontFamily: 'Poppins')),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('Quitter', style: TextStyle(
+                      fontFamily: 'Poppins', color: Colors.red)),
+                ),
+              ],
+            ),
+          );
+          if (leave == true && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryColor,
+          title: const Text('Publier une annonce',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17,
+                color: Colors.white)),
+          foregroundColor: Colors.white,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () async {
+              if (_step > 0) {
+                _goTo(_step - 1);
+              } else {
+                final leave = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    title: const Text('Quitter la publication ?',
+                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+                    content: const Text('Votre annonce en cours de création sera perdue.',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Continuer', style: TextStyle(fontFamily: 'Poppins')),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        child: const Text('Quitter', style: TextStyle(
+                            fontFamily: 'Poppins', color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (leave == true && context.mounted) Navigator.of(context).pop();
+              }
+            },
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(50),
+            child: _buildStepIndicator(),
+          ),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: _buildStepIndicator(),
-        ),
-      ),
-      body: SafeArea(
-        top: false, // AppBar already handles top safe area
-        child: PageView(
-          controller: _pageCtrl,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildStep1(),
-            _buildStep2(),
-            _buildStep3(),
-            _buildStep4(),
-            _buildStep5(),
-          ],
+        body: SafeArea(
+          top: false,
+          child: PageView(
+            controller: _pageCtrl,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildStep1(),
+              _buildStep2(),
+              _buildStep3(),
+              _buildStep4(),
+              _buildStep5(),
+            ],
+          ),
         ),
       ),
     );

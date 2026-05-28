@@ -1642,18 +1642,25 @@ class _HomeTabState extends State<_HomeTab>
 
   // ── Helpers formatage prix dropdown ───────────────────────────────────────
   String _formatPriceLabel(double v) {
-    if (v >= 1000) {
-      final thousands = (v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1);
-      return '${thousands.replaceAll('.0', '')} 000 \$';
+    // Formate sans point décimal : 1500 → "1 500 $", 10000 → "10 000 $"
+    final intVal = v.toInt();
+    final s = intVal.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write('\u00a0'); // espace insécable
+      buf.write(s[i]);
     }
-    return '${v.toInt()} \$';
+    return '$buf \$';
   }
 
   double? _parsePriceLabel(String? label) {
     if (label == null || label == "N'importe") return null;
-    // Supprimer le symbole $, la partie locale "≈ ..." et les espaces
-    final dollarPart = label.split('≈').first;
-    final cleaned = dollarPart.replaceAll('\$', '').replaceAll(' ', '').replaceAll('\u00a0', '');
+    // Supprimer le symbole $, les espaces normaux et insécables
+    final cleaned = label
+        .replaceAll('\$', '')
+        .replaceAll(' ', '')
+        .replaceAll('\u00a0', '')
+        .trim();
     return double.tryParse(cleaned);
   }
 

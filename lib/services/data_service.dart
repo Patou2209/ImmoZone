@@ -502,6 +502,18 @@ class DataService {
     }
   }
 
+  // ─── MISE À JOUR MOT DE PASSE DANS FIRESTORE ─────────────────────────────
+  // Utilisé par le flux "mot de passe oublié" via OTP SMS.
+  Future<bool> updateUserPassword(String userId, String newPassword) async {
+    try {
+      await _usersCol.doc(userId).update({'password': newPassword});
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.updateUserPassword] Erreur: $e');
+      return false;
+    }
+  }
+
   // ─── USERS ──────────────────────────────────────────────────────────────────
 
   Map<String, dynamic> _userToFirestore(UserModel u) => {

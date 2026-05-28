@@ -1,21 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../models/user_model.dart';
 import '../services/data_service.dart';
+import '../services/phone_auth_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHITECTURE AUTHENTIFICATION — Téléphone + Mot de passe
 //
-// Firebase Auth ne supporte pas directement "phone + password". On contourne
-// en utilisant un e-mail virtuel dérivé du numéro : +243812345@immozone.app
-// Ce e-mail virtuel n'est JAMAIS montré à l'utilisateur.
-//
-// Le vrai e-mail de l'utilisateur est stocké dans Firestore (champ "email")
-// et sert uniquement à la récupération de mot de passe (envoi via Admin SDK
-// ou sendPasswordResetEmail sur le compte e-mail virtuel quand l'email Firestore
-// correspond à une adresse Email Auth).
+// Inscription  : OTP SMS → verifyPhoneNumber() → profil Firestore
+// Connexion    : numéro + mot de passe → Firestore lookup
+// Mot de passe oublié : OTP SMS → verifyOtp() → update Firestore password
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AuthProvider extends ChangeNotifier {
@@ -172,13 +166,15 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // INSCRIPTION — Téléphone + Mot de passe + E-mail de récupération
+  // INSCRIPTION — Téléphone + Mot de passe (SANS email de récupération)
+  // Conservé pour compatibilité avec les anciens appels — délègue vers
+  // registerWithPhoneCredential() après OTP. Cette méthode n'est plus appelée
+  // directement dans le flux d'inscription normal (OTP via register_screen.dart).
   // ─────────────────────────────────────────────────────────────────────────
   Future<bool> register({
     required String name,
     required String phone,       // numéro complet avec indicatif (+243...)
     required String password,
-    required String recoveryEmail, // e-mail pour récupération de compte
     required String role,
     String? category,
   }) async {
@@ -203,14 +199,10 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      // 2. CRITIQUE : forcer le refresh du token Firebase AVANT l'écriture Firestore.
-      //    Sans ça, les règles de sécurité reçoivent un token non propagé
-      //    et renvoient PERMISSION_DENIED même si l'auth est valide.
+      // 2. Forcer le refresh du token Firebase AVANT l'écriture Firestore.
       try {
         await firebaseUser.getIdToken(true);
-      } catch (_) {
-        // non-bloquant si le refresh échoue — on tente quand même l'écriture
-      }
+      } catch (_) {}
 
       // 3. Créer le profil Firestore (avec retry automatique si permission-denied)
       UserModel? user;
@@ -222,7 +214,7 @@ class AuthProvider extends ChangeNotifier {
         try {
           user = await _dataService.register(
             name: name,
-            email: recoveryEmail.trim().toLowerCase(),
+            email: '',           // phone-only : pas d'email de récupération
             phone: phone,
             password: password,
             role: role,
@@ -230,19 +222,18 @@ class AuthProvider extends ChangeNotifier {
             uid: uid,
           );
           lastError = null;
-          break; // succès → sortir de la boucle
+          break;
         } on FirebaseException catch (e) {
           lastError = e;
           if (e.code == 'permission-denied' && attempts < 3) {
-            // Attendre que le token se propage, puis re-refresh avant retry
             await Future.delayed(Duration(seconds: attempts * 2));
             try { await firebaseUser.getIdToken(true); } catch (_) {}
           } else {
-            break; // autre erreur Firebase → ne pas réessayer
+            break;
           }
         } catch (e) {
           lastError = Exception(e.toString());
-          break; // erreur inattendue → ne pas réessayer
+          break;
         }
       }
 
@@ -253,18 +244,13 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
 
-      // Échec de l'écriture Firestore après tous les essais
       if (kDebugMode) {
         debugPrint('[AuthProvider.register] Échec Firestore après $attempts tentatives: $lastError');
       }
-      // Le compte Firebase Auth a été créé mais le profil Firestore n'a pas pu être sauvegardé.
-      // On redirige quand même l'utilisateur (il est authentifié) mais on log l'erreur.
-      // Un background retry va tenter de créer le profil.
       _currentUser = null;
       _isLoading = false;
       notifyListeners();
 
-      // Dernier recours : réessai en arrière-plan après 5s
       Future.delayed(const Duration(seconds: 5), () async {
         try {
           final fbUser = _auth.currentUser;
@@ -272,7 +258,7 @@ class AuthProvider extends ChangeNotifier {
             await fbUser.getIdToken(true);
             final retryUser = await _dataService.register(
               name: name,
-              email: recoveryEmail.trim().toLowerCase(),
+              email: '',
               phone: phone,
               password: password,
               role: role,
@@ -290,7 +276,7 @@ class AuthProvider extends ChangeNotifier {
         }
       });
 
-      return true; // Auth OK, profil en cours de création
+      return true;
 
     } on FirebaseAuthException catch (e) {
       _error = _mapFirebaseError(e.code);
@@ -307,122 +293,121 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MOT DE PASSE OUBLIÉ
+  // MOT DE PASSE OUBLIÉ — Étape 1 : vérifier que le numéro existe
   //
-  // Flux :
-  // 1. Chercher l'utilisateur dans Firestore par son numéro de téléphone
-  // 2. Récupérer son e-mail de récupération réel (champ "email" Firestore)
-  // 3. Appeler l'API REST Firebase Auth (sendOobCode) avec le vrai email
-  //    → Firebase envoie le lien de reset directement à la vraie boîte mail
+  // Flux OTP SMS :
+  //   1. findUserByPhone() → vérifier que le compte existe
+  //   2. sendOtpForPasswordReset() → PhoneAuthService.verifyPhoneNumber()
+  //   3. verifyOtpAndResetPassword() → vérifier l'OTP + update Firestore
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Clé API Android du projet Firebase (pour l'API REST Identity Toolkit)
-  static const String _firebaseApiKey = 'AIzaSyCPx_8e7-ecYA6amk-yu-8inbgJ0beme2g';
+  // Garde une référence sur l'utilisateur en cours de reset (entre étapes)
+  UserModel? _resetUser;
+  UserModel? get resetUser => _resetUser;
 
-  Future<bool> sendPasswordResetByPhone(String fullPhone) async {
+  // Étape 1 : Vérifier que le numéro existe et envoyer l'OTP
+  Future<bool> sendOtpForPasswordReset({
+    required String fullPhone,
+    required void Function(String verificationId, int? resendToken) onCodeSent,
+    required void Function(FirebaseAuthException e) onFailed,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
+    final normalizedPhone = _normalizePhone(fullPhone);
+    if (normalizedPhone == null) {
+      _error = 'Numéro de téléphone invalide.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    // Vérifier que le compte existe dans Firestore
+    UserModel? userProfile = await _dataService.findUserByPhone(normalizedPhone);
+    if (userProfile == null && normalizedPhone != fullPhone.trim()) {
+      userProfile = await _dataService.findUserByPhone(fullPhone.trim());
+    }
+    if (userProfile == null) {
+      _error = 'Aucun compte trouvé pour ce numéro.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    // Mémoriser l'utilisateur pour l'étape 3
+    _resetUser = userProfile;
+
+    _isLoading = false;
+    notifyListeners();
+
+    // Envoyer le SMS OTP
+    final svc = PhoneAuthService();
+    await svc.verifyPhoneNumber(
+      phoneNumber: normalizedPhone,
+      onCodeSent: onCodeSent,
+      onAutoVerified: (_) {}, // non utilisé dans ce flux
+      onFailed: (e) {
+        _error = PhoneAuthService.mapPhoneAuthError(e);
+        notifyListeners();
+        onFailed(e);
+      },
+      onTimeout: (_) {},
+    );
+    return true;
+  }
+
+  // Étape 3 : Vérifier l'OTP puis mettre à jour le mot de passe dans Firestore
+  Future<bool> verifyOtpAndResetPassword({
+    required String verificationId,
+    required String smsCode,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    if (_resetUser == null) {
+      _error = 'Session expirée. Recommencez depuis le début.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     try {
-      // Normalisation du numéro : garantit le format +XXXXXXXXXXXX
-      // Gère les cas : '823854273', '0823854273', '+243823854273', '243823854273'
-      final normalizedPhone = _normalizePhone(fullPhone);
-      if (normalizedPhone == null) {
-        _error = 'Numéro de téléphone invalide.';
+      // Vérifier le code OTP via Firebase Phone Auth
+      final svc = PhoneAuthService();
+      await svc.verifyOtp(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      // OTP valide → mettre à jour le mot de passe dans Firestore
+      final updated = await _dataService.updateUserPassword(
+          _resetUser!.id, newPassword);
+
+      if (!updated) {
+        _error = 'Impossible de mettre à jour le mot de passe. Réessayez.';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Étape 1 : Trouver le profil Firestore par numéro de téléphone
-      // Essaie le numéro normalisé ET le numéro brut (pour la compatibilité)
-      UserModel? userProfile = await _dataService.findUserByPhone(normalizedPhone);
-      // Fallback : chercher avec le numéro exact tel que saisi
-      if (userProfile == null && normalizedPhone != fullPhone.trim()) {
-        userProfile = await _dataService.findUserByPhone(fullPhone.trim());
-      }
-      if (userProfile == null) {
-        _error = 'Aucun compte trouvé pour ce numéro.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      final recoveryEmail = userProfile.email.trim().toLowerCase();
-
-      // Vérifier que l'email de récupération est un vrai email
-      if (recoveryEmail.isEmpty ||
-          !recoveryEmail.contains('@') ||
-          recoveryEmail.endsWith('@immozone.app')) {
-        _error = 'Aucun e-mail de récupération valide pour ce compte. '
-            'Contactez le support ImmoZone.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      // Étape 2 : Envoyer le lien via l'API REST Firebase Auth (sendOobCode)
-      // Cette API accepte n'importe quel email enregistré dans Auth OU
-      // permet d'envoyer à tout email via PASSWORD_RESET requestType.
-      // Firebase enverra le lien vers recoveryEmail.
-      final sent = await _sendResetViaRestApi(recoveryEmail);
-
-      if (!sent) {
-        _error = 'Impossible d\'envoyer l\'e-mail. '
-            'Contactez le support : +243821908888';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
+      _resetUser = null; // nettoyer l'état
       _isLoading = false;
       notifyListeners();
       return true;
 
     } on FirebaseAuthException catch (e) {
-      _error = e.code == 'user-not-found'
-          ? 'Aucun compte trouvé pour ce numéro.'
-          : 'Erreur : ${e.message}';
+      _error = PhoneAuthService.mapPhoneAuthError(e);
       _isLoading = false;
       notifyListeners();
-      return false;
-    } catch (_) {
-      _error = 'Erreur lors de l\'envoi. Réessayez.';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // Appelle l'API REST Firebase Auth pour envoyer un lien de reset
-  // directement à l'email de récupération réel de l'utilisateur.
-  Future<bool> _sendResetViaRestApi(String recoveryEmail) async {
-    try {
-      final url = Uri.parse(
-          'https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode'
-          '?key=$_firebaseApiKey');
-
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'requestType': 'PASSWORD_RESET',
-          'email': recoveryEmail,
-        }),
-      );
-
-      if (response.statusCode == 200) return true;
-
-      // Firebase retourne 400 si l'email n'existe pas dans Auth
-      // Dans ce cas : l'email de récupération n'est pas enregistré dans Firebase Auth
-      // On informe l'utilisateur (cas rare — email de récup jamais enregistré dans Auth)
-      if (kDebugMode) {
-        debugPrint('[AuthProvider] sendOobCode erreur: ${response.statusCode} ${response.body}');
-      }
       return false;
     } catch (e) {
-      if (kDebugMode) debugPrint('[AuthProvider] _sendResetViaRestApi exception: $e');
+      if (kDebugMode) debugPrint('[AuthProvider.verifyOtpAndResetPassword] Erreur: $e');
+      _error = 'Erreur lors de la vérification. Réessayez.';
+      _isLoading = false;
+      notifyListeners();
       return false;
     }
   }
