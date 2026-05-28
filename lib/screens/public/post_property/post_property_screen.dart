@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -2339,9 +2340,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      if (photo != null) setState(() => _mainPhoto = photo);
-    } catch (e) {
-      _err('Impossible d\'ouvrir ${fromCamera ? 'la caméra' : 'la galerie'}: $e');
+      if (photo == null) return; // annulation silencieuse
+      // Ignorer silencieusement si la même photo est déjà sélectionnée
+      if (_mainPhoto != null && _mainPhoto!.path == photo.path) return;
+      setState(() => _mainPhoto = photo);
+    } on PlatformException {
+      // Picker déjà ouvert ou permission refusée : ignorer silencieusement
+    } catch (_) {
+      // Toute autre erreur : ignorer silencieusement (ex. double-tap)
     }
   }
 
@@ -2355,9 +2361,16 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      if (photo != null) setState(() => _secondaryPhotos.add(photo));
-    } catch (e) {
-      _err('Impossible d\'ouvrir ${fromCamera ? 'la caméra' : 'la galerie'}: $e');
+      if (photo == null) return; // annulation silencieuse
+      // Ignorer silencieusement les doublons (même chemin de fichier)
+      final isDuplicate = _secondaryPhotos.any((f) => f.path == photo.path) ||
+          (_mainPhoto != null && _mainPhoto!.path == photo.path);
+      if (isDuplicate) return;
+      setState(() => _secondaryPhotos.add(photo));
+    } on PlatformException {
+      // Picker déjà ouvert ou permission refusée : ignorer silencieusement
+    } catch (_) {
+      // Toute autre erreur : ignorer silencieusement (ex. double-tap)
     }
   }
 

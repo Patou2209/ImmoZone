@@ -2,10 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/phone_auth_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import 'register_screen.dart';
+import 'otp_reset_password_screen.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -52,19 +52,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ── Mot de passe oublié — 3 étapes OTP SMS ──────────────────────────────────
-  // Étape 1 : saisie du numéro → envoi OTP
-  // Étape 2 : saisie du code SMS reçu
-  // Étape 3 : saisie du nouveau mot de passe → mise à jour Firestore
+  // ── Mot de passe oublié — Envoi OTP puis navigation vers OtpResetPasswordScreen
   Future<void> _forgotPassword() async {
     // Pré-remplir avec le numéro déjà saisi dans le champ login
     final phoneCtrl = TextEditingController(text: _phoneCtrl.text.trim());
     String selectedCode = _countryCode;
 
-    // ─── ÉTAPE 1 : Saisie du numéro ──────────────────────────────────────────
+    // Résultat de l'étape 1 (envoi du SMS)
     String? verificationIdResult;
     String? fullPhoneResult;
 
+    // ─── ÉTAPE 1 : Saisie du numéro → envoi OTP ──────────────────────────────
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -86,11 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: AppTheme.primaryColor, size: 22),
                 ),
                 const SizedBox(width: 10),
-                const Text('Mot de passe oublié',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17)),
+                const Flexible(
+                  child: Text('Mot de passe oublié',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17)),
+                ),
               ]),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -191,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               otpSent = true;
                             },
                             onFailed: (FirebaseAuthException e) {
-                              setSB(() => isSending = false);
+                              if (ctx.mounted) setSB(() => isSending = false);
                             },
                           );
 
@@ -203,10 +203,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             fullPhoneResult = full;
                             Navigator.of(ctx).pop();
                           } else {
-                            if (auth.error != null) {
+                            final errMsg = auth.error;
+                            if (errMsg != null && ctx.mounted) {
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
-                                  content: Text(auth.error!,
+                                  content: Text(errMsg,
                                       style: const TextStyle(
                                           fontFamily: 'Poppins')),
                                   backgroundColor: AppTheme.errorColor,
@@ -235,315 +236,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     phoneCtrl.dispose();
 
-    // Si l'OTP n'a pas été envoyé, arrêter ici
+    // Si l'OTP n'a pas été envoyé ou l'utilisateur a annulé, s'arrêter ici
     if (!mounted || verificationIdResult == null || fullPhoneResult == null) {
       return;
     }
 
-    // ─── ÉTAPE 2 : Saisie du code SMS ────────────────────────────────────────
-    final otpCtrl = TextEditingController();
-    String? capturedOtp;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.accentColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.sms_rounded,
-                color: AppTheme.accentColor, size: 22),
-          ),
-          const SizedBox(width: 10),
-          const Text('Code SMS reçu',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 17)),
-        ]),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Un code de 6 chiffres a été envoyé au $fullPhoneResult',
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                  height: 1.5),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 8),
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '------',
-                hintStyle: TextStyle(
-                    fontFamily: 'Poppins',
-                    color: AppTheme.dividerColor,
-                    letterSpacing: 8,
-                    fontSize: 22),
-                filled: true,
-                fillColor: AppTheme.backgroundColor,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppTheme.dividerColor)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppTheme.dividerColor)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                        color: AppTheme.accentColor, width: 2)),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
-              ),
-            ),
-          ],
+    // ─── ÉTAPES 2 & 3 : Page dédiée OTP + nouveau mot de passe ───────────────
+    // Navigation vers OtpResetPasswordScreen — évite toute chaîne de dialogs
+    // qui peut être interrompue par le WebView reCAPTCHA.
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OtpResetPasswordScreen(
+          phoneNumber: fullPhoneResult!,
+          verificationId: verificationIdResult!,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler',
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    color: AppTheme.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final code = otpCtrl.text.trim();
-              if (code.length < 6) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(
-                    content: Text('Code à 6 chiffres requis.',
-                        style: TextStyle(fontFamily: 'Poppins')),
-                    backgroundColor: Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-                return;
-              }
-              capturedOtp = code;
-              Navigator.of(ctx).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.accentColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Vérifier',
-                style: TextStyle(
-                    fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
-    otpCtrl.dispose();
-
-    if (!mounted || capturedOtp == null) return;
-
-    // ─── ÉTAPE 3 : Nouveau mot de passe ──────────────────────────────────────
-    final newPwdCtrl     = TextEditingController();
-    final confirmPwdCtrl = TextEditingController();
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (_, setSB) {
-          bool obsNew     = true;
-          bool obsConfirm = true;
-          return StatefulBuilder(
-            builder: (_, setSB2) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              title: Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.lock_open_rounded,
-                      color: AppTheme.successColor, size: 22),
-                ),
-                const SizedBox(width: 10),
-                const Text('Nouveau mot de passe',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17)),
-              ]),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: newPwdCtrl,
-                    obscureText: obsNew,
-                    decoration: InputDecoration(
-                      labelText: 'Nouveau mot de passe',
-                      labelStyle: const TextStyle(
-                          fontFamily: 'Poppins', fontSize: 13),
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: AppTheme.accentColor, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                            obsNew
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: AppTheme.textSecondary,
-                            size: 20),
-                        onPressed: () =>
-                            setSB2(() => obsNew = !obsNew),
-                      ),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            const BorderSide(color: AppTheme.dividerColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                            color: AppTheme.accentColor, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: confirmPwdCtrl,
-                    obscureText: obsConfirm,
-                    decoration: InputDecoration(
-                      labelText: 'Confirmer le mot de passe',
-                      labelStyle: const TextStyle(
-                          fontFamily: 'Poppins', fontSize: 13),
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: AppTheme.accentColor, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                            obsConfirm
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: AppTheme.textSecondary,
-                            size: 20),
-                        onPressed: () =>
-                            setSB2(() => obsConfirm = !obsConfirm),
-                      ),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            const BorderSide(color: AppTheme.dividerColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(
-                            color: AppTheme.accentColor, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 14),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Annuler',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          color: AppTheme.textSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final pwd     = newPwdCtrl.text.trim();
-                    final confirm = confirmPwdCtrl.text.trim();
-                    if (pwd.length < 6) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                          content: Text('Minimum 6 caractères requis.',
-                              style: TextStyle(fontFamily: 'Poppins')),
-                          backgroundColor: Colors.red,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-                    if (pwd != confirm) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Les mots de passe ne correspondent pas.',
-                              style: TextStyle(fontFamily: 'Poppins')),
-                          backgroundColor: Colors.red,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                      return;
-                    }
-                    Navigator.of(ctx).pop();
-                    final auth = context.read<AuthProvider>();
-                    final ok = await auth.verifyOtpAndResetPassword(
-                      verificationId: verificationIdResult!,
-                      smsCode: capturedOtp!,
-                      newPassword: pwd,
-                    );
-                    if (!mounted) return;
-                    if (ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Mot de passe mis à jour ! Connectez-vous.',
-                              style: TextStyle(fontFamily: 'Poppins')),
-                          backgroundColor: AppTheme.successColor,
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    } else {
-                      _showError(auth.error ?? 'Erreur de vérification.');
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.successColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Enregistrer',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-    newPwdCtrl.dispose();
-    confirmPwdCtrl.dispose();
   }
 
   // ── Sélecteur d'indicatif pays ────────────────────────────────────────────
