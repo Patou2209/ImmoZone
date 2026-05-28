@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -53,23 +55,25 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // ── Mot de passe oublié — Envoi OTP puis navigation vers OtpResetPasswordScreen
+  //
+  // PROBLÈME CLEF : Firebase verifyPhoneNumber() est non-bloquante.
+  // Le callback onCodeSent() arrive APRÈS le retour de await sendOtpForPasswordReset().
+  // Solution : Completer<String?> — bloque jusqu'à ce que Firebase appelle onCodeSent
+  // ou onFailed, puis showDialog retourne le verificationId via Navigator.pop(id).
   Future<void> _forgotPassword() async {
-    // Pré-remplir avec le numéro déjà saisi dans le champ login
     final phoneCtrl = TextEditingController(text: _phoneCtrl.text.trim());
     String selectedCode = _countryCode;
 
-    // Résultat de l'étape 1 (envoi du SMS)
-    String? verificationIdResult;
-    String? fullPhoneResult;
-
-    // ─── ÉTAPE 1 : Saisie du numéro → envoi OTP ──────────────────────────────
-    await showDialog(
+    // showDialog retourne le verificationId via pop(verificationId), ou null si annulé
+    final verificationId = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setS) {
-          bool isSending = false;
-          return StatefulBuilder(
+      builder: (ctx) {
+        // État local du dialog
+        bool isSending = false;
+
+        return StatefulBuilder(
+          builder: (ctx2, setS) => StatefulBuilder(
             builder: (_, setSB) => AlertDialog(
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
@@ -113,9 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Row(children: [
                       _codeButton(selectedCode, () async {
                         final picked = await _pickCountryCode(ctx2);
-                        if (picked != null) {
-                          setS(() => selectedCode = picked);
-                        }
+                        if (picked != null) setS(() => selectedCode = picked);
                       }),
                       Expanded(
                         child: TextField(
@@ -147,7 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isSending ? null : () => Navigator.of(ctx).pop(),
+                  onPressed: isSending
+                      ? null
+                      : () => Navigator.of(ctx).pop(null),
                   child: const Text('Annuler',
                       style: TextStyle(
                           fontFamily: 'Poppins',
@@ -161,8 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (number.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                    'Veuillez saisir votre numéro.',
+                                content: Text('Veuillez saisir votre numéro.',
                                     style: TextStyle(fontFamily: 'Poppins')),
                                 backgroundColor: Colors.red,
                                 behavior: SnackBarBehavior.floating,
@@ -177,44 +180,48 @@ class _LoginScreenState extends State<LoginScreen> {
                           } else {
                             full = '$selectedCode$number';
                           }
-
                           setSB(() => isSending = true);
 
-                          final auth = context.read<AuthProvider>();
-                          bool otpSent = false;
-                          String? capturedVerifId;
+                          // ── Completer : attend le vrai callback Firebase ─────
+                          // verifyPhoneNumber() retourne immédiatement ;
+                          // onCodeSent / onFailed arrivent en callback asynchrone.
+                          final completer = Completer<String?>();
 
+                          final auth = context.read<AuthProvider>();
                           await auth.sendOtpForPasswordReset(
                             fullPhone: full,
-                            onCodeSent: (verificationId, _) {
-                              capturedVerifId = verificationId;
-                              otpSent = true;
+                            onCodeSent: (vId, _) {
+                              // Firebase a envoyé le SMS → on résout le completer
+                              if (!completer.isCompleted) completer.complete(vId);
                             },
                             onFailed: (FirebaseAuthException e) {
-                              if (ctx.mounted) setSB(() => isSending = false);
+                              // Échec → on résout avec null
+                              if (!completer.isCompleted) completer.complete(null);
                             },
+                          );
+
+                          // Attendre que Firebase appelle le callback (max 120 s)
+                          final vId = await completer.future.timeout(
+                            const Duration(seconds: 120),
+                            onTimeout: () => null,
                           );
 
                           if (!ctx.mounted) return;
                           setSB(() => isSending = false);
 
-                          if (otpSent && capturedVerifId != null) {
-                            verificationIdResult = capturedVerifId;
-                            fullPhoneResult = full;
-                            Navigator.of(ctx).pop();
+                          if (vId != null) {
+                            // Succès : fermer le dialog en retournant le verificationId
+                            Navigator.of(ctx).pop(vId);
                           } else {
-                            final errMsg = auth.error;
-                            if (errMsg != null && ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text(errMsg,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins')),
-                                  backgroundColor: AppTheme.errorColor,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
+                            // Erreur : afficher le message sans fermer le dialog
+                            final errMsg = auth.error ??
+                                'Échec de l\'envoi du SMS. Réessayez.';
+                            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                              content: Text(errMsg,
+                                  style: const TextStyle(fontFamily: 'Poppins')),
+                              backgroundColor: AppTheme.errorColor,
+                              behavior: SnackBarBehavior.floating,
+                            ));
                           }
                         },
                   style: ElevatedButton.styleFrom(
@@ -230,28 +237,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
+
+    final fullPhone = _buildFullPhone(phoneCtrl.text.trim(), selectedCode);
     phoneCtrl.dispose();
 
-    // Si l'OTP n'a pas été envoyé ou l'utilisateur a annulé, s'arrêter ici
-    if (!mounted || verificationIdResult == null || fullPhoneResult == null) {
-      return;
-    }
+    // Annulation ou échec → s'arrêter ici
+    if (!mounted || verificationId == null) return;
 
     // ─── ÉTAPES 2 & 3 : Page dédiée OTP + nouveau mot de passe ───────────────
-    // Navigation vers OtpResetPasswordScreen — évite toute chaîne de dialogs
-    // qui peut être interrompue par le WebView reCAPTCHA.
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => OtpResetPasswordScreen(
-          phoneNumber: fullPhoneResult!,
-          verificationId: verificationIdResult!,
+          phoneNumber: fullPhone,
+          verificationId: verificationId,
         ),
       ),
     );
+  }
+
+  // Reconstitue le numéro complet (utilisé après dispose du controller)
+  String _buildFullPhone(String number, String code) {
+    if (number.startsWith('+') || number.startsWith('00')) {
+      return number.replaceAll(RegExp(r'^00'), '+');
+    }
+    return '$code$number';
   }
 
   // ── Sélecteur d'indicatif pays ────────────────────────────────────────────
