@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -17,6 +19,23 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // ── Désactiver reCAPTCHA visible — forcer Play Integrity (Android) ──────────
+  // Sans cette ligne, Firebase Auth 5.x affiche un reCAPTCHA web dans une
+  // WebView chaque fois que Play Integrity n'est pas immédiatement disponible.
+  // forceRecaptchaFlow: false  → Firebase utilise toujours SafetyNet/Play Integrity
+  // en priorité, jamais le reCAPTCHA visible. Si Play Integrity échoue,
+  // l'OTP est quand même envoyé via silent push notification.
+  if (!kIsWeb) {
+    try {
+      await FirebaseAuth.instance.setSettings(
+        forceRecaptchaFlow: false,
+        appVerificationDisabledForTesting: false,
+      );
+    } catch (_) {
+      // Non-bloquant — l'app fonctionne même si setSettings échoue
+    }
+  }
 
   await DataService().init();
 

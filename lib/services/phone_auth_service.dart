@@ -4,18 +4,14 @@ import 'package:flutter/foundation.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // PhoneAuthService — gère le flux Firebase Phone Auth (SMS OTP)
 //
-// Flux Android :
-//  1. verifyPhoneNumber()  → Firebase envoie un SMS (sans reCAPTCHA)
-//  2. Si auto-retrieval possible → onAutoVerified() appelé automatiquement
-//  3. Sinon → onCodeSent()  → l'utilisateur saisit le code
-//  4. verifyOtp()          → crée/récupère le UserCredential Firebase
+// Flux Android (APK release signé) :
+//  1. verifyPhoneNumber()  → Play Integrity vérifie l'app silencieusement
+//  2. Firebase envoie le SMS OTP directement (aucune WebView, aucun reCAPTCHA)
+//  3. Si auto-retrieval possible → onAutoVerified() déclenché automatiquement
+//  4. Sinon → onCodeSent() → l'utilisateur saisit le code manuellement
+//  5. verifyOtp() → crée le UserCredential Firebase
 //
-// NOTE RECAPTCHA :
-//  Sur Android, Firebase utilise SafetyNet/Play Integrity pour vérifier l'app
-//  sans afficher de reCAPTCHA visible. Le reCAPTCHA visible n'apparaît que si
-//  SafetyNet échoue (APK non signé ou émulateur).
-//  → Solution : s'assurer que l'APK est bien signé (release build).
-//  → Sur l'appareil physique avec APK release signé : pas de reCAPTCHA visible.
+// NOTE : forceRecaptchaFlow: false est appliqué dans main.dart au démarrage.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class PhoneAuthService {
@@ -33,7 +29,8 @@ class PhoneAuthService {
     required void Function(UserCredential credential) onAutoVerified,
     required void Function(FirebaseAuthException e) onFailed,
     required void Function(String verificationId) onTimeout,
-    Duration timeout = const Duration(seconds: 60),
+    // 120 secondes : laisse le temps à Play Integrity de répondre avant timeout
+    Duration timeout = const Duration(seconds: 120),
     bool isResend = false,
   }) async {
     if (kDebugMode) {
@@ -77,7 +74,7 @@ class PhoneAuthService {
         onTimeout(verificationId);
       },
 
-      // forceResendingToken uniquement pour les renvois (évite reCAPTCHA inutile)
+      // forceResendingToken : utilisé uniquement pour les renvois
       forceResendingToken: isResend ? _resendToken : null,
     );
   }
