@@ -44,9 +44,10 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
 
   // ── État de l'écran ──────────────────────────────────────────────────────────
   // Phase A : saisie OTP / Phase B : saisie nouveau mot de passe
-  bool _otpVerified   = false;
-  bool _isSaving      = false;
-  bool _showSuccess   = false;
+  bool _otpVerified    = false;
+  bool _isSaving       = false;
+  bool _showSuccess    = false;
+  bool _showNoSmsHint  = false; // indice affiché si SMS non reçu après 30s
 
   // ── Mot de passe ─────────────────────────────────────────────────────────────
   final _newPwdCtrl     = TextEditingController();
@@ -87,11 +88,17 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   // ─────────────────────────────────────────────────────────────────────────────
   void _startResendTimer() {
     _resendTimer?.cancel();
-    setState(() => _resendSeconds = 60);
+    setState(() {
+      _resendSeconds = 30; // 30s au lieu de 60s pour renvoyer plus vite
+      _showNoSmsHint = false;
+    });
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_resendSeconds <= 1) {
         t.cancel();
-        if (mounted) setState(() => _resendSeconds = 0);
+        if (mounted) setState(() {
+          _resendSeconds = 0;
+          _showNoSmsHint = true; // afficher le hint après expiration
+        });
       } else {
         if (mounted) setState(() => _resendSeconds--);
       }
@@ -435,38 +442,96 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
             const SizedBox(height: 20),
 
             // Renvoi
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            if (_resendSeconds > 0)
               Text(
-                _resendSeconds > 0
-                    ? 'Renvoyer dans $_resendSeconds s'
-                    : 'Pas reçu le code ?',
+                'Renvoyer dans $_resendSeconds s',
                 style: const TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
                     color: AppTheme.textSecondary),
-              ),
-              if (_resendSeconds == 0) ...[
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: _isResending ? null : _resendOtp,
-                  child: _isResending
-                      ? const SizedBox(
-                          width: 14, height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text('Renvoyer',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.primaryColor,
-                              decoration: TextDecoration.underline)),
-                ),
-              ],
-            ]),
+              )
+            else
+              _isResending
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : GestureDetector(
+                      onTap: _resendOtp,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppTheme.primaryColor.withValues(
+                                  alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.refresh_rounded,
+                                color: AppTheme.primaryColor, size: 16),
+                            const SizedBox(width: 6),
+                            Text('Renvoyer le code SMS',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.primaryColor)),
+                          ],
+                        ),
+                      ),
+                    ),
           ]),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+
+        // ── Banner d'aide si SMS non reçu après 30s ───────────────────────────
+        if (_showNoSmsHint)
+          AnimatedOpacity(
+            opacity: _showNoSmsHint ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 400),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.info_outline_rounded,
+                        color: Colors.orange.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Text('SMS non reçu ?',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Colors.orange.shade800)),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(
+                    '• Vérifiez que le numéro est correct\n'
+                    '• Le SMS peut prendre 1-2 minutes\n'
+                    '• Vérifiez vos messages bloqués/spam\n'
+                    '• Appuyez sur "Renvoyer" ci-dessus',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        height: 1.6,
+                        color: Colors.orange.shade800),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         TextButton.icon(
           onPressed: _isVerifying ? null : () => Navigator.of(context).pop(),
           icon: const Icon(Icons.edit_rounded, size: 16),
