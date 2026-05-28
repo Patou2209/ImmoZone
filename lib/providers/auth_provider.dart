@@ -65,13 +65,32 @@ class AuthProvider extends ChangeNotifier {
 
   // ─────────────────────────────────────────────────────────────────────────
   // VÉRIFICATION SESSION AU DÉMARRAGE
+  //
+  // LOGIQUE :
+  //   1. Si session SharedPrefs existe (isLoggedIn + userId) → recharger le
+  //      profil Firestore par ID. Couvre TOUS les comptes (OTP + admin).
+  //   2. Fallback : Firebase Auth currentUser (pour les comptes email virtuel
+  //      dont la session Firebase est encore active).
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> checkAuth() async {
+    // Priorité 1 : session locale SharedPreferences (persiste entre les lancements)
+    if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
+      final user = await _dataService.getUserById(_dataService.currentUserId);
+      if (user != null) {
+        _currentUser = user;
+        notifyListeners();
+        return;
+      }
+    }
+
+    // Priorité 2 : session Firebase Auth active (admin email virtuel)
     final firebaseUser = _auth.currentUser;
     if (firebaseUser != null) {
       final user = await _dataService.loginById(firebaseUser.uid);
-      _currentUser = user;
-      notifyListeners();
+      if (user != null) {
+        _currentUser = user;
+        notifyListeners();
+      }
     }
   }
 
