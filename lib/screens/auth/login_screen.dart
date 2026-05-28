@@ -213,15 +213,60 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Succès : fermer le dialog en retournant le verificationId
                             Navigator.of(ctx).pop(vId);
                           } else {
-                            // Erreur : afficher le message sans fermer le dialog
+                            // Erreur : afficher un dialog explicatif (pas un snackbar
+                            // qui disparaît trop vite pour les messages importants)
                             final errMsg = auth.error ??
                                 'Échec de l\'envoi du SMS. Réessayez.';
-                            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                              content: Text(errMsg,
-                                  style: const TextStyle(fontFamily: 'Poppins')),
-                              backgroundColor: AppTheme.errorColor,
-                              behavior: SnackBarBehavior.floating,
-                            ));
+                            final isTooMany = errMsg.contains('10 à 30') ||
+                                errMsg.contains('Trop de tentatives');
+                            if (ctx.mounted) {
+                              await showDialog<void>(
+                                context: ctx,
+                                builder: (dCtx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  title: Row(children: [
+                                    Icon(
+                                      isTooMany
+                                          ? Icons.timer_outlined
+                                          : Icons.error_outline_rounded,
+                                      color: AppTheme.errorColor,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Flexible(
+                                      child: Text('Envoi impossible',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16)),
+                                    ),
+                                  ]),
+                                  content: Text(errMsg,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          height: 1.5)),
+                                  actions: [
+                                    ElevatedButton(
+                                      onPressed: () =>
+                                          Navigator.of(dCtx).pop(),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      child: const Text('OK',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
                           }
                         },
                   style: ElevatedButton.styleFrom(

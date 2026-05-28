@@ -113,7 +113,7 @@ class PhoneAuthService {
       case 'invalid-phone-number':
         return 'Numéro de téléphone invalide. Vérifiez le format.';
       case 'too-many-requests':
-        return 'Trop de tentatives. Réessayez dans quelques minutes.';
+        return 'Trop de tentatives sur ce numéro. Attendez 10 à 30 minutes avant de réessayer.';
       case 'quota-exceeded':
         return 'Quota SMS dépassé. Contactez le support.';
       case 'invalid-verification-code':
