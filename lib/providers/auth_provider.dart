@@ -89,52 +89,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final normalizedPhone = _normalizePhone(fullPhone) ?? fullPhone.trim();
-    final virtualEmail    = phoneToVirtualEmail(normalizedPhone);
 
-    // ── Tentative 1 : Email virtuel Firebase Auth (admin + anciens comptes) ─
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: virtualEmail,
-        password: password,
-      );
-      final uid = cred.user?.uid;
-      if (uid != null) {
-        final user = await _dataService.loginById(uid);
-        if (user != null) {
-          _currentUser = user;
-          _isLoading = false;
-          notifyListeners();
-          return true;
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      // SEUL wrong-password est un signal fiable de "mauvais mot de passe sur
-      // un compte email virtuel existant". On s'arrête uniquement dans ce cas.
-      //
-      // invalid-credential : Firebase renvoie ce code aussi quand l'email virtuel
-      // n'existe PAS (ex: compte inscrit via Phone Auth OTP, pas d'email virtuel).
-      // → NE PAS s'arrêter : continuer vers Tentative 2 (Firestore phone lookup).
-      //
-      // too-many-requests : bloquer temporairement mais laisser passer vers T2
-      // pour ne pas frustrer un compte Phone Auth légitime.
-      if (e.code == 'wrong-password') {
-        // Email virtuel EXISTS + mauvais mot de passe → erreur définitive
-        _error = _mapFirebaseError(e.code);
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-      // Tous les autres codes (user-not-found, invalid-email, invalid-credential,
-      // too-many-requests, etc.) → continuer vers Tentative 2 (Phone Auth OTP)
-    } catch (_) {
-      // erreur réseau ou autre → continuer vers tentative 2
-    }
-
-    // ── Tentative 2 : Compte créé via OTP (Phone Auth) ──────────────────────
-    // Ces comptes n'ont pas d'email virtuel Firebase Auth.
-    // On vérifie le mot de passe directement dans Firestore.
-    try {
-      // Chercher le profil Firestore par numéro
+      // ── ÉTAPE 1 : Chercher le profil dans Firestore par numéro ──────────────
+      // C'est la source de vérité unique pour TOUS les utilisateurs.
+      // L'admin a aussi son profil Firestore avec son numéro.
       UserModel? userProfile = await _dataService.findUserByPhone(normalizedPhone);
       if (userProfile == null && normalizedPhone != fullPhone.trim()) {
         userProfile = await _dataService.findUserByPhone(fullPhone.trim());
@@ -147,17 +106,32 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      // Vérifier le mot de passe stocké dans Firestore
+      // ── ÉTAPE 2 : Vérifier le mot de passe stocké dans Firestore ────────────
+      // Tous les comptes (admin inclus) ont leur mot de passe dans Firestore.
       final storedPassword = await _dataService.getUserPassword(userProfile.id);
+
       if (storedPassword == null || storedPassword != password) {
-        _error = 'Mot de passe incorrect.';
+        _error = 'Numéro ou mot de passe incorrect.';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      // Mot de passe OK → connecter sans Firebase Auth session
-      // (l'utilisateur Phone Auth n'a pas de session email)
+      // ── ÉTAPE 3 : Connexion réussie ──────────────────────────────────────────
+      // Pour l'admin : tenter aussi la connexion Firebase Auth (email virtuel)
+      // pour maintenir la session Firebase (accès Firestore sécurisé).
+      if (userProfile.role == 'admin') {
+        try {
+          final virtualEmail = phoneToVirtualEmail(normalizedPhone);
+          await _auth.signInWithEmailAndPassword(
+            email: virtualEmail,
+            password: password,
+          );
+        } catch (_) {
+          // Non-bloquant : l'admin peut quand même accéder via session Firestore
+        }
+      }
+
       _currentUser = userProfile;
       await _dataService.saveSessionDirectly(userProfile);
       _isLoading = false;
@@ -165,7 +139,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
 
     } catch (e) {
-      if (kDebugMode) debugPrint('[AuthProvider.loginWithPhone] Tentative 2 erreur: $e');
+      if (kDebugMode) debugPrint('[AuthProvider.loginWithPhone] Erreur: $e');
       _error = 'Une erreur est survenue. Réessayez.';
       _isLoading = false;
       notifyListeners();
