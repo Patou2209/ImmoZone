@@ -108,17 +108,24 @@ class AuthProvider extends ChangeNotifier {
         }
       }
     } on FirebaseAuthException catch (e) {
-      // wrong-password / invalid-credential → mauvais mot de passe → erreur directe
-      if (e.code == 'wrong-password' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'too-many-requests') {
+      // SEUL wrong-password est un signal fiable de "mauvais mot de passe sur
+      // un compte email virtuel existant". On s'arrête uniquement dans ce cas.
+      //
+      // invalid-credential : Firebase renvoie ce code aussi quand l'email virtuel
+      // n'existe PAS (ex: compte inscrit via Phone Auth OTP, pas d'email virtuel).
+      // → NE PAS s'arrêter : continuer vers Tentative 2 (Firestore phone lookup).
+      //
+      // too-many-requests : bloquer temporairement mais laisser passer vers T2
+      // pour ne pas frustrer un compte Phone Auth légitime.
+      if (e.code == 'wrong-password') {
+        // Email virtuel EXISTS + mauvais mot de passe → erreur définitive
         _error = _mapFirebaseError(e.code);
         _isLoading = false;
         notifyListeners();
         return false;
       }
-      // user-not-found / invalid-email → compte email virtuel inexistant
-      // → continuer vers tentative 2 (compte Phone Auth)
+      // Tous les autres codes (user-not-found, invalid-email, invalid-credential,
+      // too-many-requests, etc.) → continuer vers Tentative 2 (Phone Auth OTP)
     } catch (_) {
       // erreur réseau ou autre → continuer vers tentative 2
     }
