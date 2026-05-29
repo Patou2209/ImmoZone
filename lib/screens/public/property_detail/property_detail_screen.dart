@@ -807,56 +807,71 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // Nom de l'annonceur (ligne complète)
+                      Text(p.ownerName,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                              color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      // Ancienneté + numéro sur la même ligne
                       Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                        Expanded(
-                          child: Text(p.ownerName,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Poppins',
-                                  color: AppTheme.textPrimary),
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                        if (_ownerSince.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.accentColor.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: AppTheme.accentColor.withValues(alpha: 0.3)),
+                        // Badge ancienneté — toujours visible (même pendant le chargement)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _ownerSince.isEmpty
+                                ? AppTheme.dividerColor.withValues(alpha: 0.5)
+                                : AppTheme.accentColor.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: _ownerSince.isEmpty
+                                    ? AppTheme.dividerColor
+                                    : AppTheme.accentColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(
+                              _ownerSince == 'Nouveau'
+                                  ? Icons.fiber_new_rounded
+                                  : Icons.workspace_premium_rounded,
+                              size: 11,
+                              color: _ownerSince.isEmpty
+                                  ? AppTheme.textHint
+                                  : AppTheme.accentColor,
                             ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.verified_user_rounded,
-                                  size: 10, color: AppTheme.accentColor),
-                              const SizedBox(width: 3),
-                              Text(_ownerSince,
+                            const SizedBox(width: 3),
+                            Text(
+                              _ownerSince.isEmpty ? '···' : _ownerSince,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: _ownerSince.isEmpty
+                                      ? AppTheme.textHint
+                                      : AppTheme.accentColor),
+                            ),
+                          ]),
+                        ),
+                        if (p.ownerPhone.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _copyToClipboard(p.ownerPhone, 'Numero'),
+                            child: Row(children: [
+                              const Icon(Icons.phone_rounded,
+                                  size: 13, color: AppTheme.accentColor),
+                              const SizedBox(width: 4),
+                              Text(p.ownerPhone,
                                   style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.accentColor,
                                       fontFamily: 'Poppins',
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.accentColor)),
+                                      fontWeight: FontWeight.w600)),
                             ]),
                           ),
                         ],
                       ]),
-                      const SizedBox(height: 3),
-                      if (p.ownerPhone.isNotEmpty)
-                        GestureDetector(
-                          onTap: () => _copyToClipboard(p.ownerPhone, 'Numero'),
-                          child: Row(children: [
-                            const Icon(Icons.phone_rounded,
-                                size: 13, color: AppTheme.accentColor),
-                            const SizedBox(width: 4),
-                            Text(p.ownerPhone,
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.accentColor,
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.w600)),
-                          ]),
-                        ),
                     ]),
                   ),
                 ]),

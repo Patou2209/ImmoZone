@@ -26,6 +26,25 @@ class _LoginScreenState extends State<LoginScreen> {
   // Indicatif pays sélectionné
   String _countryCode = '+243';
 
+  // ── Compteur de tentatives OTP mot de passe oublié ────────────────────────
+  // Max 5 tentatives par session, puis blocage 10 minutes
+  static const int _maxOtpAttempts   = 5;
+  int   _otpAttemptCount  = 0;
+  DateTime? _otpBlockedUntil;
+
+  /// Retourne null si non bloqué, sinon le nombre de secondes restantes
+  int? _otpBlockedSecondsRemaining() {
+    if (_otpBlockedUntil == null) return null;
+    final remaining = _otpBlockedUntil!.difference(DateTime.now()).inSeconds;
+    if (remaining <= 0) {
+      // Blocage expiré → réinitialiser
+      _otpBlockedUntil  = null;
+      _otpAttemptCount  = 0;
+      return null;
+    }
+    return remaining;
+  }
+
   String get _fullPhone =>
       '$_countryCode${_phoneCtrl.text.trim()}';
 
@@ -61,6 +80,50 @@ class _LoginScreenState extends State<LoginScreen> {
   // Solution : Completer<String?> — bloque jusqu'à ce que Firebase appelle onCodeSent
   // ou onFailed, puis showDialog retourne le verificationId via Navigator.pop(id).
   Future<void> _forgotPassword() async {
+    // ── Vérifier si l'utilisateur est bloqué ─────────────────────────────────
+    final blockedSecs = _otpBlockedSecondsRemaining();
+    if (blockedSecs != null) {
+      final mins = (blockedSecs / 60).ceil();
+      await showDialog<void>(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.timer_outlined, color: AppTheme.warningColor, size: 24),
+            const SizedBox(width: 10),
+            const Flexible(
+              child: Text('Trop de demandes',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16)),
+            ),
+          ]),
+          content: Text(
+            'Vous avez atteint le maximum de $_maxOtpAttempts demandes.\n\n'
+            'Veuillez patienter encore $mins minute${mins > 1 ? 's' : ''} avant de réessayer.',
+            style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 13, height: 1.5),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(dCtx).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('OK',
+                  style: TextStyle(
+                      fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final phoneCtrl = TextEditingController(text: _phoneCtrl.text.trim());
     String selectedCode = _countryCode;
 
@@ -108,6 +171,30 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppTheme.textSecondary,
                         height: 1.5),
                   ),
+                  // Compteur de tentatives (affiché dès la 1ère utilisation)
+                  if (_otpAttemptCount > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 13,
+                        color: _otpAttemptCount >= _maxOtpAttempts - 1
+                            ? AppTheme.warningColor
+                            : AppTheme.textSecondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Tentative $_otpAttemptCount/$_maxOtpAttempts',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _otpAttemptCount >= _maxOtpAttempts - 1
+                                ? AppTheme.warningColor
+                                : AppTheme.textSecondary),
+                      ),
+                    ]),
+                  ],
                   const SizedBox(height: 14),
                   Container(
                     decoration: BoxDecoration(
@@ -182,6 +269,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           }
                           setSB(() => isSending = true);
 
+                          // ── Incrémenter le compteur de tentatives ────────────
+                          _otpAttemptCount++;
+                          final remainingAttempts =
+                              _maxOtpAttempts - _otpAttemptCount;
+
                           // ── Completer : attend le vrai callback Firebase ─────
                           // verifyPhoneNumber() retourne immédiatement ;
                           // onCodeSent / onFailed arrivent en callback asynchrone.
@@ -210,15 +302,42 @@ class _LoginScreenState extends State<LoginScreen> {
                           setSB(() => isSending = false);
 
                           if (vId != null) {
-                            // Succès : fermer le dialog en retournant le verificationId
+                            // Succès : réinitialiser le compteur
+                            _otpAttemptCount = 0;
+                            _otpBlockedUntil = null;
                             Navigator.of(ctx).pop(vId);
                           } else {
-                            // Erreur : afficher un dialog explicatif (pas un snackbar
-                            // qui disparaît trop vite pour les messages importants)
+                            // Erreur — bloquer si max atteint
+                            if (_otpAttemptCount >= _maxOtpAttempts) {
+                              _otpBlockedUntil = DateTime.now()
+                                  .add(const Duration(minutes: 10));
+                            }
+
                             final errMsg = auth.error ??
                                 'Échec de l\'envoi du SMS. Réessayez.';
-                            final isTooMany = errMsg.contains('10 à 30') ||
-                                errMsg.contains('Trop de tentatives');
+                            final isTooMany = errMsg.contains('Trop de') ||
+                                errMsg.contains('too-many') ||
+                                errMsg.contains('tentatives') ||
+                                _otpAttemptCount >= _maxOtpAttempts;
+
+                            // Message adapté selon le contexte
+                            String displayMsg;
+                            if (_otpAttemptCount >= _maxOtpAttempts) {
+                              displayMsg =
+                                  'Vous avez atteint le maximum de $_maxOtpAttempts demandes.\n\n'
+                                  'Attendez 10 minutes avant de réessayer.';
+                            } else if (isTooMany) {
+                              displayMsg =
+                                  'Ce numéro a reçu trop de codes récemment.\n\n'
+                                  'Attendez environ 10 minutes et réessayez.\n\n'
+                                  'Tentatives restantes : $remainingAttempts sur $_maxOtpAttempts';
+                            } else {
+                              displayMsg = errMsg +
+                                  (remainingAttempts > 0
+                                      ? '\n\nTentatives restantes : $remainingAttempts sur $_maxOtpAttempts'
+                                      : '');
+                            }
+
                             if (ctx.mounted) {
                               await showDialog<void>(
                                 context: ctx,
@@ -230,27 +349,36 @@ class _LoginScreenState extends State<LoginScreen> {
                                       isTooMany
                                           ? Icons.timer_outlined
                                           : Icons.error_outline_rounded,
-                                      color: AppTheme.errorColor,
+                                      color: isTooMany
+                                          ? AppTheme.warningColor
+                                          : AppTheme.errorColor,
                                       size: 24,
                                     ),
                                     const SizedBox(width: 10),
-                                    const Flexible(
-                                      child: Text('Envoi impossible',
-                                          style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16)),
+                                    Flexible(
+                                      child: Text(
+                                        isTooMany ? 'Trop de demandes' : 'Envoi impossible',
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16)),
                                     ),
                                   ]),
-                                  content: Text(errMsg,
+                                  content: Text(displayMsg,
                                       style: const TextStyle(
                                           fontFamily: 'Poppins',
                                           fontSize: 13,
                                           height: 1.5)),
                                   actions: [
                                     ElevatedButton(
-                                      onPressed: () =>
-                                          Navigator.of(dCtx).pop(),
+                                      onPressed: () {
+                                        Navigator.of(dCtx).pop();
+                                        // Si max atteint → fermer aussi le dialog principal
+                                        if (_otpAttemptCount >= _maxOtpAttempts
+                                            && ctx.mounted) {
+                                          Navigator.of(ctx).pop(null);
+                                        }
+                                      },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primaryColor,
                                         foregroundColor: Colors.white,

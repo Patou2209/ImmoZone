@@ -98,7 +98,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
       onFailed: (firebase_auth.FirebaseAuthException e) {
         if (!mounted) return;
         setState(() => _isSending = false);
-        _showError(PhoneAuthService.mapPhoneAuthError(e));
+        final errMsg = PhoneAuthService.mapPhoneAuthError(e);
+        // Pour "trop de demandes" : afficher un dialog plutôt qu'un snackbar
+        if (e.code == 'too-many-requests') {
+          showDialog<void>(
+            context: context,
+            builder: (dCtx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: Row(children: [
+                const Icon(Icons.timer_outlined,
+                    color: AppTheme.warningColor, size: 24),
+                const SizedBox(width: 10),
+                const Flexible(
+                  child: Text('Inscription temporairement bloquée',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
+                ),
+              ]),
+              content: const Text(
+                'Ce numéro a reçu trop de codes SMS récemment '
+                '(peut arriver si un compte a été supprimé puis recréé).\n\n'
+                'Attendez environ 10 minutes et réessayez.\n\n'
+                'Si le problème persiste, contactez le support.',
+                style: TextStyle(
+                    fontFamily: 'Poppins', fontSize: 13, height: 1.5),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.of(dCtx).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('OK',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+          );
+        } else {
+          _showError(errMsg);
+        }
       },
       onTimeout: (_) {
         if (!mounted) return;
@@ -255,10 +302,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _nameCtrl,
                   textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Nom complet',
-                    prefixIcon: Icon(Icons.person_outline, color: AppTheme.accentColor),
                     hintText: 'Votre nom et prénom',
+                    // Icône renforcée — fond coloré pour meilleure visibilité
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.25)),
+                      ),
+                      child: const Icon(Icons.person_rounded,
+                          color: AppTheme.primaryColor, size: 18),
+                    ),
+                    // Bordure visible en permanence (override du thème global)
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primaryColor, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primaryColor, width: 2.5),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.errorColor, width: 1.5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.errorColor, width: 2),
+                    ),
                   ),
                   validator: (v) => v == null || v.trim().isEmpty ? 'Nom requis' : null,
                 ),

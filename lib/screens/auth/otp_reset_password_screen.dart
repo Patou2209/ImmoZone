@@ -45,7 +45,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
 
   late String _currentVerificationId;
   bool _isResending    = false;
-  int  _resendSeconds  = 30;
+  int  _resendSeconds  = 90;
   Timer? _resendTimer;
   bool _showNoSmsHint  = false;
 
@@ -99,7 +99,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   void _startResendTimer() {
     _resendTimer?.cancel();
     setState(() {
-      _resendSeconds  = 30;
+      _resendSeconds  = 90;
       _showNoSmsHint  = false;
     });
     _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -578,7 +578,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
           // Bouton renvoyer
           if (_resendSeconds > 0)
             Text(
-              'Renvoyer dans $_resendSeconds s',
+              'Renvoyer dans ${_resendSeconds >= 60 ? "${_resendSeconds ~/ 60}m${_resendSeconds % 60 > 0 ? " ${_resendSeconds % 60}s" : ""}" : "$_resendSeconds s"}',
               style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 12,
