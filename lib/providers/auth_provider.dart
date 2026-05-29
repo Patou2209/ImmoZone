@@ -358,6 +358,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Étape 3 : Vérifier l'OTP puis mettre à jour le mot de passe dans Firestore
+  //
+  // IMPORTANT — Gestion du conflit de session Firebase :
+  //   signInWithCredential() échoue avec "session-expired" si un autre compte
+  //   Firebase est déjà connecté (même anonyme). On déconnecte d'abord Firebase
+  //   Auth, on vérifie le code OTP, puis on restaure la session Firestore
+  //   depuis SharedPreferences (checkAuth() gère ça via _dataService).
   Future<bool> verifyOtpAndResetPassword({
     required String verificationId,
     required String smsCode,
@@ -374,37 +380,59 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
+    // Sauvegarder le profil utilisateur avant toute déconnexion Firebase
+    final userToUpdate = _resetUser!;
+
     try {
-      // Vérifier le code OTP via Firebase Phone Auth
+      // ── Étape A : Déconnecter Firebase Auth pour éviter les conflits ─────────
+      // signInWithCredential() peut échouer avec "session-expired" si un compte
+      // Firebase est déjà actif (email virtuel, anonymous, etc.).
+      try {
+        await _auth.signOut();
+      } catch (_) {
+        // Non-bloquant : si signOut échoue, on continue quand même
+      }
+
+      // ── Étape B : Vérifier le code OTP via Firebase Phone Auth ───────────────
       final svc = PhoneAuthService();
       await svc.verifyOtp(
         verificationId: verificationId,
         smsCode: smsCode,
       );
 
-      // OTP valide → mettre à jour le mot de passe dans Firestore
+      // ── Étape C : OTP valide → mettre à jour le mot de passe dans Firestore ──
       final updated = await _dataService.updateUserPassword(
-          _resetUser!.id, newPassword);
+          userToUpdate.id, newPassword);
 
       if (!updated) {
+        // Restaurer la session si la mise à jour Firestore échoue
+        _currentUser = userToUpdate;
+        _resetUser = null;
         _error = 'Impossible de mettre à jour le mot de passe. Réessayez.';
         _isLoading = false;
         notifyListeners();
         return false;
       }
 
-      _resetUser = null; // nettoyer l'état
+      // ── Étape D : Nettoyer l'état ─────────────────────────────────────────────
+      // _currentUser est intentionnellement laissé intact :
+      // si l'utilisateur était connecté (rôle admin), la session Firestore
+      // SharedPrefs reste valide et checkAuth() la restaurera au prochain démarrage.
+      _resetUser = null;
       _isLoading = false;
       notifyListeners();
       return true;
 
     } on FirebaseAuthException catch (e) {
+      // Restaurer la session Firestore même en cas d'erreur Firebase
+      _currentUser ??= userToUpdate;
       _error = PhoneAuthService.mapPhoneAuthError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     } catch (e) {
       if (kDebugMode) debugPrint('[AuthProvider.verifyOtpAndResetPassword] Erreur: $e');
+      _currentUser ??= userToUpdate;
       _error = 'Erreur lors de la vérification. Réessayez.';
       _isLoading = false;
       notifyListeners();
