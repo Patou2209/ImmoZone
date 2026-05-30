@@ -1054,9 +1054,14 @@ class DataService {
   // Retourne le nombre d'unites pour une commune
   // Nouveau format : commune -> { zone: 'Standard' } + zones_config -> { Standard: { units: 1 } }
   // Ancien format  : commune -> { credits: 3, standing: 'Premium' }
+  //
   /// Retourne le nombre d'unites requis pour publier dans [commune] pendant [days] jours.
   /// [days] doit etre 7, 15 ou 30 (defaut = 30).
-  int getCreditsForCommune(String commune, {int days = 30}) {
+  /// [transactionType] : 'Location' (defaut) ou 'Vente'.
+  ///   Pour 'Vente', les unites Location sont multiplies par le coefficient vente
+  ///   configure dans la zone (champ 'vente_coefficient', defaut = 2.0).
+  int getCreditsForCommune(String commune,
+      {int days = 30, String transactionType = 'Location'}) {
     final zones = geographicZones;
     final cfg   = zonesConfig;
 
@@ -1071,6 +1076,8 @@ class DataService {
       'Luxe':          {7: 10, 15: 15, 30: 20},
     };
 
+    int baseUnits;
+
     if (zones.containsKey(commune)) {
       final data = zones[commune] as Map<String, dynamic>;
       // Nouveau format : via zone
@@ -1079,18 +1086,34 @@ class DataService {
         if (cfg.containsKey(zoneName)) {
           final zoneCfg = cfg[zoneName];
           if (zoneCfg is Map && zoneCfg.containsKey(dKey)) {
-            return (zoneCfg[dKey] as num?)?.toInt() ?? 1;
+            baseUnits = (zoneCfg[dKey] as num?)?.toInt() ?? 1;
+          } else if (zoneCfg is Map && zoneCfg.containsKey('units')) {
+            // Ancien format (un seul 'units') — compatibilite
+            baseUnits = (zoneCfg['units'] as num?)?.toInt() ?? 1;
+          } else {
+            baseUnits = fallbackDurations[zoneName]?[days] ?? 1;
           }
-          // Ancien format (un seul 'units') — compatibilite
-          if (zoneCfg is Map && zoneCfg.containsKey('units')) {
-            return (zoneCfg['units'] as num?)?.toInt() ?? 1;
+
+          // Appliquer le coefficient vente si applicable
+          if (transactionType == 'Vente' && zoneCfg is Map) {
+            final coeff = (zoneCfg['vente_coefficient'] as num?)?.toDouble() ?? 2.0;
+            return (baseUnits * coeff).round();
           }
+          return baseUnits;
         }
-        return fallbackDurations[zoneName]?[days] ?? 1;
+        baseUnits = fallbackDurations[zoneName]?[days] ?? 1;
+        if (transactionType == 'Vente') {
+          return (baseUnits * 2.0).round(); // coefficient defaut
+        }
+        return baseUnits;
       }
       // Ancien format : credits direct
       if (data.containsKey('credits')) {
-        return (data['credits'] as num?)?.toInt() ?? 1;
+        baseUnits = (data['credits'] as num?)?.toInt() ?? 1;
+        if (transactionType == 'Vente') {
+          return (baseUnits * 2.0).round();
+        }
+        return baseUnits;
       }
     }
 
@@ -1098,10 +1121,19 @@ class DataService {
     if (cfg.containsKey('Standard')) {
       final stdCfg = cfg['Standard'];
       if (stdCfg is Map && stdCfg.containsKey(dKey)) {
-        return (stdCfg[dKey] as num?)?.toInt() ?? 1;
+        baseUnits = (stdCfg[dKey] as num?)?.toInt() ?? 1;
+        if (transactionType == 'Vente') {
+          final coeff = (stdCfg['vente_coefficient'] as num?)?.toDouble() ?? 2.0;
+          return (baseUnits * coeff).round();
+        }
+        return baseUnits;
       }
     }
-    return fallbackDurations['Standard']?[days] ?? 1;
+    baseUnits = fallbackDurations['Standard']?[days] ?? 1;
+    if (transactionType == 'Vente') {
+      return (baseUnits * 2.0).round();
+    }
+    return baseUnits;
   }
 
   String getZoneStanding(String commune) {
@@ -1612,7 +1644,7 @@ class DataService {
   // Retourne: 'free_trial' | 'free_quota' | 'paid_credit' | 'no_right'
 
   Future<String> checkPublicationRight(String userId,
-      {String commune = '', int days = 30}) async {
+      {String commune = '', int days = 30, String transactionType = 'Location'}) async {
     // 1. Free trial activé globalement ?
     if (isFreeTrial) return 'free_trial';
 
@@ -1626,7 +1658,7 @@ class DataService {
 
     // 3. Crédits payants disponibles ?
     final required = commune.isNotEmpty
-        ? getCreditsForCommune(commune, days: days)
+        ? getCreditsForCommune(commune, days: days, transactionType: transactionType)
         : 1;
     final available = await getUserAvailableCredits(userId);
     if (available >= required) return 'paid_credit';
@@ -1671,7 +1703,7 @@ class DataService {
   }
 
   Future<void> consumePublicationRight(String userId,
-      {String commune = '', int days = 30}) async {
+      {String commune = '', int days = 30, String transactionType = 'Location'}) async {
     // 1. Free trial : rien à consommer
     if (isFreeTrial) return;
 
@@ -1693,7 +1725,7 @@ class DataService {
 
     // 3. Crédits payants
     final required = commune.isNotEmpty
-        ? getCreditsForCommune(commune, days: days)
+        ? getCreditsForCommune(commune, days: days, transactionType: transactionType)
         : 1;
     await consumeCredits(userId, required);
   }

@@ -32,11 +32,25 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   // Unites par zone ET par duree (7j / 15j / 30j), admin-configurable
   static const List<int> _durations = [7, 15, 30];
 
+  // Valeurs disponibles pour le coefficient vente
+  static const List<double> _coeffValues = [
+    1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0
+  ];
+
   Map<String, Map<int, int>> _zoneDurations = {
     'Standard':      {7: 1,  15: 2,  30: 3},
     'Intermediaire': {7: 3,  15: 5,  30: 8},
     'Premium':       {7: 5,  15: 8,  30: 12},
     'Luxe':          {7: 10, 15: 15, 30: 20},
+  };
+
+  // Coefficient de vente par zone (multiplie les unites Location pour obtenir le cout Vente)
+  // Defaut = 2.0 pour toutes les zones
+  Map<String, double> _venteCoeff = {
+    'Standard':      2.0,
+    'Intermediaire': 2.0,
+    'Premium':       2.0,
+    'Luxe':          2.0,
   };
 
   // ── Taux de conversion monnaies (admin-configurable) ─────────────────────
@@ -122,7 +136,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   Future<void> _load() async {
     setState(() => _isLoading = true);
 
-    // Charger config des zones (unites + taux monnaies)
+    // Charger config des zones (unites + taux monnaies + coefficient vente)
     final zonesConfig = _ds.zonesConfig;
     if (zonesConfig.isNotEmpty) {
       for (final name in _zoneNames) {
@@ -134,6 +148,9 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
             15: (cfg['units_15d'] as num?)?.toInt() ?? defaults[15]!,
             30: (cfg['units_30d'] as num?)?.toInt() ?? defaults[30]!,
           };
+          // Charger le coefficient de vente (defaut 2.0)
+          final coeff = (cfg['vente_coefficient'] as num?)?.toDouble() ?? 2.0;
+          _venteCoeff[name] = _coeffValues.contains(coeff) ? coeff : 2.0;
         }
       }
       // Charger taux de conversion
@@ -167,14 +184,15 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
   Future<void> _saveAll() async {
     setState(() => _isSaving = true);
 
-    // Sauvegarder config zones + taux monnaies
+    // Sauvegarder config zones + taux monnaies + coefficient vente
     final zonesConfigMap = <String, dynamic>{};
     for (final name in _zoneNames) {
       final dur = _zoneDurations[name]!;
       zonesConfigMap[name] = {
-        'units_7d':  dur[7]  ?? 1,
-        'units_15d': dur[15] ?? 1,
-        'units_30d': dur[30] ?? 1,
+        'units_7d':         dur[7]  ?? 1,
+        'units_15d':        dur[15] ?? 1,
+        'units_30d':        dur[30] ?? 1,
+        'vente_coefficient': _venteCoeff[name] ?? 2.0,
       };
     }
     // Inclure les taux de conversion
@@ -690,9 +708,142 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
               ]),
             );
           }),
+
+          // ── Coefficient Vente ───────────────────────────────────────────
+          _buildVenteCoeffSelector(zoneName, color),
         ]),
       ),
     );
+  }
+
+  /// Selecteur de coefficient de vente — scroll horizontal des valeurs 1..5 (pas 0.5)
+  Widget _buildVenteCoeffSelector(String zoneName, Color color) {
+    final coeff = _venteCoeff[zoneName] ?? 2.0;
+    // Exemple dynamique : unites 30j × coeff
+    final baseUnits30 = _zoneDurations[zoneName]?[30] ?? 1;
+    final venteUnits  = (baseUnits30 * coeff).round();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Divider(height: 20),
+
+      // En-tete
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.deepOrange.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(children: [
+          const Icon(Icons.sell_rounded, size: 13, color: Colors.deepOrange),
+          const SizedBox(width: 6),
+          const Text('Coefficient Vente',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 11, color: Colors.deepOrange)),
+          const Spacer(),
+          // Badge valeur actuelle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.deepOrange,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('×${coeff % 1 == 0 ? coeff.toInt() : coeff}',
+                style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                    fontSize: 11, color: Colors.white)),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 8),
+
+      // Ligne d'info dynamique
+      RichText(
+        text: TextSpan(
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 11, height: 1.4),
+          children: [
+            const TextSpan(
+              text: 'Location 30j : ',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            TextSpan(
+              text: '$baseUnits30 u.',
+              style: TextStyle(fontWeight: FontWeight.w700, color: color),
+            ),
+            const TextSpan(
+              text: '  →  Vente 30j : ',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            TextSpan(
+              text: '$venteUnits u.',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.deepOrange),
+            ),
+            TextSpan(
+              text: '  (×${coeff % 1 == 0 ? coeff.toInt() : coeff})',
+              style: const TextStyle(color: Colors.deepOrange, fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 10),
+
+      // Scroll horizontal des coefficients
+      SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _coeffValues.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final v   = _coeffValues[i];
+            final sel = coeff == v;
+            final label = v % 1 == 0 ? '×${v.toInt()}' : '×$v';
+            return GestureDetector(
+              onTap: () => setState(() => _venteCoeff[zoneName] = v),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 52,
+                decoration: BoxDecoration(
+                  color: sel ? Colors.deepOrange : Colors.deepOrange.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: sel ? Colors.deepOrange : Colors.deepOrange.withValues(alpha: 0.25),
+                    width: sel ? 2 : 1,
+                  ),
+                  boxShadow: sel
+                      ? [BoxShadow(
+                          color: Colors.deepOrange.withValues(alpha: 0.25),
+                          blurRadius: 6, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Center(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: sel ? Colors.white : Colors.deepOrange)),
+                    if (sel)
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        width: 4, height: 4,
+                        decoration: const BoxDecoration(
+                            color: Colors.white, shape: BoxShape.circle),
+                      ),
+                  ]),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Legende
+      Text(
+        'Les unites Location × ce coefficient = unites Vente pour cette zone.',
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+            color: AppTheme.textSecondary.withValues(alpha: 0.8)),
+      ),
+    ]);
   }
 
   Widget _buildZoneUsageRecap() {

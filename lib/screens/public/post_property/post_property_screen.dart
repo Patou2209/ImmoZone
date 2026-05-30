@@ -402,11 +402,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     if (!auth.isLoggedIn) return;
     final ds = DataService();
     final userId = auth.currentUser!.id;
-    final required = ds.getCreditsForCommune(_selectedCommune, days: _selectedDuration);
+    final required = ds.getCreditsForCommune(_selectedCommune,
+        days: _selectedDuration, transactionType: _selectedTransaction);
     // Count paid credits only (free quota handled separately via checkPublicationRight)
     final available = await ds.getUserAvailableCredits(userId);
     // Use the authoritative publication right check (free trial, free quota, paid credit, no right)
-    final right = await ds.checkPublicationRight(userId, commune: _selectedCommune, days: _selectedDuration);
+    final right = await ds.checkPublicationRight(userId,
+        commune: _selectedCommune, days: _selectedDuration,
+        transactionType: _selectedTransaction);
     // "enough" = free trial active, OR free monthly quota still available, OR sufficient paid credits
     final enough = (right == 'free_trial') || (right == 'free_quota') || (right == 'paid_credit');
     // Récupérer le quota de bienvenue (year=0)
@@ -456,7 +459,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       // Consume the publication right (handles free trial, free quota, or paid credits)
       if (_hasEnoughCredits) {
         final ds = DataService();
-        await ds.consumePublicationRight(user.id, commune: _selectedCommune, days: _selectedDuration);
+        await ds.consumePublicationRight(user.id,
+            commune: _selectedCommune, days: _selectedDuration,
+            transactionType: _selectedTransaction);
       }
 
       // ── Convertir les fichiers locaux en base64 ──────────────────────────────
@@ -1011,9 +1016,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // Cost per duration
-    final cost7  = ds.getCreditsForCommune(_selectedCommune, days: 7);
-    final cost15 = ds.getCreditsForCommune(_selectedCommune, days: 15);
-    final cost30 = ds.getCreditsForCommune(_selectedCommune, days: 30);
+    final cost7  = ds.getCreditsForCommune(_selectedCommune, days: 7,  transactionType: _selectedTransaction);
+    final cost15 = ds.getCreditsForCommune(_selectedCommune, days: 15, transactionType: _selectedTransaction);
+    final cost30 = ds.getCreditsForCommune(_selectedCommune, days: 30, transactionType: _selectedTransaction);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
