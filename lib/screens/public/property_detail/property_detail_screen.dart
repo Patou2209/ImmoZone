@@ -867,34 +867,54 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // Nom de l'annonceur (ligne complète)
-                      Text(p.ownerName,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins',
-                              color: AppTheme.textPrimary),
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 3),
-                      // Ancienneté — texte simple sous le nom
-                      if (!_ownerSinceLoaded)
-                        const Text(
-                          'Chargement...',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textHint),
-                        )
-                      else if (_ownerSince.isNotEmpty)
-                        Text(
-                          _ownerSince,
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: AppTheme.textSecondary),
+                      // Nom + ancienneté sur la MÊME ligne
+                      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        // Nom — flexible pour ne pas dépasser
+                        Flexible(
+                          child: Text(p.ownerName,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Poppins',
+                                  color: AppTheme.textPrimary),
+                              overflow: TextOverflow.ellipsis),
                         ),
+                        // Ancienneté inline à droite du nom
+                        if (!_ownerSinceLoaded) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.textHint.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text('...',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 10,
+                                    color: AppTheme.textHint)),
+                          ),
+                        ] else if (_ownerSince.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+                            ),
+                            child: Text(
+                              _ownerSince,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primaryColor),
+                            ),
+                          ),
+                        ],
+                      ]),
                       const SizedBox(height: 3),
                       // Numéro de téléphone
                       if (p.ownerPhone.isNotEmpty)

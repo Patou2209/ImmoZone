@@ -838,6 +838,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             if (_selectedType == 'Chambre d\'hôtel') {
               _selectedTransaction = 'Location';
             }
+            // Le type de bien peut changer la transaction → recalculer le coût
+            _creditChecked = false;
           });
         }),
         // Pour Terrain à bâtir et Concession : Vente only. Chambre d'hôtel : Location only.
@@ -852,7 +854,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   : AppConstants.transactionTypes;
           return _dropdown('Type de transaction *', _selectedTransaction,
               availableTx, Icons.swap_horiz,
-              (v) => setState(() => _selectedTransaction = v!));
+              (v) => setState(() {
+                _selectedTransaction = v!;
+                // Recalculer le coût (Location vs Vente → coefficient différent)
+                _creditChecked = false;
+              }));
         }),
         // Prix affiché selon le type de bien (label adapté selon type + transaction)
         // Chambre d'hôtel : toujours "Prix par nuitée" (gestion spéciale indépendante)
