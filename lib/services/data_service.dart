@@ -26,6 +26,9 @@ class DataService {
   // Collections Firestore
   CollectionReference get _propertiesCol => _db.collection('properties');
   CollectionReference get _usersCol => _db.collection('users');
+  /// Accès public à la collection users — utilisé par ex. dans property_detail
+  /// pour lire le champ brut 'createdAt' sans passer par UserModel.fromMap.
+  CollectionReference get usersCollection => _db.collection('users');
   CollectionReference get _creditsCol => _db.collection('credits');
   CollectionReference get _notificationsCol => _db.collection('notifications');
   CollectionReference get _messagesCol => _db.collection('messages');
@@ -566,7 +569,10 @@ class DataService {
     try {
       final snap = await _usersCol.doc(id).get();
       if (!snap.exists) return null;
-      return UserModel.fromMap(snap.data() as Map<String, dynamic>);
+      // Injecter le document ID dans la map — Firestore ne l'inclut pas dans data()
+      final data = Map<String, dynamic>.from(snap.data() as Map<String, dynamic>);
+      data['id'] = snap.id;
+      return UserModel.fromMap(data);
     } catch (_) {
       return null;
     }

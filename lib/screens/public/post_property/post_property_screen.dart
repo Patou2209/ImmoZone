@@ -121,6 +121,19 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return 'USD';
   }
 
+  /// Label du champ prix en mode Location selon le type de bien :
+  /// • Loyer  → Maison, Appartement, Bureau, Propriété Commerciale, Propriété Industrielle
+  /// • Tarif  → Salle de Fêtes, Chambre d'hôtel, Espace Funéraire, Salle Polyvalente
+  String get _priceLabelForLocation {
+    const tarifTypes = [
+      'Salle de Fêtes',
+      'Chambre d\'hôtel',
+      'Espace Funéraire',
+      'Salle Polyvalente',
+    ];
+    return tarifTypes.contains(_selectedType) ? 'Tarif *' : 'Loyer *';
+  }
+
   // Listes dynamiques selon selections
   List<String> get _availableCities =>
       AppConstants.getCitiesForProvince(_selectedCountry, _selectedProvince);
@@ -837,11 +850,15 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               (v) => setState(() => _selectedTransaction = v!));
         }),
         // Prix affiché selon le type de bien (label adapté selon type + transaction)
+        // Chambre d'hôtel : toujours "Prix par nuitée" (gestion spéciale indépendante)
+        // Location        : Loyer (Maison/Appart/Bureau/Commercial/Industriel)
+        //                   Tarif (Salle de Fêtes/Chambre hôtel/Espace Funéraire/Salle Polyvalente)
+        // Vente           : Prix
         _selectedType == 'Chambre d\'hôtel'
             ? _field(_priceCtrl, 'Prix par nuitée (USD) *', Icons.nights_stay_outlined, '0',
                 type: TextInputType.number, suffix: _currencyDropdown())
             : _field(_priceCtrl,
-                _selectedTransaction == 'Location' ? 'Loyer *' : 'Prix *',
+                _selectedTransaction == 'Location' ? _priceLabelForLocation : 'Prix *',
                 Icons.attach_money, '0',
                 type: TextInputType.number, suffix: _currencyDropdown()),
 

@@ -28,6 +28,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   String _officialMessage = '';
   bool _messageExpanded = false;
   String _ownerSince = '';
+  bool _ownerSinceLoaded = false; // true une fois la requête terminée
   // Compteur de vues local — mis à jour après incrément Firestore
   late int _views;
 
@@ -54,13 +55,64 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
+  // ── Charge l'ancienneté de l'annonceur depuis Firestore ──────────────────
+  // Lit le champ brut 'createdAt' (Timestamp Firestore OU String ISO8601)
+  // directement depuis le document, sans passer par UserModel.fromMap,
+  // pour éviter les problèmes de parsing sur les anciens documents.
   Future<void> _loadOwnerSince() async {
-    final owner = await _ds.getUserById(widget.property.ownerId);
-    if (owner == null || !mounted) return;
-    final now = DateTime.now();
-    final diff = now.difference(owner.createdAt);
-    final totalMonths = (diff.inDays / 30.44).floor();
-    String label;
+    final ownerId = widget.property.ownerId;
+    if (ownerId.isEmpty) return;
+
+    DateTime? createdAt;
+
+    // ── Tentative 1 : lecture directe Firestore (champ brut) ─────────────────
+    try {
+      final snap = await _ds.usersCollection.doc(ownerId).get();
+      if (snap.exists) {
+        final raw = (snap.data() as Map<String, dynamic>?)?['createdAt'];
+        debugPrint('[ancienneté] ownerId=$ownerId  raw=$raw  type=${raw?.runtimeType}');
+        if (raw != null) {
+          if (raw is DateTime) {
+            createdAt = raw;
+          } else {
+            // Timestamp Firestore (duck-typing)
+            try { createdAt = (raw as dynamic).toDate() as DateTime; } catch (_) {}
+            // String ISO8601
+            if (createdAt == null) {
+              try { createdAt = DateTime.parse(raw.toString()); } catch (_) {}
+            }
+          }
+        }
+      } else {
+        debugPrint('[ancienneté] document inexistant pour ownerId=$ownerId');
+      }
+    } catch (e) {
+      debugPrint('[ancienneté] erreur lecture Firestore: $e');
+    }
+
+    // ── Tentative 2 : via getUserById (fallback) ──────────────────────────────
+    if (createdAt == null) {
+      try {
+        final owner = await _ds.getUserById(ownerId);
+        // N'utiliser que si la date est significative (pas DateTime.now() de fallback)
+        if (owner != null) {
+          final diff = DateTime.now().difference(owner.createdAt).inDays;
+          if (diff > 0) createdAt = owner.createdAt;
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    // ── Calcul du label ────────────────────────────────────────────────────────
+    if (createdAt == null) {
+      // Impossible de déterminer la date → ne rien afficher, mais marquer comme chargé
+      if (mounted) setState(() => _ownerSinceLoaded = true);
+      return;
+    }
+
+    final totalMonths = (DateTime.now().difference(createdAt).inDays / 30.44).floor();
+    final String label;
     if (totalMonths < 1) {
       label = 'Membre depuis moins d\'un mois';
     } else if (totalMonths == 1) {
@@ -74,7 +126,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       final mStr   = months > 0 ? ' $months mois' : '';
       label = 'Membre depuis $yStr$mStr';
     }
-    setState(() => _ownerSince = label);
+
+    setState(() {
+      _ownerSince = label;
+      _ownerSinceLoaded = true;
+    });
   }
 
   @override
@@ -821,16 +877,24 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
                       // Ancienneté — texte simple sous le nom
-                      Text(
-                        _ownerSince.isEmpty ? 'Chargement...' : _ownerSince,
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: _ownerSince.isEmpty
-                                ? AppTheme.textHint
-                                : AppTheme.textSecondary),
-                      ),
+                      if (!_ownerSinceLoaded)
+                        const Text(
+                          'Chargement...',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textHint),
+                        )
+                      else if (_ownerSince.isNotEmpty)
+                        Text(
+                          _ownerSince,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textSecondary),
+                        ),
                       const SizedBox(height: 3),
                       // Numéro de téléphone
                       if (p.ownerPhone.isNotEmpty)
