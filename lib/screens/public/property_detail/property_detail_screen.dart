@@ -112,19 +112,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
 
     final totalMonths = (DateTime.now().difference(createdAt).inDays / 30.44).floor();
+    // Labels courts pour le badge inline (max ~12 caractères)
     final String label;
     if (totalMonths < 1) {
-      label = 'Membre depuis moins d\'un mois';
-    } else if (totalMonths == 1) {
-      label = 'Membre depuis 1 mois';
+      label = 'Nouveau';
     } else if (totalMonths < 12) {
-      label = 'Membre depuis $totalMonths mois';
+      label = '$totalMonths mois';
     } else {
       final years  = totalMonths ~/ 12;
       final months = totalMonths % 12;
       final yStr   = '$years an${years > 1 ? 's' : ''}';
-      final mStr   = months > 0 ? ' $months mois' : '';
-      label = 'Membre depuis $yStr$mStr';
+      final mStr   = months > 0 ? ' $months m.' : '';
+      label = '$yStr$mStr';
     }
 
     setState(() {
@@ -843,7 +842,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         fontFamily: 'Poppins',
                         color: AppTheme.textPrimary)),
                 const SizedBox(height: 14),
-                Row(children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  // ── Avatar initiale ──────────────────────────────────────
                   Container(
                     width: 52,
                     height: 52,
@@ -865,58 +865,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 14),
+
+                  // ── Nom + Téléphone (Expanded) ───────────────────────────
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // Nom + ancienneté sur la MÊME ligne
-                      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                        // Nom — flexible pour ne pas dépasser
-                        Flexible(
-                          child: Text(p.ownerName,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  fontFamily: 'Poppins',
-                                  color: AppTheme.textPrimary),
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                        // Ancienneté inline à droite du nom
-                        if (!_ownerSinceLoaded) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppTheme.textHint.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text('...',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 10,
-                                    color: AppTheme.textHint)),
-                          ),
-                        ] else if (_ownerSince.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.18)),
-                            ),
-                            child: Text(
-                              _ownerSince,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.primaryColor),
-                            ),
-                          ),
-                        ],
-                      ]),
+                      Text(p.ownerName,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
+                              color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
-                      // Numéro de téléphone
                       if (p.ownerPhone.isNotEmpty)
                         GestureDetector(
                           onTap: () => _copyToClipboard(p.ownerPhone, 'Numero'),
@@ -934,6 +894,51 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                     ]),
                   ),
+
+                  // ── Badge ancienneté — trailing à droite ─────────────────
+                  const SizedBox(width: 10),
+                  if (!_ownerSinceLoaded)
+                    // Skeleton pendant le chargement
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppTheme.textHint.withValues(alpha: 0.10),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: AppTheme.textHint),
+                        ),
+                      ),
+                    )
+                  else if (_ownerSince.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.25),
+                            width: 1.2),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.verified_rounded,
+                            size: 11, color: AppTheme.primaryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          _ownerSince,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor),
+                        ),
+                      ]),
+                    ),
                 ]),
 
                 // WhatsApp + Call buttons (non-owner only)
