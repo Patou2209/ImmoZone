@@ -30,6 +30,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Firebase App Check — debug token pour APK sideload (hors Play Store) -->
+        <!-- Ce token permet à Play Integrity de valider l'app même sans Play Store -->
+        <!-- Token enregistré dans Firebase Console → App Check → Debug tokens -->
+        <meta-data
+            android:name="com.google.firebase.appcheck.debug.force_debug_token"
+            android:value="3EBB85EC-B680-4076-A9E8-6A52F48A0A9F" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -66,6 +73,7 @@
         </intent>
     </queries>
 </manifest>
+
 
 
 

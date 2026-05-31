@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -18,6 +19,15 @@ void main() async {
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ── Firebase App Check — debug token (APK sideload / hors Play Store) ────────
+  // Le token 3EBB85EC-B680-4076-A9E8-6A52F48A0A9F est déclaré dans
+  // AndroidManifest.xml via la meta-data force_debug_token.
+  // Sur un build Play Store signé, remplacer AndroidProvider.debug
+  // par AndroidProvider.playIntegrity pour la production.
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
   );
 
   // ── Désactiver reCAPTCHA visible — forcer Play Integrity (Android) ──────────
