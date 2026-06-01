@@ -8,7 +8,10 @@ import '../../../services/data_service.dart';
 import '../property_detail/property_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String? initialType;
+  final String? initialTransaction;
+
+  const SearchScreen({super.key, this.initialType, this.initialTransaction});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -58,8 +61,15 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    // Pré-remplir les filtres si fournis depuis le dashboard stats
+    if (widget.initialType != null) _selectedType = widget.initialType;
+    if (widget.initialTransaction != null) _selectedTransaction = widget.initialTransaction;
     context.read<PropertyProvider>().loadProperties();
     _loadFavorites();
+    // Appliquer les filtres initiaux automatiquement après le premier frame
+    if (widget.initialType != null || widget.initialTransaction != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFilters());
+    }
   }
 
   @override

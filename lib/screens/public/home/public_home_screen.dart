@@ -17,6 +17,7 @@ import '../post_property/post_property_screen.dart';
 import '../post_property/edit_property_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../admin/admin_home_screen.dart';
+import '../search/search_screen.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -1934,52 +1935,96 @@ class _HomeTabState extends State<_HomeTab>
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
       ),
       child: Column(children: [
-        // En-tete
+        // En-tête
         Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            const Icon(Icons.bar_chart_rounded, color: AppTheme.accentColor, size: 18),
-            const SizedBox(width: 8),
+            // Icône professionnelle — immeuble/marché immobilier
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.domain_rounded, color: AppTheme.accentColor, size: 18),
+            ),
+            const SizedBox(width: 10),
             const Expanded(
-              child: Text('Marche Immobilier - Disponibilites',
+              child: Text('Marché Immobilier — Disponibilités',
                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                       fontSize: 13, color: Colors.white)),
             ),
             if (_statsLoading)
               const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(color: AppTheme.accentColor, strokeWidth: 2)),
+                  child: CircularProgressIndicator(color: AppTheme.accentColor, strokeWidth: 2))
+            else
+              Tooltip(
+                message: 'Cliquez sur une catégorie pour filtrer les annonces',
+                child: Icon(Icons.touch_app_rounded,
+                    color: AppTheme.accentColor.withValues(alpha: 0.7), size: 16),
+              ),
           ]),
         ),
         if (!_statsLoading) ...[
           const Divider(height: 1, color: Colors.white12),
-          _statRow('Maisons en vente',          _stats['maisonVente'] ?? 0,      AppTheme.accentColor),
-          _statRow('Maisons en location',       _stats['maisonLocation'] ?? 0,   const Color(0xFF4FC3F7)),
-          _statRow('Maisons vendues',           _stats['maisonVendue'] ?? 0,     AppTheme.successColor),
-          _statRow('Terrains disponibles',      _stats['terrainDispo'] ?? 0,     AppTheme.warningColor),
-          _statRow('Terrains vendus',           _stats['terrainVendu'] ?? 0,     AppTheme.successColor),
-          _statRow('Appartements en vente',     _stats['appartVente'] ?? 0,      AppTheme.accentColor),
-          _statRow('Appartements en location',  _stats['appartLocation'] ?? 0,   const Color(0xFF4FC3F7)),
-          _statRow('Bureaux en location',       _stats['bureauLocation'] ?? 0,   const Color(0xFFA0C4FF)),
-          _statRow('Salles de fetes dispo.',    _stats['salleFetes'] ?? 0,       Colors.purple.shade300),
-          _statRow('Espaces funeraires dispo.', _stats['espaceFuneraire'] ?? 0,  Colors.blueGrey.shade300),
+          // ── Rangées cliquables — type + transaction ─────────────────────────
+          _statRow('Maisons en vente',               _stats['maisonVente'] ?? 0,     AppTheme.accentColor,
+              typeFilter: 'Maison',              transactionFilter: 'Vente'),
+          _statRow('Maisons en location',            _stats['maisonLocation'] ?? 0,  const Color(0xFF4FC3F7),
+              typeFilter: 'Maison',              transactionFilter: 'Location'),
+          _statRow('Maisons vendues',                _stats['maisonVendue'] ?? 0,    AppTheme.successColor,
+              typeFilter: 'Maison',              transactionFilter: 'Vente'),
+          _statRow('Terrains disponibles',           _stats['terrainDispo'] ?? 0,    AppTheme.warningColor,
+              typeFilter: 'Terrain \u00e0 b\u00e2tir',      transactionFilter: 'Vente'),
+          _statRow('Terrains vendus',                _stats['terrainVendu'] ?? 0,    AppTheme.successColor,
+              typeFilter: 'Terrain \u00e0 b\u00e2tir',      transactionFilter: 'Vente'),
+          _statRow('Appartements en vente',          _stats['appartVente'] ?? 0,     AppTheme.accentColor,
+              typeFilter: 'Appartement / Flat',   transactionFilter: 'Vente'),
+          _statRow('Appartements en location',       _stats['appartLocation'] ?? 0,  const Color(0xFF4FC3F7),
+              typeFilter: 'Appartement / Flat',   transactionFilter: 'Location'),
+          _statRow('Bureaux en location',            _stats['bureauLocation'] ?? 0,  const Color(0xFFA0C4FF),
+              typeFilter: 'Bureau',              transactionFilter: 'Location'),
+          _statRow('Salles des f\u00eates disponibles',   _stats['salleFetes'] ?? 0,     Colors.purple.shade300,
+              typeFilter: 'Salle de F\u00eates'),
+          _statRow('Espaces fun\u00e9raires disponibles', _stats['espaceFuneraire'] ?? 0, Colors.blueGrey.shade300,
+              typeFilter: 'Espace Fun\u00e9raire'),
           const Divider(height: 1, color: Colors.white12),
-          _statRow('Total annonces actives',    _stats['totalActif'] ?? 0,       AppTheme.accentColor, total: true),
+          // Ligne total — non cliquable
+          _statRow('Total annonces actives',    _stats['totalActif'] ?? 0,       AppTheme.accentColor,
+              total: true),
           const SizedBox(height: 8),
         ],
       ]),
     );
   }
 
-  Widget _statRow(String label, int count, Color color, {bool total = false}) {
-    return Padding(
+  Widget _statRow(
+    String label,
+    int count,
+    Color color, {
+    bool total = false,
+    String? typeFilter,
+    String? transactionFilter,
+  }) {
+    final bool clickable = !total && (typeFilter != null || transactionFilter != null);
+
+    Widget row = Padding(
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: total ? 10 : 6),
       child: Row(children: [
         Expanded(
-          child: Text(label,
-              style: TextStyle(fontFamily: 'Poppins',
-                  fontSize: total ? 13 : 12,
-                  fontWeight: total ? FontWeight.w700 : FontWeight.w400,
-                  color: total ? Colors.white : Colors.white70)),
+          child: Row(children: [
+            if (clickable) ...
+              [const Icon(Icons.arrow_forward_ios_rounded,
+                  size: 10, color: Colors.white38),
+              const SizedBox(width: 5)],
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontSize: total ? 13 : 12,
+                      fontWeight: total ? FontWeight.w700 : FontWeight.w400,
+                      color: total ? Colors.white : Colors.white70)),
+            ),
+          ]),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -1995,6 +2040,27 @@ class _HomeTabState extends State<_HomeTab>
                   color: Colors.white)),
         ),
       ]),
+    );
+
+    if (!clickable) return row;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        splashColor: color.withValues(alpha: 0.15),
+        highlightColor: color.withValues(alpha: 0.08),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SearchScreen(
+              initialType: typeFilter,
+              initialTransaction: transactionFilter,
+            ),
+          ),
+        ),
+        child: row,
+      ),
     );
   }
 }
