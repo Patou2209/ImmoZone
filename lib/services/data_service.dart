@@ -1204,20 +1204,38 @@ class DataService {
 
   Future<Map<String, dynamic>> getPublicStats() async {
     final props = await getActiveProperties();
-    final all = await getProperties();
+    final all   = await getProperties();
+    final now   = DateTime.now();
+
+    // Annonces fermées dans les 72 dernières heures (vendues ou louées/occupées)
+    final recentes = all.where((p) {
+      if (!(p.isSold || p.isRented)) return false;
+      if (p.updatedAt == null) return false;
+      return now.difference(p.updatedAt!).inHours < 72;
+    }).toList();
+
     return {
-      'maisonVente': props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
-      'maisonVendue': all.where((p) => p.type == 'Maison' && p.isSold).length,
-      'maisonLocation': props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
-      'terrainDispo': props.where((p) => p.type.contains('Terrain')).length,
-      'terrainVendu': all.where((p) => p.type.contains('Terrain') && p.isSold).length,
-      'parcelleDispo': props.where((p) => p.type == 'Parcelle').length,
-      'salleFetes': props.where((p) => p.type.contains('Salle')).length,
+      // ── Disponibilités (annonces actives) ──────────────────────────────────
+      'maisonVente':     props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
+      'maisonLocation':  props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
+      'terrainDispo':    props.where((p) => p.type.contains('Terrain')).length,
+      'parcelleDispo':   props.where((p) => p.type == 'Parcelle').length,
+      'salleFetes':      props.where((p) => p.type.contains('Salle')).length,
       'espaceFuneraire': props.where((p) => p.type.contains('Funer')).length,
-      'bureauLocation': props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
-      'appartVente': props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
-      'appartLocation': props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
-      'totalActif': props.length,
+      'bureauLocation':  props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
+      'appartVente':     props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
+      'appartLocation':  props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
+      'totalActif':      props.length,
+
+      // ── Historique 72h (vendus / occupés récemment) ──────────────────────
+      'hist72_maisonVendue':   recentes.where((p) => p.type == 'Maison' && p.isSold).length,
+      'hist72_maisonOccupee':  recentes.where((p) => p.type == 'Maison' && p.isRented).length,
+      'hist72_terrainVendu':   recentes.where((p) => p.type.contains('Terrain') && p.isSold).length,
+      'hist72_appartVendu':    recentes.where((p) => p.type.contains('Appartement') && p.isSold).length,
+      'hist72_appartOccupe':   recentes.where((p) => p.type.contains('Appartement') && p.isRented).length,
+      'hist72_bureauOccupe':   recentes.where((p) => p.type == 'Bureau' && p.isRented).length,
+      'hist72_salleOccupee':   recentes.where((p) => p.type.contains('Salle') && p.isRented).length,
+      'hist72_total':          recentes.length,
     };
   }
 

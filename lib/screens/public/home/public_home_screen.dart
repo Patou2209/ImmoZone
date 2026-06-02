@@ -1927,10 +1927,71 @@ class _HomeTabState extends State<_HomeTab>
 
   // ── STATS FOOTER ──────────────────────────────────────────────────────────
   Widget _buildStatsFooter() {
+    return Column(children: [
+      // ── Tableau 1 : Disponibilités ──────────────────────────────────────
+      _buildStatsCard(
+        icon: Icons.domain_rounded,
+        title: 'Marché Immobilier — Disponibilités',
+        tooltipMsg: 'Cliquez sur une catégorie pour filtrer les annonces',
+        rows: !_statsLoading ? [
+          _statRow('Maisons en vente',               _stats['maisonVente'] ?? 0,     AppTheme.accentColor,
+              typeFilter: 'Maison',              transactionFilter: 'Vente'),
+          _statRow('Maisons en location',            _stats['maisonLocation'] ?? 0,  const Color(0xFF4FC3F7),
+              typeFilter: 'Maison',              transactionFilter: 'Location'),
+          _statRow('Terrains disponibles',           _stats['terrainDispo'] ?? 0,    AppTheme.warningColor,
+              typeFilter: 'Terrain à bâtir',    transactionFilter: 'Vente'),
+          _statRow('Appartements en vente',          _stats['appartVente'] ?? 0,     AppTheme.accentColor,
+              typeFilter: 'Appartement / Flat',   transactionFilter: 'Vente'),
+          _statRow('Appartements en location',       _stats['appartLocation'] ?? 0,  const Color(0xFF4FC3F7),
+              typeFilter: 'Appartement / Flat',   transactionFilter: 'Location'),
+          _statRow('Bureaux en location',            _stats['bureauLocation'] ?? 0,  const Color(0xFFA0C4FF),
+              typeFilter: 'Bureau',              transactionFilter: 'Location'),
+          _statRow('Salles des fêtes disponibles',   _stats['salleFetes'] ?? 0,      Colors.purple.shade300,
+              typeFilter: 'Salle de Fêtes'),
+          _statRow('Espaces funéraires disponibles', _stats['espaceFuneraire'] ?? 0, Colors.blueGrey.shade300,
+              typeFilter: 'Espace Funéraire'),
+          const Divider(height: 1, color: Colors.white12),
+          _statRow('Total annonces actives',    _stats['totalActif'] ?? 0,  AppTheme.accentColor,
+              total: true),
+        ] : [],
+      ),
+
+      const SizedBox(height: 10),
+
+      // ── Tableau 2 : Historique 72h ──────────────────────────────────────
+      _buildStatsCard(
+        icon: Icons.history_rounded,
+        title: 'Historique des 72 dernières heures',
+        tooltipMsg: 'Biens vendus ou occupés au cours des 3 derniers jours',
+        headerColor: Colors.deepPurple.shade700,
+        rows: !_statsLoading ? [
+          _statRow('Maisons vendues',          _stats['hist72_maisonVendue'] ?? 0,  AppTheme.successColor),
+          _statRow('Maisons occupées',         _stats['hist72_maisonOccupee'] ?? 0, const Color(0xFF4FC3F7)),
+          _statRow('Terrains vendus',          _stats['hist72_terrainVendu'] ?? 0,  AppTheme.warningColor),
+          _statRow('Appartements vendus',      _stats['hist72_appartVendu'] ?? 0,   AppTheme.successColor),
+          _statRow('Appartements occupés',     _stats['hist72_appartOccupe'] ?? 0,  const Color(0xFF4FC3F7)),
+          _statRow('Bureaux occupés',          _stats['hist72_bureauOccupe'] ?? 0,  const Color(0xFFA0C4FF)),
+          _statRow('Salles occupées',          _stats['hist72_salleOccupee'] ?? 0,  Colors.purple.shade300),
+          const Divider(height: 1, color: Colors.white12),
+          _statRow('Total transactions récentes', _stats['hist72_total'] ?? 0,     Colors.amber.shade300,
+              total: true),
+        ] : [],
+      ),
+    ]);
+  }
+
+  // ── Carte stats réutilisable ─────────────────────────────────────────────
+  Widget _buildStatsCard({
+    required IconData icon,
+    required String title,
+    required String tooltipMsg,
+    required List<Widget> rows,
+    Color? headerColor,
+  }) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor,
+        color: headerColor ?? AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
       ),
@@ -1939,19 +2000,19 @@ class _HomeTabState extends State<_HomeTab>
         Padding(
           padding: const EdgeInsets.all(14),
           child: Row(children: [
-            // Icône professionnelle — immeuble/marché immobilier
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: AppTheme.accentColor.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.domain_rounded, color: AppTheme.accentColor, size: 18),
+              child: Icon(icon, color: AppTheme.accentColor, size: 18),
             ),
             const SizedBox(width: 10),
-            const Expanded(
-              child: Text('Marché Immobilier — Disponibilités',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(title,
+                  style: const TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
                       fontSize: 13, color: Colors.white)),
             ),
             if (_statsLoading)
@@ -1959,39 +2020,15 @@ class _HomeTabState extends State<_HomeTab>
                   child: CircularProgressIndicator(color: AppTheme.accentColor, strokeWidth: 2))
             else
               Tooltip(
-                message: 'Cliquez sur une catégorie pour filtrer les annonces',
-                child: Icon(Icons.touch_app_rounded,
+                message: tooltipMsg,
+                child: Icon(Icons.info_outline_rounded,
                     color: AppTheme.accentColor.withValues(alpha: 0.7), size: 16),
               ),
           ]),
         ),
-        if (!_statsLoading) ...[
+        if (!_statsLoading && rows.isNotEmpty) ...[
           const Divider(height: 1, color: Colors.white12),
-          // ── Rangées cliquables — type + transaction ─────────────────────────
-          _statRow('Maisons en vente',               _stats['maisonVente'] ?? 0,     AppTheme.accentColor,
-              typeFilter: 'Maison',              transactionFilter: 'Vente'),
-          _statRow('Maisons en location',            _stats['maisonLocation'] ?? 0,  const Color(0xFF4FC3F7),
-              typeFilter: 'Maison',              transactionFilter: 'Location'),
-          _statRow('Maisons vendues',                _stats['maisonVendue'] ?? 0,    AppTheme.successColor,
-              typeFilter: 'Maison',              transactionFilter: 'Vente'),
-          _statRow('Terrains disponibles',           _stats['terrainDispo'] ?? 0,    AppTheme.warningColor,
-              typeFilter: 'Terrain \u00e0 b\u00e2tir',      transactionFilter: 'Vente'),
-          _statRow('Terrains vendus',                _stats['terrainVendu'] ?? 0,    AppTheme.successColor,
-              typeFilter: 'Terrain \u00e0 b\u00e2tir',      transactionFilter: 'Vente'),
-          _statRow('Appartements en vente',          _stats['appartVente'] ?? 0,     AppTheme.accentColor,
-              typeFilter: 'Appartement / Flat',   transactionFilter: 'Vente'),
-          _statRow('Appartements en location',       _stats['appartLocation'] ?? 0,  const Color(0xFF4FC3F7),
-              typeFilter: 'Appartement / Flat',   transactionFilter: 'Location'),
-          _statRow('Bureaux en location',            _stats['bureauLocation'] ?? 0,  const Color(0xFFA0C4FF),
-              typeFilter: 'Bureau',              transactionFilter: 'Location'),
-          _statRow('Salles des f\u00eates disponibles',   _stats['salleFetes'] ?? 0,     Colors.purple.shade300,
-              typeFilter: 'Salle de F\u00eates'),
-          _statRow('Espaces fun\u00e9raires disponibles', _stats['espaceFuneraire'] ?? 0, Colors.blueGrey.shade300,
-              typeFilter: 'Espace Fun\u00e9raire'),
-          const Divider(height: 1, color: Colors.white12),
-          // Ligne total — non cliquable
-          _statRow('Total annonces actives',    _stats['totalActif'] ?? 0,       AppTheme.accentColor,
-              total: true),
+          ...rows,
           const SizedBox(height: 8),
         ],
       ]),

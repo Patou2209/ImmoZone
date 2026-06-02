@@ -269,31 +269,101 @@ class _LoginScreenState extends State<LoginScreen> {
                           }
                           setSB(() => isSending = true);
 
-                          // ── Incrémenter le compteur de tentatives ────────────
+                          final auth = context.read<AuthProvider>();
+
+                          // ── ÉTAPE 0 : vérifier si le numéro a un compte ──────
+                          // sendOtpForPasswordReset() retourne false immédiatement
+                          // si aucun compte Firestore n'est associé à ce numéro.
+                          // On intercepte ce cas AVANT d'envoyer quoi que ce soit.
+                          bool accountExists = true;
+                          // Pré-vérification légère : on tente l'envoi et on
+                          // capture le retour false = compte inexistant.
+                          final completerPre = Completer<String?>();
+                          final sentOk = await auth.sendOtpForPasswordReset(
+                            fullPhone: full,
+                            onCodeSent: (vId, _) {
+                              if (!completerPre.isCompleted) completerPre.complete(vId);
+                            },
+                            onFailed: (FirebaseAuthException e) {
+                              if (!completerPre.isCompleted) completerPre.complete(null);
+                            },
+                          );
+
+                          if (!sentOk) {
+                            // Numéro inconnu — alerte immédiate, pas d'OTP envoyé
+                            accountExists = false;
+                            if (ctx.mounted) setSB(() => isSending = false);
+                            if (ctx.mounted) {
+                              await showDialog<void>(
+                                context: ctx,
+                                builder: (dCtx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  title: Row(children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.errorColor.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.person_off_outlined,
+                                          color: AppTheme.errorColor, size: 22),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Flexible(
+                                      child: Text('Aucun compte trouvé',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16)),
+                                    ),
+                                  ]),
+                                  content: const Text(
+                                    'Aucun compte ImmoZone n\'est associé à ce numéro de téléphone.\n\n'
+                                    'Vérifiez le numéro saisi ou créez un nouveau compte.',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 13,
+                                        height: 1.5),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(dCtx).pop(),
+                                      child: const Text('Fermer',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              color: AppTheme.textSecondary)),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.of(dCtx).pop();
+                                        Navigator.of(ctx).pop(null);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.primaryColor,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      child: const Text('Créer un compte',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          // ── Compte trouvé : incrémenter tentatives + attendre OTP ──
                           _otpAttemptCount++;
                           final remainingAttempts =
                               _maxOtpAttempts - _otpAttemptCount;
 
-                          // ── Completer : attend le vrai callback Firebase ─────
-                          // verifyPhoneNumber() retourne immédiatement ;
-                          // onCodeSent / onFailed arrivent en callback asynchrone.
-                          final completer = Completer<String?>();
-
-                          final auth = context.read<AuthProvider>();
-                          await auth.sendOtpForPasswordReset(
-                            fullPhone: full,
-                            onCodeSent: (vId, _) {
-                              // Firebase a envoyé le SMS → on résout le completer
-                              if (!completer.isCompleted) completer.complete(vId);
-                            },
-                            onFailed: (FirebaseAuthException e) {
-                              // Échec → on résout avec null
-                              if (!completer.isCompleted) completer.complete(null);
-                            },
-                          );
-
                           // Attendre que Firebase appelle le callback (max 120 s)
-                          final vId = await completer.future.timeout(
+                          final vId = await completerPre.future.timeout(
                             const Duration(seconds: 120),
                             onTimeout: () => null,
                           );
@@ -301,7 +371,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (!ctx.mounted) return;
                           setSB(() => isSending = false);
 
-                          if (vId != null) {
+                          if (vId != null && accountExists) {
                             // Succès : réinitialiser le compteur
                             _otpAttemptCount = 0;
                             _otpBlockedUntil = null;

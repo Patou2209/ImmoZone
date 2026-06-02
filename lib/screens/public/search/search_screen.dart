@@ -123,11 +123,17 @@ class _SearchScreenState extends State<SearchScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('Rechercher',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                color: Colors.white)),
         backgroundColor: AppTheme.primaryColor,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
+            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list,
+                color: Colors.white),
             onPressed: () => setState(() => _showFilters = !_showFilters),
             tooltip: 'Filtres',
           ),

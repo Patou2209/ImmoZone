@@ -57,6 +57,9 @@ class PropertyModel {
   // Terrain à bâtir — dimensions individuelles
   final double? longueurM;         // longueur en mètres
   final double? largeurM;          // largeur en mètres
+  // Période de tarification pour Appartement/Flat en location
+  // 'mensuel' (défaut) | 'journalier'
+  final String pricePeriod;
 
   PropertyModel({
     required this.id,
@@ -64,6 +67,7 @@ class PropertyModel {
     required this.description,
     required this.type,
     required this.transactionType,
+    this.pricePeriod = 'mensuel',
     required this.price,
     this.currency = 'USD',
     this.country = 'Congo (RDC)',
@@ -179,6 +183,7 @@ class PropertyModel {
     commissionPct: commissionPct ?? this.commissionPct,
     longueurM: longueurM ?? this.longueurM,
     largeurM: largeurM ?? this.largeurM,
+    pricePeriod: pricePeriod ?? this.pricePeriod,
   );
 
   Map<String, dynamic> toMap() => {
@@ -206,6 +211,7 @@ class PropertyModel {
     'minLeaseDuration': minLeaseDuration, 'garantieMois': garantieMois,
     'hasCommission': hasCommission, 'commissionPct': commissionPct,
     'longueurM': longueurM, 'largeurM': largeurM,
+    'pricePeriod': pricePeriod,
   };
 
   factory PropertyModel.fromMap(Map<String, dynamic> m) => PropertyModel(
@@ -251,6 +257,7 @@ class PropertyModel {
     commissionPct: m['commissionPct']?.toDouble(),
     longueurM: m['longueurM']?.toDouble(),
     largeurM: m['largeurM']?.toDouble(),
+    pricePeriod: m['pricePeriod'] ?? 'mensuel',
   );
 
   // Prix complet sans abréviation (1000 USD, pas 1K USD)
@@ -259,6 +266,15 @@ class PropertyModel {
       return '${price.toInt()} $currency';
     }
     return '${price.toStringAsFixed(0)} $currency';
+  }
+
+  // Libellé de période pour Appartement/Flat en location
+  String get pricePeriodLabel {
+    if (transactionType == 'Location' && type.contains('Appartement')) {
+      return pricePeriod == 'journalier' ? '/ jour' : '/ mois';
+    }
+    if (transactionType == 'Location') return '/ mois';
+    return '';
   }
 
   String get mainImage {

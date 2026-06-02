@@ -615,7 +615,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                p.type == 'Espace Funéraire' ||
                                p.type == 'Salle Polyvalente')
                                 ? 'par jour'
-                                : 'par mois',
+                                // Appartement : respecte le choix mensuel/journalier
+                                : p.type.contains('Appartement')
+                                    ? (p.pricePeriod == 'journalier' ? 'par jour' : 'par mois')
+                                    : 'par mois',
                           style: const TextStyle(
                               fontSize: 12,
                               color: AppTheme.textSecondary,

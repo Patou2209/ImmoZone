@@ -74,6 +74,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   int _garantieMois = 0;           // 0 = pas de garantie
   bool _hasCommission = false;
   final _commissionPctCtrl = TextEditingController();
+  // Période de tarification Appartement/Flat en location
+  // 'mensuel' | 'journalier'
+  String _pricePeriod = 'mensuel';
 
   // ── Étape 2 — Images ──────────────────────────────────────────────────────
   // Photo principale (obligatoire) + 3 photos secondaires (obligatoires) = 4 exactement
@@ -119,6 +122,114 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     if (_selectedCountry == 'Rwanda') return 'RWF';
     if (_selectedCountry == 'Burundi') return 'BIF';
     return 'USD';
+  }
+
+  // ── Champ prix Appartement/Flat en location (mensuel ou journalier) ─────────
+  Widget _buildAppartPriceField() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Sélecteur de période
+        Row(children: [
+          const Icon(Icons.monetization_on_outlined,
+              color: AppTheme.accentColor, size: 18),
+          const SizedBox(width: 8),
+          const Text('Période de tarification',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary)),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          _periodChip('mensuel', 'Tarif mensuel', Icons.calendar_month_outlined),
+          const SizedBox(width: 10),
+          _periodChip('journalier', 'Tarif journalier', Icons.today_outlined),
+        ]),
+        const SizedBox(height: 10),
+        // Champ montant
+        TextField(
+          controller: _priceCtrl,
+          keyboardType: TextInputType.number,
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+          decoration: InputDecoration(
+            labelText: _pricePeriod == 'journalier'
+                ? 'Tarif journalier *'
+                : 'Tarif mensuel *',
+            hintText: '0',
+            prefixIcon: const Icon(Icons.monetization_on_outlined,
+                color: AppTheme.accentColor, size: 18),
+            suffix: _currencyDropdown(),
+            filled: true,
+            fillColor: Colors.white,
+            labelStyle: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: AppTheme.textSecondary),
+            hintStyle: const TextStyle(
+                fontFamily: 'Poppins',
+                color: AppTheme.textHint,
+                fontSize: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.dividerColor)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppTheme.accentColor, width: 2)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.dividerColor)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _periodChip(String value, String label, IconData icon) {
+    final bool selected = _pricePeriod == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _pricePeriod = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.accentColor
+                : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? AppTheme.accentColor : AppTheme.dividerColor,
+              width: selected ? 2 : 1,
+            ),
+            boxShadow: selected
+                ? [BoxShadow(
+                    color: AppTheme.accentColor.withValues(alpha: 0.25),
+                    blurRadius: 6, offset: const Offset(0, 3))]
+                : [],
+          ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon,
+                size: 16,
+                color: selected ? Colors.white : AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label,
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? Colors.white : AppTheme.textSecondary),
+                  overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+        ),
+      ),
+    );
   }
 
   /// Label du champ prix en mode Location selon le type de bien :
@@ -549,6 +660,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         garantieMois: _garantieMois > 0 ? _garantieMois : null,
         hasCommission: _hasCommission,
         commissionPct: _hasCommission ? double.tryParse(_commissionPctCtrl.text.trim()) : null,
+        pricePeriod: _selectedTransaction == 'Location' && _selectedType.contains('Appartement')
+            ? _pricePeriod
+            : 'mensuel',
         images: finalImages,
         ownerId: user.id,
         ownerName: ownerName,
@@ -866,12 +980,19 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         //                   Tarif (Salle de Fêtes/Chambre hôtel/Espace Funéraire/Salle Polyvalente)
         // Vente           : Prix
         _selectedType == 'Chambre d\'hôtel'
-            ? _field(_priceCtrl, 'Prix par nuitée (USD) *', Icons.nights_stay_outlined, '0',
+            ? _field(_priceCtrl, 'Prix par nuitée *', Icons.nights_stay_outlined, '0',
                 type: TextInputType.number, suffix: _currencyDropdown())
-            : _field(_priceCtrl,
-                _selectedTransaction == 'Location' ? _priceLabelForLocation : 'Prix *',
-                Icons.attach_money, '0',
-                type: TextInputType.number, suffix: _currencyDropdown()),
+            : _selectedTransaction == 'Location' && _selectedType.contains('Appartement')
+                // ── Appartement en location : sélecteur Mensuel / Journalier ──
+                ? _buildAppartPriceField()
+                : _field(_priceCtrl,
+                    _selectedTransaction == 'Location'
+                        ? (_priceLabelForLocation == 'Loyer *'
+                            ? 'Loyer mensuel *'
+                            : _priceLabelForLocation)
+                        : 'Prix *',
+                    Icons.monetization_on_outlined, '0',
+                    type: TextInputType.number, suffix: _currencyDropdown()),
 
         // ── Description ────────────────────────────────────────────────────
         _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
