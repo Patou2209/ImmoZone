@@ -601,6 +601,37 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 // Price + Views
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    // Pour Appartement avec les deux tarifs, affichage spécial
+                    if (p.type.contains('Appartement') &&
+                        p.transactionType == 'Location' &&
+                        p.pricePeriod == 'both' &&
+                        p.pricePerDay != null) ...[
+                      // Tarif mensuel
+                      RichText(text: TextSpan(children: [
+                        TextSpan(
+                            text: p.formattedPrice,
+                            style: const TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.w800,
+                                color: AppTheme.accentColor, fontFamily: 'Poppins')),
+                        const TextSpan(
+                            text: ' / mois',
+                            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary,
+                                fontFamily: 'Poppins')),
+                      ])),
+                      const SizedBox(height: 2),
+                      // Tarif journalier
+                      RichText(text: TextSpan(children: [
+                        TextSpan(
+                            text: '${p.pricePerDay!.toInt()} ${p.currency}',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w700,
+                                color: Colors.orange.shade600, fontFamily: 'Poppins')),
+                        const TextSpan(
+                            text: ' / jour',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary,
+                                fontFamily: 'Poppins')),
+                      ])),
+                    ] else ...[
                     Text(p.formattedPrice,
                         style: const TextStyle(
                             fontSize: 26,
@@ -615,7 +646,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                p.type == 'Espace Funéraire' ||
                                p.type == 'Salle Polyvalente')
                                 ? 'par jour'
-                                // Appartement : respecte le choix mensuel/journalier
                                 : p.type.contains('Appartement')
                                     ? (p.pricePeriod == 'journalier' ? 'par jour' : 'par mois')
                                     : 'par mois',
@@ -696,6 +726,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                       ],
                     ],
+                    ], // ferme le bloc else du prix appartement both
                   ]),
                   Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                     Row(children: [

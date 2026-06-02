@@ -1962,16 +1962,24 @@ class _HomeTabState extends State<_HomeTab>
       _buildStatsCard(
         icon: Icons.history_rounded,
         title: 'Historique des 72 dernières heures',
-        tooltipMsg: 'Biens vendus ou occupés au cours des 3 derniers jours',
-        headerColor: Colors.deepPurple.shade700,
+        tooltipMsg: 'Biens vendus ou occupés — cliquez pour voir les annonces',
+        headerColor: const Color(0xFFE65100), // orange foncé professionnel
+        accentIconColor: Colors.orange.shade300,
         rows: !_statsLoading ? [
-          _statRow('Maisons vendues',          _stats['hist72_maisonVendue'] ?? 0,  AppTheme.successColor),
-          _statRow('Maisons occupées',         _stats['hist72_maisonOccupee'] ?? 0, const Color(0xFF4FC3F7)),
-          _statRow('Terrains vendus',          _stats['hist72_terrainVendu'] ?? 0,  AppTheme.warningColor),
-          _statRow('Appartements vendus',      _stats['hist72_appartVendu'] ?? 0,   AppTheme.successColor),
-          _statRow('Appartements occupés',     _stats['hist72_appartOccupe'] ?? 0,  const Color(0xFF4FC3F7)),
-          _statRow('Bureaux occupés',          _stats['hist72_bureauOccupe'] ?? 0,  const Color(0xFFA0C4FF)),
-          _statRow('Salles occupées',          _stats['hist72_salleOccupee'] ?? 0,  Colors.purple.shade300),
+          _statRow('Maisons vendues',          _stats['hist72_maisonVendue'] ?? 0,  Colors.orange.shade300,
+              typeFilter: 'Maison',          transactionFilter: 'Vente'),
+          _statRow('Maisons occupées',         _stats['hist72_maisonOccupee'] ?? 0, Colors.amber.shade300,
+              typeFilter: 'Maison',          transactionFilter: 'Location'),
+          _statRow('Terrains vendus',          _stats['hist72_terrainVendu'] ?? 0,  Colors.orange.shade200,
+              typeFilter: 'Terrain à bâtir', transactionFilter: 'Vente'),
+          _statRow('Appartements vendus',      _stats['hist72_appartVendu'] ?? 0,   Colors.orange.shade300,
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Vente'),
+          _statRow('Appartements occupés',     _stats['hist72_appartOccupe'] ?? 0,  Colors.amber.shade300,
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Location'),
+          _statRow('Bureaux occupés',          _stats['hist72_bureauOccupe'] ?? 0,  Colors.orange.shade200,
+              typeFilter: 'Bureau',          transactionFilter: 'Location'),
+          _statRow('Salles occupées',          _stats['hist72_salleOccupee'] ?? 0,  Colors.amber.shade200,
+              typeFilter: 'Salle de Fêtes'),
           const Divider(height: 1, color: Colors.white12),
           _statRow('Total transactions récentes', _stats['hist72_total'] ?? 0,     Colors.amber.shade300,
               total: true),
@@ -1987,13 +1995,15 @@ class _HomeTabState extends State<_HomeTab>
     required String tooltipMsg,
     required List<Widget> rows,
     Color? headerColor,
+    Color? accentIconColor,
   }) {
+    final Color iconColor = accentIconColor ?? AppTheme.accentColor;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
       decoration: BoxDecoration(
         color: headerColor ?? AppTheme.primaryColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+        border: Border.all(color: iconColor.withValues(alpha: 0.4)),
       ),
       child: Column(children: [
         // En-tête
@@ -2003,10 +2013,10 @@ class _HomeTabState extends State<_HomeTab>
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AppTheme.accentColor.withValues(alpha: 0.18),
+                color: iconColor.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: AppTheme.accentColor, size: 18),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -2016,13 +2026,13 @@ class _HomeTabState extends State<_HomeTab>
                       fontSize: 13, color: Colors.white)),
             ),
             if (_statsLoading)
-              const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(color: AppTheme.accentColor, strokeWidth: 2))
+              SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(color: iconColor, strokeWidth: 2))
             else
               Tooltip(
                 message: tooltipMsg,
-                child: Icon(Icons.info_outline_rounded,
-                    color: AppTheme.accentColor.withValues(alpha: 0.7), size: 16),
+                child: Icon(Icons.touch_app_rounded,
+                    color: iconColor.withValues(alpha: 0.8), size: 16),
               ),
           ]),
         ),
@@ -2281,6 +2291,8 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                 color: Colors.white)),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
           IconButton(

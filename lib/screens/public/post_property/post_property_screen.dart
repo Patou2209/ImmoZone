@@ -124,109 +124,111 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return 'USD';
   }
 
-  // ── Champ prix Appartement/Flat en location (mensuel ou journalier) ─────────
+  // ── Deux champs prix simultanés pour Appartement/Flat en location ───────────
+  // L'annonceur peut renseigner l'un ou l'autre ou les deux.
+  // _priceCtrl      → tarif mensuel  (price dans le modèle)
+  // _pricePerDayCtrl → tarif journalier (pricePerDay dans le modèle)
+  // pricePeriod est auto-calculé selon ce qui est rempli.
   Widget _buildAppartPriceField() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Sélecteur de période
-        Row(children: [
-          const Icon(Icons.monetization_on_outlined,
-              color: AppTheme.accentColor, size: 18),
-          const SizedBox(width: 8),
-          const Text('Période de tarification',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textSecondary)),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          _periodChip('mensuel', 'Tarif mensuel', Icons.calendar_month_outlined),
-          const SizedBox(width: 10),
-          _periodChip('journalier', 'Tarif journalier', Icons.today_outlined),
-        ]),
-        const SizedBox(height: 10),
-        // Champ montant
-        TextField(
-          controller: _priceCtrl,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-          decoration: InputDecoration(
-            labelText: _pricePeriod == 'journalier'
-                ? 'Tarif journalier *'
-                : 'Tarif mensuel *',
-            hintText: '0',
-            prefixIcon: const Icon(Icons.monetization_on_outlined,
-                color: AppTheme.accentColor, size: 18),
-            suffix: _currencyDropdown(),
-            filled: true,
-            fillColor: Colors.white,
-            labelStyle: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                color: AppTheme.textSecondary),
-            hintStyle: const TextStyle(
-                fontFamily: 'Poppins',
-                color: AppTheme.textHint,
-                fontSize: 12),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.dividerColor)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    const BorderSide(color: AppTheme.accentColor, width: 2)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.dividerColor)),
+        // En-tête section
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppTheme.accentColor.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
           ),
+          child: Row(children: [
+            const Icon(Icons.monetization_on_outlined,
+                color: AppTheme.accentColor, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Tarification — Appartement / Flat',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.accentColor)),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 6),
+        // Sous-label explicatif
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 10),
+          child: Text(
+            'Renseignez un ou les deux tarifs selon votre offre.',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                color: AppTheme.textHint),
+          ),
+        ),
+
+        // ── Input 1 : Tarif mensuel ──────────────────────────────────────────
+        _appartPriceInput(
+          ctrl: _priceCtrl,
+          label: 'Tarif mensuel',
+          hint: 'ex : 500',
+          icon: Icons.calendar_month_outlined,
+          accentColor: AppTheme.accentColor,
+        ),
+
+        // ── Input 2 : Tarif journalier ───────────────────────────────────────
+        _appartPriceInput(
+          ctrl: _pricePerDayCtrl,
+          label: 'Tarif journalier',
+          hint: 'ex : 30',
+          icon: Icons.today_outlined,
+          accentColor: Colors.orange.shade600,
         ),
       ]),
     );
   }
 
-  Widget _periodChip(String value, String label, IconData icon) {
-    final bool selected = _pricePeriod == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _pricePeriod = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.accentColor
-                : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? AppTheme.accentColor : AppTheme.dividerColor,
-              width: selected ? 2 : 1,
-            ),
-            boxShadow: selected
-                ? [BoxShadow(
-                    color: AppTheme.accentColor.withValues(alpha: 0.25),
-                    blurRadius: 6, offset: const Offset(0, 3))]
-                : [],
-          ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(icon,
-                size: 16,
-                color: selected ? Colors.white : AppTheme.textSecondary),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(label,
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : AppTheme.textSecondary),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ]),
+  // Champ prix individuel pour appartement avec couleur d'accent configurable
+  Widget _appartPriceInput({
+    required TextEditingController ctrl,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required Color accentColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: ctrl,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        decoration: InputDecoration(
+          labelText: '$label (optionnel)',
+          hintText: hint,
+          prefixIcon: Icon(icon, color: accentColor, size: 18),
+          suffix: _currencyDropdown(),
+          filled: true,
+          fillColor: Colors.white,
+          labelStyle: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              color: accentColor.withValues(alpha: 0.8)),
+          hintStyle: const TextStyle(
+              fontFamily: 'Poppins',
+              color: AppTheme.textHint,
+              fontSize: 12),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: accentColor.withValues(alpha: 0.4))),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: accentColor, width: 2)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: accentColor.withValues(alpha: 0.3))),
         ),
       ),
     );
@@ -405,7 +407,18 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         _err('Nombre de lits obligatoire pour une Chambre d\'h\u00f4tel'); return false;
       }
     }
-    if (_priceCtrl.text.trim().isEmpty) { _err('Prix requis'); return false; }
+    // Pour Appartement/Flat en location, au moins un des deux tarifs est requis
+    if (_selectedTransaction == 'Location' && _selectedType.contains('Appartement')) {
+      final mensuel    = _priceCtrl.text.trim();
+      final journalier = _pricePerDayCtrl.text.trim();
+      if (mensuel.isEmpty && journalier.isEmpty) {
+        _err('Veuillez renseigner au moins un tarif (mensuel ou journalier)');
+        return false;
+      }
+    } else if (_selectedType != 'Chambre d\'hôtel' && _priceCtrl.text.trim().isEmpty) {
+      _err('Prix requis');
+      return false;
+    }
     // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
     if (_selectedType == 'Salle de Fêtes' || _selectedType == 'Salle Polyvalente') {
       if (_capacityCtrl.text.trim().isEmpty || int.tryParse(_capacityCtrl.text.trim()) == null) {
@@ -660,9 +673,17 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         garantieMois: _garantieMois > 0 ? _garantieMois : null,
         hasCommission: _hasCommission,
         commissionPct: _hasCommission ? double.tryParse(_commissionPctCtrl.text.trim()) : null,
-        pricePeriod: _selectedTransaction == 'Location' && _selectedType.contains('Appartement')
-            ? _pricePeriod
-            : 'mensuel',
+        // Pour Appartement/Flat: pricePeriod reflète ce qui est rempli
+        // Si les deux sont remplis → 'both' | un seul → 'mensuel' ou 'journalier'
+        pricePeriod: () {
+          if (_selectedTransaction == 'Location' && _selectedType.contains('Appartement')) {
+            final hasMensuel    = _priceCtrl.text.trim().isNotEmpty;
+            final hasJournalier = _pricePerDayCtrl.text.trim().isNotEmpty;
+            if (hasMensuel && hasJournalier) return 'both';
+            if (hasJournalier) return 'journalier';
+          }
+          return 'mensuel';
+        }(),
         images: finalImages,
         ownerId: user.id,
         ownerName: ownerName,
