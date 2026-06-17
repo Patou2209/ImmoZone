@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../providers/property_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/property_card.dart';
+import '../../../core/widgets/ad_banner_card.dart';
 import '../../../services/data_service.dart';
+import '../../../models/property_model.dart';
+import '../../../models/ad_model.dart';
 import '../property_detail/property_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialType;
   final String? initialTransaction;
+  /// Quand true : charge uniquement les annonces vendues/occupées (72h)
+  /// et interdit de mélanger avec les disponibilités.
+  final bool initialHistorique;
 
-  const SearchScreen({super.key, this.initialType, this.initialTransaction});
+  const SearchScreen({
+    super.key,
+    this.initialType,
+    this.initialTransaction,
+    this.initialHistorique = false,
+  });
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -31,6 +43,9 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _showFilters = false;
   bool _hasSearched = false; // masque "aucune annonce" tant qu'aucune requête envoyée
   List<String> _favorites = [];
+  List<AdModel> _liveAds = [];
+  int _adRotationIndex = 0;
+  static const _kAdRotKey = 'ad_rotation_index';
   final DataService _dataService = DataService();
 
   // Listes dynamiques
@@ -64,7 +79,11 @@ class _SearchScreenState extends State<SearchScreen> {
     // Pré-remplir les filtres si fournis depuis le dashboard stats
     if (widget.initialType != null) _selectedType = widget.initialType;
     if (widget.initialTransaction != null) _selectedTransaction = widget.initialTransaction;
-    context.read<PropertyProvider>().loadProperties();
+    if (widget.initialHistorique) {
+      context.read<PropertyProvider>().loadHistoriqueProperties();
+    } else {
+      context.read<PropertyProvider>().loadProperties();
+    }
     _loadFavorites();
     // Appliquer les filtres initiaux automatiquement après le premier frame
     if (widget.initialType != null || widget.initialTransaction != null) {
@@ -81,6 +100,13 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _loadFavorites() async {
     final favs = await _dataService.getFavorites();
     if (mounted) setState(() => _favorites = favs);
+    final ads = await _dataService.getLiveAds();
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt(_kAdRotKey) ?? 0;
+    if (mounted) setState(() {
+      _liveAds = ads;
+      _adRotationIndex = savedIndex;
+    });
   }
 
   Future<void> _toggleFavorite(String id) async {
@@ -143,6 +169,29 @@ class _SearchScreenState extends State<SearchScreen> {
         top: false,
         child: Column(
         children: [
+          // ── Bandeau Historique 72h (visible uniquement en mode historique) ────
+          if (widget.initialHistorique)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              color: const Color(0xFFE65100),
+              child: Row(children: [
+                const Icon(Icons.history_rounded, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Annonces vendues / occupées — 72 dernières heures',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+
           // ── Barre de recherche ──────────────────────────────────────────────
           Container(
             color: AppTheme.accentColor,
@@ -378,52 +427,195 @@ class _SearchScreenState extends State<SearchScreen> {
                           ],
                         ),
                       )
-                    : properties.isEmpty
-                        // Recherche lancée mais aucun résultat
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
-                                const SizedBox(height: 12),
-                                const Text('Aucun résultat trouvé',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
-                                        fontFamily: 'Poppins', color: AppTheme.textSecondary)),
-                                const SizedBox(height: 8),
-                                const Text("Essayez d'autres critères de recherche",
-                                    style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
-                                        color: AppTheme.textHint)),
-                                const SizedBox(height: 16),
-                                TextButton(
-                                  onPressed: _clearFilters,
-                                  child: const Text('Effacer les filtres',
-                                      style: TextStyle(fontFamily: 'Poppins', color: AppTheme.accentColor)),
-                                ),
-                              ],
-                            ),
-                          )
-                        // Résultats
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: properties.length,
-                            itemBuilder: (ctx, i) {
-                              final p = properties[i];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: PropertyCard(
-                                  property: p,
-                                  isFavorite: _favorites.contains(p.id),
-                                  onFavorite: () => _toggleFavorite(p.id),
-                                  onTap: () => Navigator.push(context,
-                                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
-                                ),
-                              );
-                            },
-                          ),
+                    : _buildSearchResults(context, provider, properties),
           ),
         ],
         ),
       ),
+    );
+  }
+
+  /// Construit la vue des résultats avec la section "Offres Spéciales" en tête
+  Widget _buildSearchResults(BuildContext context, PropertyProvider provider, List<PropertyModel> properties) {
+    // Annonces boostées filtrées selon les critères courants
+    final boosted = provider.getBoostedProperties(
+      transactionType: _selectedTransaction,
+      propertyType: _selectedType,
+      country: _selectedCountry,
+      province: _selectedProvince,
+      city: _selectedCity,
+      commune: _selectedCommune,
+    );
+
+    if (properties.isEmpty && boosted.isEmpty) {
+      // Aucun résultat du tout
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 64, color: Colors.grey[300]),
+            const SizedBox(height: 12),
+            const Text('Aucun résultat trouvé',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins', color: AppTheme.textSecondary)),
+            const SizedBox(height: 8),
+            const Text("Essayez d'autres critères de recherche",
+                style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                    color: AppTheme.textHint)),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _clearFilters,
+              child: const Text('Effacer les filtres',
+                  style: TextStyle(fontFamily: 'Poppins', color: AppTheme.accentColor)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        // ── Section Offres Spéciales ──────────────────────────────────────
+        if (boosted.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          _buildBoostSectionHeader(
+            icon: Icons.workspace_premium_rounded,
+            label: 'Offres Spéciales',
+            color: const Color(0xFFE65100),
+          ),
+          const SizedBox(height: 8),
+          ...boosted.map((p) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: PropertyCard(
+                  property: p,
+                  isFavorite: _favorites.contains(p.id),
+                  onFavorite: () => _toggleFavorite(p.id),
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+                ),
+              )),
+          // Séparateur entre boostées et normales
+          if (properties.isNotEmpty)
+            _buildBoostSectionDivider(),
+        ],
+
+        // ── Titre section normale (si boostées visibles) ──────────────────
+        if (boosted.isNotEmpty && properties.isNotEmpty) ...[
+          _buildBoostSectionHeader(
+            icon: Icons.home_work_rounded,
+            label: 'Toutes les annonces',
+            color: AppTheme.primaryColor,
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        // ── Liste normale avec publicités intercalées ────────────────────
+        ..._buildNormalListWithAds(context, properties),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  /// Construit la liste normale en intercalant 1 ou 2 publicités
+  /// selon la même règle que HomeTab :
+  ///   • 0–4 annonces → 1 pub en dernière position
+  ///   • 5+ annonces  → 2 pubs : position 4 + dernière
+  ///
+  /// L'index de rotation est partagé avec HomeTab (même clé SharedPrefs).
+  List<Widget> _buildNormalListWithAds(BuildContext context, List<PropertyModel> properties) {
+    final widgets = <Widget>[];
+    final n = properties.length;
+
+    // Liste simple si pas de pubs
+    if (_liveAds.isEmpty) {
+      for (final p in properties) {
+        widgets.add(_propertyPadding(context, p));
+      }
+      return widgets;
+    }
+
+    final totalAds = _liveAds.length;
+    final twoAds = n >= 5;
+
+    final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
+    final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
+
+    // Avancer l'index (partagé avec HomeTab via SharedPrefs)
+    final next = (_adRotationIndex + (twoAds ? 2 : 1)) % totalAds;
+    SharedPreferences.getInstance().then((p) => p.setInt(_kAdRotKey, next));
+
+    for (int i = 0; i < n; i++) {
+      widgets.add(_propertyPadding(context, properties[i]));
+      // Pub après la 4e annonce si twoAds
+      if (twoAds && i == 3) {
+        widgets.add(AdBannerCard(
+            key: ValueKey('ads_first_${adFirst.id}'), ad: adFirst));
+      }
+    }
+
+    // Pub en dernière position
+    final AdModel adLast = twoAds ? adSecond : adFirst;
+    widgets.add(AdBannerCard(
+        key: ValueKey('ads_last_${adLast.id}'), ad: adLast));
+
+    return widgets;
+  }
+
+  Widget _propertyPadding(BuildContext context, PropertyModel p) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: PropertyCard(
+        property: p,
+        isFavorite: _favorites.contains(p.id),
+        onFavorite: () => _toggleFavorite(p.id),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+      ),
+    );
+  }
+
+  Widget _buildBoostSectionHeader({required IconData icon, required String label, required Color color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, color.withValues(alpha: 0.75)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Colors.white,
+              )),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildBoostSectionDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Expanded(child: Container(height: 1, color: const Color(0xFFE4E8F0))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('Annonces disponibles',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: Colors.grey[400], fontWeight: FontWeight.w500)),
+        ),
+        Expanded(child: Container(height: 1, color: const Color(0xFFE4E8F0))),
+      ]),
     );
   }
 

@@ -7,6 +7,7 @@ import '../models/property_model.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
 import '../models/quota_model.dart';
+import '../models/ad_model.dart';
 
 import '../models/payment_model.dart';
 import '../models/credit_model.dart';
@@ -37,6 +38,7 @@ class DataService {
   CollectionReference get _logsCol => _db.collection('audit_logs');
   CollectionReference get _quotasCol => _db.collection('quotas');
   DocumentReference get _settingsDoc => _db.collection('config').doc('system_settings');
+  CollectionReference get _adsCol => _db.collection('ads');
   DocumentReference get _zonesDoc => _db.collection('config').doc('geographic_zones');
   DocumentReference get _zonesConfigDoc => _db.collection('config').doc('zones_config');
   DocumentReference get _paymentMethodsDoc => _db.collection('config').doc('payment_methods');
@@ -824,12 +826,30 @@ class DataService {
     }
   }
 
-  Future<void> boostProperty(String id, String boostType) async {
-    final duration = boostType == 'semaine' ? 7 : 30;
+  /// Active le boost sur une annonce.
+  /// [boostLevel] : 1=Standard, 2=Premium, 3=VIP
+  /// [days]       : durée en jours (7, 15 ou 30)
+  Future<void> boostProperty(String id, {
+    required int boostLevel,
+    required int days,
+  }) async {
+    final boostType = days <= 7 ? 'semaine' : days <= 15 ? '15jours' : 'mois';
     await _propertiesCol.doc(id).update({
       'isFeatured': true,
-      'boostEnd': DateTime.now().add(Duration(days: duration)).toIso8601String(),
+      'boostLevel': boostLevel,
+      'boostEnd': DateTime.now().add(Duration(days: days)).toIso8601String(),
       'boostType': boostType,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Retire le boost d'une annonce.
+  Future<void> removeBoost(String id) async {
+    await _propertiesCol.doc(id).update({
+      'isFeatured': false,
+      'boostLevel': 0,
+      'boostEnd': null,
+      'boostType': null,
       'updatedAt': DateTime.now().toIso8601String(),
     });
   }
@@ -1766,6 +1786,92 @@ class DataService {
       if (kDebugMode) debugPrint('[DataService.getAuditLogs] Erreur: $e');
       return [];
     }
+  }
+
+  // ─── PUBLICITÉS INTERNES ────────────────────────────────────────────────────
+
+  /// Récupère toutes les pubs (admin).
+  Future<List<AdModel>> getAllAds() async {
+    try {
+      final snap = await _adsCol.orderBy('createdAt', descending: true).get();
+      return snap.docs
+          .map((d) => AdModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getAllAds] $e');
+      return [];
+    }
+  }
+
+  /// Récupère uniquement les pubs actives et dans leur période (côté public).
+  Future<List<AdModel>> getLiveAds() async {
+    try {
+      final snap = await _adsCol
+          .where('isActive', isEqualTo: true)
+          .get();
+      final now = DateTime.now();
+      final list = snap.docs
+          .map((d) => AdModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .where((a) => now.isAfter(a.startDate) && now.isBefore(a.endDate))
+          .toList();
+      // Trier par position puis date de création
+      list.sort((a, b) => a.position.compareTo(b.position));
+      return list;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getLiveAds] $e');
+      return [];
+    }
+  }
+
+  /// Crée une nouvelle pub.
+  Future<String> createAd(AdModel ad) async {
+    try {
+      final ref = _adsCol.doc();
+      final data = ad.toMap();
+      data['id'] = ref.id;
+      await ref.set(data);
+      return ref.id;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.createAd] $e');
+      rethrow;
+    }
+  }
+
+  /// Met à jour une pub existante.
+  Future<void> updateAd(String id, Map<String, dynamic> data) async {
+    data['updatedAt'] = DateTime.now().toIso8601String();
+    await _adsCol.doc(id).update(data);
+  }
+
+  /// Active ou désactive une pub.
+  Future<void> toggleAdStatus(String id, bool isActive) async {
+    await _adsCol.doc(id).update({
+      'isActive': isActive,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Supprime une pub.
+  Future<void> deleteAd(String id) async {
+    await _adsCol.doc(id).delete();
+  }
+
+  /// Incrémente le compteur de clics d'une pub.
+  Future<void> recordAdClick(String id) async {
+    try {
+      await _adsCol.doc(id).update({
+        'clicks': FieldValue.increment(1),
+      });
+    } catch (_) {}
+  }
+
+  /// Incrémente le compteur d'impressions d'une pub.
+  Future<void> recordAdImpression(String id) async {
+    try {
+      await _adsCol.doc(id).update({
+        'impressions': FieldValue.increment(1),
+      });
+    } catch (_) {}
   }
 
   // ─── REFRESH CACHES AU DÉMARRAGE ────────────────────────────────────────────

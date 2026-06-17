@@ -6,6 +6,7 @@ import 'reception/admin_reception_screen.dart';
 import 'properties/admin_properties_screen.dart';
 import 'users/admin_users_screen.dart';
 import 'settings/admin_settings_screen.dart';
+import 'ads/admin_ads_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -34,6 +35,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     AdminReceptionScreen(),
     AdminPropertiesScreen(),
     AdminUsersScreen(),
+    AdminAdsScreen(),
     AdminSettingsScreen(),
   ];
 
@@ -76,6 +78,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             icon: Icon(Icons.people_outline),
             activeIcon: Icon(Icons.people),
             label: 'Utilisateurs',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.campaign_outlined),
+            activeIcon: Icon(Icons.campaign_rounded),
+            label: 'Publicités',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),

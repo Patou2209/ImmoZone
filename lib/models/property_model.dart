@@ -40,6 +40,7 @@ class PropertyModel {
   final bool isFeatured;     // annonce en avant (boost)
   final DateTime? boostEnd;  // fin du boost
   final String? boostType;   // 'semaine' | 'mois'
+  final int boostLevel;      // 0=aucun | 1=Standard | 2=Premium | 3=VIP
   final double? latitude;
   final double? longitude;
   // Champs conditionnels
@@ -104,6 +105,7 @@ class PropertyModel {
     this.isFeatured = false,
     this.boostEnd,
     this.boostType,
+    this.boostLevel = 0,
     this.latitude,
     this.longitude,
     this.pricePerNight,
@@ -124,6 +126,19 @@ class PropertyModel {
   bool get isBoostActive => isFeatured && boostEnd != null && boostEnd!.isAfter(DateTime.now());
   bool get isExpired => expiresAt != null && expiresAt!.isBefore(DateTime.now());
   bool get isMarkedClosed => isSold || isRented;
+  bool get isVip => isBoostActive && boostLevel == 3;
+  bool get isPremium => isBoostActive && boostLevel == 2;
+  bool get isStandard => isBoostActive && boostLevel == 1;
+  /// Label badge visible sur la PropertyCard
+  String? get boostBadge {
+    if (!isBoostActive) return null;
+    if (boostLevel == 3) return 'Spécial';
+    return 'Offre Spéciale';
+  }
+
+  // Sentinelles publiques pour autoriser copyWith(boostEnd: null) ou copyWith(boostType: null)
+  static final clearDate   = DateTime.fromMillisecondsSinceEpoch(0);
+  static const String clearStr = '__clear__';
 
   PropertyModel copyWith({
     String? id, String? title, String? description, String? type,
@@ -137,7 +152,7 @@ class PropertyModel {
     String? ownerEmail, String? ownerWhatsApp, String? ownerCategory, String? status,
     bool? isSold, bool? isRented,
     DateTime? createdAt, DateTime? updatedAt, DateTime? expiresAt,
-    int? views, bool? isFeatured, DateTime? boostEnd, String? boostType,
+    int? views, bool? isFeatured, DateTime? boostEnd, String? boostType, int? boostLevel,
     double? latitude, double? longitude,
     double? pricePerNight, int? numberOfBeds, String? establishmentName, bool? hasAirConditioning,
     bool? hasBreakfast, double? pricePerDay, int? capacity,
@@ -168,7 +183,9 @@ class PropertyModel {
     createdAt: createdAt ?? this.createdAt, updatedAt: updatedAt ?? this.updatedAt,
     expiresAt: expiresAt ?? this.expiresAt,
     views: views ?? this.views, isFeatured: isFeatured ?? this.isFeatured,
-    boostEnd: boostEnd ?? this.boostEnd, boostType: boostType ?? this.boostType,
+    boostEnd: boostEnd == clearDate ? null : (boostEnd ?? this.boostEnd),
+    boostType: boostType == clearStr ? null : (boostType ?? this.boostType),
+    boostLevel: boostLevel ?? this.boostLevel,
     latitude: latitude ?? this.latitude, longitude: longitude ?? this.longitude,
     pricePerNight: pricePerNight ?? this.pricePerNight,
     numberOfBeds: numberOfBeds ?? this.numberOfBeds,
@@ -204,6 +221,7 @@ class PropertyModel {
     'expiresAt': expiresAt?.toIso8601String(),
     'views': views, 'isFeatured': isFeatured,
     'boostEnd': boostEnd?.toIso8601String(), 'boostType': boostType,
+    'boostLevel': boostLevel,
     'latitude': latitude, 'longitude': longitude,
     'pricePerNight': pricePerNight, 'numberOfBeds': numberOfBeds, 'establishmentName': establishmentName,
     'hasAirConditioning': hasAirConditioning, 'hasBreakfast': hasBreakfast,
@@ -243,6 +261,7 @@ class PropertyModel {
     views: (m['views'] as num?)?.toInt() ?? 0, isFeatured: m['isFeatured'] ?? false,
     boostEnd: m['boostEnd'] != null ? DateTime.tryParse(m['boostEnd']) : null,
     boostType: m['boostType'],
+    boostLevel: (m['boostLevel'] as num?)?.toInt() ?? 0,
     latitude: m['latitude']?.toDouble(), longitude: m['longitude']?.toDouble(),
     pricePerNight: m['pricePerNight']?.toDouble(),
     numberOfBeds: m['numberOfBeds'],

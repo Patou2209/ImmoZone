@@ -636,7 +636,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 : '$_selectedType – ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCity'),
         description: _descCtrl.text.trim().isNotEmpty
             ? _descCtrl.text.trim()
-            : '$_selectedType a $_selectedTransaction \u2013 ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCommune, $_selectedCity',
+            : '$_selectedType en $_selectedTransaction \u2013 ${_quartierCtrl.text.trim().isNotEmpty ? "${_quartierCtrl.text.trim()}, " : ""}$_selectedCommune, $_selectedCity',
         type: _selectedType,
         transactionType: _selectedTransaction,
         price: double.tryParse(_priceCtrl.text.trim()) ?? 0,

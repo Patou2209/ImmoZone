@@ -18,6 +18,8 @@ class PropertyProvider extends ChangeNotifier {
   String? _selectedProvince;
   double? _minPrice;
   double? _maxPrice;
+  // Mode historique : affiche uniquement les annonces vendues/occupées (72h)
+  bool _historiqueMode = false;
 
   List<PropertyModel> get properties => _properties;
   List<PropertyModel> get filteredProperties => _filteredProperties;
@@ -27,15 +29,86 @@ class PropertyProvider extends ChangeNotifier {
   String? get selectedType => _selectedType;
   String? get selectedTransaction => _selectedTransaction;
   String? get selectedCity => _selectedCity;
+  bool get historiqueMode => _historiqueMode;
+
+  // ─── BOOST ──────────────────────────────────────────────────────────────────
+  // Retourne les annonces boostées actives selon les filtres courants.
+  // VIP : toujours inclus (ignore tous les filtres).
+  // Premium/Standard : inclus si les 6 critères de base correspondent.
+  List<PropertyModel> getBoostedProperties({
+    String? country,
+    String? province,
+    String? city,
+    String? commune,
+    String? transactionType,
+    String? propertyType,
+  }) {
+    final now = DateTime.now();
+    // Pool source : toutes les annonces actives (non sellées)
+    final pool = _properties.where((p) =>
+        p.isBoostActive && p.status == 'Actif' && !p.isSold && !p.isRented).toList();
+
+    final result = pool.where((p) {
+      // VIP → toujours visible
+      if (p.isVip) return true;
+      // Standard / Premium → les 6 critères de base doivent correspondre
+      final matchCountry      = country == null || country.isEmpty ||
+          p.country.toLowerCase() == country.toLowerCase();
+      final matchProvince     = province == null || province.isEmpty ||
+          p.province.toLowerCase() == province.toLowerCase();
+      final matchCity         = city == null || city.isEmpty ||
+          p.city.toLowerCase() == city.toLowerCase();
+      final matchCommune      = commune == null || commune.isEmpty ||
+          p.commune.toLowerCase() == commune.toLowerCase();
+      final matchTransaction  = transactionType == null || transactionType.isEmpty ||
+          p.transactionType == transactionType;
+      final matchType         = propertyType == null || propertyType.isEmpty ||
+          p.type == propertyType;
+      return matchCountry && matchProvince && matchCity &&
+             matchCommune && matchTransaction && matchType;
+    }).toList();
+
+    // Tri : VIP (3) > Premium (2) > Standard (1) ; à égalité : boost récent en premier
+    result.sort((a, b) {
+      if (a.boostLevel != b.boostLevel) return b.boostLevel.compareTo(a.boostLevel);
+      final aEnd = a.boostEnd ?? now;
+      final bEnd = b.boostEnd ?? now;
+      return bEnd.compareTo(aEnd);
+    });
+    return result;
+  }
 
   Future<void> loadProperties() async {
     _isLoading = true;
+    _historiqueMode = false; // mode normal : annonces actives uniquement
     notifyListeners();
     try {
       _properties = await _dataService.getActiveProperties();
       _applyFilters();
     } catch (e) {
       _error = 'Erreur de chargement';
+    }
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Charge UNIQUEMENT les annonces vendues ou occupées dans les 72 dernières heures.
+  /// Utilisé exclusivement depuis SearchScreen en mode historique.
+  Future<void> loadHistoriqueProperties() async {
+    _isLoading = true;
+    _historiqueMode = true;
+    notifyListeners();
+    try {
+      final all = await _dataService.getProperties();
+      final now = DateTime.now();
+      _properties = all.where((p) {
+        if (!(p.isSold || p.isRented)) return false;
+        if (p.updatedAt == null) return false;
+        return now.difference(p.updatedAt!).inHours < 72;
+      }).toList();
+      _applyFilters();
+    } catch (e) {
+      _error = 'Erreur de chargement historique';
     }
     _isLoading = false;
     notifyListeners();
@@ -125,12 +198,18 @@ class PropertyProvider extends ChangeNotifier {
     _selectedProvince = null;
     _minPrice = null;
     _maxPrice = null;
+    // Ne pas réinitialiser _historiqueMode ici — le mode est géré
+    // par SearchScreen (loadProperties vs loadHistoriqueProperties)
     _applyFilters();
     notifyListeners();
   }
 
   void _applyFilters() {
+    // Les annonces boostées sont exclues de la liste normale — elles s’affichent
+    // dans la section "Offres Spéciales" via getBoostedProperties().
     _filteredProperties = _properties.where((p) {
+      // Ne pas inclure les boostés actifs dans la liste principale
+      if (p.isBoostActive) return false;
       final matchesSearch = _searchQuery.isEmpty ||
           p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           p.city.toLowerCase().contains(_searchQuery.toLowerCase()) ||

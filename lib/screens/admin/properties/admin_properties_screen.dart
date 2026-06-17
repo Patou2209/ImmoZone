@@ -513,6 +513,41 @@ class _AdminPropertyTile extends StatelessWidget {
                                   fontFamily: 'Poppins', color: AppTheme.textPrimary),
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
+                        // Badge boost niveau
+                        if (property.isBoostActive) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: property.isVip
+                                    ? [const Color(0xFF7B1FA2), const Color(0xFFE040FB)]
+                                    : property.isPremium
+                                        ? [const Color(0xFFE65100), const Color(0xFFFF9800)]
+                                        : [const Color(0xFF1565C0), const Color(0xFF42A5F5)],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(
+                                property.isVip
+                                    ? Icons.workspace_premium_rounded
+                                    : Icons.star_rounded,
+                                color: Colors.white, size: 10,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                property.isVip ? 'VIP'
+                                    : property.isPremium ? 'PRO' : 'STD',
+                                style: const TextStyle(fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'Poppins',
+                                    color: Colors.white),
+                              ),
+                            ]),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(

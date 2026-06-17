@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
@@ -8,6 +9,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../core/widgets/property_image.dart';
+import '../../../core/widgets/ad_banner_card.dart';
+import '../../../models/ad_model.dart';
 import '../../../services/data_service.dart';
 import '../../../models/property_model.dart';
 import '../../../models/app_notification_model.dart';
@@ -735,6 +738,10 @@ class _HomeTabState extends State<_HomeTab>
   final DataService _ds = DataService();
   bool _filtersExpanded = false;
   bool _hasSearched = false; // true apres une vraie recherche
+  List<AdModel> _liveAds = [];
+  // Index de rotation des pubs — persisté entre sessions
+  int _adRotationIndex = 0;
+  static const _kAdRotKey = 'ad_rotation_index';
 
   @override
   void initState() {
@@ -770,6 +777,15 @@ class _HomeTabState extends State<_HomeTab>
 
   Future<void> _loadData() async {
     await context.read<PropertyProvider>().loadProperties();
+    final ads = await _ds.getLiveAds();
+    if (!mounted) return;
+    // Récupérer l'index de rotation sauvegardé
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt(_kAdRotKey) ?? 0;
+    setState(() {
+      _liveAds = ads;
+      _adRotationIndex = savedIndex;
+    });
   }
 
   Future<void> _loadFavorites() async {
@@ -915,10 +931,20 @@ class _HomeTabState extends State<_HomeTab>
 
   @override
   Widget build(BuildContext context) {
-    context.watch<PropertyProvider>();
+    final provider = context.watch<PropertyProvider>();
     final filtered = _filteredProperties;
     final displayed = filtered.take(_displayCount).toList();
     final hasMore = filtered.length > _displayCount;
+
+    // Annonces boostées filtrées selon le contexte courant
+    final boosted = provider.getBoostedProperties(
+      country: _country != AppConstants.defaultCountry ? _country : null,
+      province: _province,
+      city: _city,
+      commune: _commune,
+      transactionType: _activeMode == 'Location' ? 'Location' : 'Vente',
+      propertyType: _searchQuery.isEmpty ? _selectedCategory : null,
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -941,6 +967,19 @@ class _HomeTabState extends State<_HomeTab>
                   // Filtres avances
                   if (_filtersExpanded) _buildAdvancedFilters(),
 
+                  // ── Section Offres Spéciales (boostées) ───────────────────────
+                  if (boosted.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildSectionHeader(
+                      icon: Icons.workspace_premium_rounded,
+                      label: 'Offres Spéciales',
+                      color: const Color(0xFFE65100),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildGrid(context, boosted),
+                    _buildSectionDivider(),
+                  ],
+
                   const SizedBox(height: 12),
 
                   // Bandeau nombre de resultats
@@ -962,7 +1001,7 @@ class _HomeTabState extends State<_HomeTab>
                             const SizedBox(width: 5),
                             Text(
                               '${filtered.length} '
-                              'propri\u00e9t\u00e9${filtered.length > 1 ? 's' : ''} trouv\u00e9e${filtered.length > 1 ? 's' : ''}',
+                              'propriété${filtered.length > 1 ? 's' : ''} trouvée${filtered.length > 1 ? 's' : ''}',
                               style: const TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 12,
@@ -975,13 +1014,23 @@ class _HomeTabState extends State<_HomeTab>
                       ]),
                     ),
 
+                  // Titre section liste normale (seulement si boostées visibles)
+                  if (boosted.isNotEmpty && displayed.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _buildSectionHeader(
+                      icon: Icons.home_work_rounded,
+                      label: 'Toutes les annonces',
+                      color: AppTheme.primaryColor,
+                    ),
+                  ],
+
                   const SizedBox(height: 8),
 
                   // Liste ou etat vide
                   if (displayed.isEmpty)
                     _buildEmptyWithSimilar([])
                   else
-                    _buildGrid(context, displayed),
+                    _buildGridWithAds(context, displayed),
 
                   // Voir plus
                   if (hasMore) _buildVoirPlus(filtered.length),
@@ -997,6 +1046,52 @@ class _HomeTabState extends State<_HomeTab>
       ),
     );
   }
+
+  // ── SÉPARATEURS DE SECTION BOOST ───────────────────────────────────────────
+  Widget _buildSectionHeader({required IconData icon, required String label, required Color color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, color.withValues(alpha: 0.75)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: Colors.white,
+              )),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildSectionDivider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Expanded(child: Container(height: 1, color: const Color(0xFFE4E8F0))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('Annonces disponibles',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: Colors.grey[400], fontWeight: FontWeight.w500)),
+        ),
+        Expanded(child: Container(height: 1, color: const Color(0xFFE4E8F0))),
+      ]),
+    );
+  }
+
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
   // ── TOP BAR (fixe — ne scrolle pas) ─────────────────────────────────────
@@ -1809,6 +1904,72 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
+  /// Construit la liste principale en intercalant 1 ou 2 publicités
+  /// selon la règle de position fixe :
+  ///   • 0–4 annonces  → 1 pub à la dernière position
+  ///   • 5+ annonces   → 2 pubs : position 4 (index 3) + dernière position
+  ///
+  /// Rotation : chaque chargement avance _adRotationIndex de +1 ou +2
+  /// pour que toutes les pubs soient vues à fréquence égale.
+  Widget _buildGridWithAds(BuildContext context, List<PropertyModel> items) {
+    if (_liveAds.isEmpty) return _buildGrid(context, items);
+
+    final n = items.length;
+    final totalAds = _liveAds.length;
+    final twoAds = n >= 5;
+
+    // Sélectionner la ou les pubs de cette session
+    final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
+    final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
+
+    // Avancer l'index pour le prochain chargement et persister
+    _persistAdRotation(twoAds ? 2 : 1);
+
+    // Construire la liste avec insertions
+    final widgets = <Widget>[];
+    int insertedAds = 0; // nombre de pubs déjà insérées
+
+    for (int i = 0; i < n; i++) {
+      final p = items[i];
+      widgets.add(Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        child: PropertyCard(
+          property: p,
+          isFavorite: _favorites.contains(p.id),
+          onFavorite: () => _toggleFavorite(p.id),
+          selectedCountry: _country,
+          onTap: () async {
+            await Navigator.push(context,
+                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+            if (mounted) _loadData();
+          },
+        ),
+      ));
+
+      // Insérer la première pub après la 4e annonce (si twoAds)
+      if (twoAds && i == 3 && insertedAds == 0) {
+        widgets.add(AdBannerCard(
+            key: ValueKey('ad_first_${adFirst.id}'), ad: adFirst));
+        insertedAds++;
+      }
+    }
+
+    // Dernière position : ajouter la pub finale
+    final AdModel adLast = twoAds ? adSecond : adFirst;
+    widgets.add(AdBannerCard(
+        key: ValueKey('ad_last_${adLast.id}'), ad: adLast));
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+  }
+
+  /// Persiste l'index de rotation dans shared_preferences
+  void _persistAdRotation(int advance) {
+    if (_liveAds.isEmpty) return;
+    final next = (_adRotationIndex + advance) % _liveAds.length;
+    SharedPreferences.getInstance().then(
+        (p) => p.setInt(_kAdRotKey, next));
+  }
+
   // ── ANNONCES RECENTES (quand la categorie n'a pas de resultat) ──────────
   List<PropertyModel> _getRecentListings() {
     final provider = context.read<PropertyProvider>();
@@ -1967,19 +2128,19 @@ class _HomeTabState extends State<_HomeTab>
         accentIconColor: Colors.orange.shade300,
         rows: !_statsLoading ? [
           _statRow('Maisons vendues',          _stats['hist72_maisonVendue'] ?? 0,  Colors.orange.shade300,
-              typeFilter: 'Maison',          transactionFilter: 'Vente'),
+              typeFilter: 'Maison',          transactionFilter: 'Vente',    initialHistorique: true),
           _statRow('Maisons occupées',         _stats['hist72_maisonOccupee'] ?? 0, Colors.amber.shade300,
-              typeFilter: 'Maison',          transactionFilter: 'Location'),
+              typeFilter: 'Maison',          transactionFilter: 'Location', initialHistorique: true),
           _statRow('Terrains vendus',          _stats['hist72_terrainVendu'] ?? 0,  Colors.orange.shade200,
-              typeFilter: 'Terrain à bâtir', transactionFilter: 'Vente'),
+              typeFilter: 'Terrain à bâtir', transactionFilter: 'Vente',    initialHistorique: true),
           _statRow('Appartements vendus',      _stats['hist72_appartVendu'] ?? 0,   Colors.orange.shade300,
-              typeFilter: 'Appartement / Flat', transactionFilter: 'Vente'),
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Vente',  initialHistorique: true),
           _statRow('Appartements occupés',     _stats['hist72_appartOccupe'] ?? 0,  Colors.amber.shade300,
-              typeFilter: 'Appartement / Flat', transactionFilter: 'Location'),
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Location', initialHistorique: true),
           _statRow('Bureaux occupés',          _stats['hist72_bureauOccupe'] ?? 0,  Colors.orange.shade200,
-              typeFilter: 'Bureau',          transactionFilter: 'Location'),
+              typeFilter: 'Bureau',          transactionFilter: 'Location', initialHistorique: true),
           _statRow('Salles occupées',          _stats['hist72_salleOccupee'] ?? 0,  Colors.amber.shade200,
-              typeFilter: 'Salle de Fêtes'),
+              typeFilter: 'Salle de Fêtes',                                 initialHistorique: true),
           const Divider(height: 1, color: Colors.white12),
           _statRow('Total transactions récentes', _stats['hist72_total'] ?? 0,     Colors.amber.shade300,
               total: true),
@@ -2052,6 +2213,7 @@ class _HomeTabState extends State<_HomeTab>
     bool total = false,
     String? typeFilter,
     String? transactionFilter,
+    bool initialHistorique = false, // true pour les lignes Historique 72h
   }) {
     final bool clickable = !total && (typeFilter != null || transactionFilter != null);
 
@@ -2103,6 +2265,7 @@ class _HomeTabState extends State<_HomeTab>
             builder: (_) => SearchScreen(
               initialType: typeFilter,
               initialTransaction: transactionFilter,
+              initialHistorique: initialHistorique,
             ),
           ),
         ),
@@ -2163,8 +2326,8 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 
   Future<void> _markSold(PropertyModel p) async {
     final confirmed = await _confirmDialog(
-      title: 'Marquer comme vendu',
-      message: 'Cette annonce sera marquee comme VENDUE et supprimee automatiquement apres 72 heures.',
+      title: 'Marquer comme vendue',
+      message: 'Cette annonce sera marquée comme VENDUE et supprimée automatiquement après 72 heures.',
       confirmLabel: 'Confirmer',
       confirmColor: AppTheme.accentColor,
     );
@@ -2172,7 +2335,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
     await _ds.markPropertySoldOrRented(p.id, sold: true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Annonce marquee comme vendue. Suppression dans 72h.',
+        content: Text('Annonce marquée comme vendue. Suppression dans 72h.',
             style: TextStyle(fontFamily: 'Poppins')),
         backgroundColor: AppTheme.successColor,
         behavior: SnackBarBehavior.floating,
@@ -2183,8 +2346,8 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 
   Future<void> _markOccupied(PropertyModel p) async {
     final confirmed = await _confirmDialog(
-      title: 'Marquer comme occupe',
-      message: 'Cette annonce sera marquee comme OCCUPEE (bien loue). Elle sera supprimee apres 72 heures.',
+      title: 'Marquer comme occupée',
+      message: 'Cette annonce sera marquée comme OCCUPÉE (bien loué). Elle sera supprimée après 72 heures.',
       confirmLabel: 'Confirmer',
       confirmColor: const Color(0xFF4FC3F7),
     );
@@ -2192,7 +2355,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
     await _ds.markPropertySoldOrRented(p.id, rented: true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Annonce marquee comme occupee. Suppression dans 72h.',
+        content: Text('Annonce marquée comme occupée. Suppression dans 72h.',
             style: TextStyle(fontFamily: 'Poppins')),
         backgroundColor: AppTheme.primaryLight,
         behavior: SnackBarBehavior.floating,
@@ -2204,7 +2367,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
   Future<void> _deleteProperty(PropertyModel p) async {
     final confirmed = await _confirmDialog(
       title: 'Supprimer l\'annonce',
-      message: 'Supprimer "${p.title}" definitivement ? Cette action est irreversible.',
+      message: 'Supprimer « ${p.title} » définitivement ? Cette action est irréversible.',
       confirmLabel: 'Supprimer',
       confirmColor: AppTheme.errorColor,
     );
@@ -2212,7 +2375,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
     await _ds.deleteProperty(p.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Annonce supprimee.', style: TextStyle(fontFamily: 'Poppins')),
+        content: Text('Annonce supprimée.', style: TextStyle(fontFamily: 'Poppins')),
         backgroundColor: AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
       ));
@@ -2414,10 +2577,10 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                     _statCard('En attente', pending.length, Icons.hourglass_top_rounded,
                         AppTheme.warningColor),
                     const SizedBox(width: 10),
-                    _statCard('Fermees', closed.length, Icons.lock_outline_rounded,
+                    _statCard('Fermées', closed.length, Icons.lock_outline_rounded,
                         AppTheme.accentColor),
                     const SizedBox(width: 10),
-                    _statCard('Rejetees', rejected.length, Icons.cancel_outlined,
+                    _statCard('Rejetées', rejected.length, Icons.cancel_outlined,
                         AppTheme.errorColor),
                   ]),
                   const SizedBox(height: 24),
@@ -2524,7 +2687,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
       statusIcon  = Icons.check_circle_rounded;
     } else if (isRented) {
       statusColor = const Color(0xFF4FC3F7);
-      statusLabel = 'Occupe';
+      statusLabel = 'Occupé';
       statusIcon  = Icons.lock_rounded;
     } else if (p.status == 'En attente') {
       statusColor = AppTheme.warningColor;
@@ -2532,7 +2695,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
       statusIcon  = Icons.hourglass_top_rounded;
     } else if (p.status == 'Rejete') {
       statusColor = AppTheme.errorColor;
-      statusLabel = 'Rejete';
+      statusLabel = 'Rejeté';
       statusIcon  = Icons.cancel_rounded;
     } else {
       statusColor = AppTheme.statusActive;
@@ -2636,11 +2799,11 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                   color: AppTheme.successColor,
                   onTap: () => _markSold(p),
                 )),
-              // Marquer occupe (si location)
+              // Marquer occupé (si location)
               if (p.transactionType == 'Location') ...[
                 Expanded(child: _actionButton(
                   icon: Icons.lock_rounded,
-                  label: 'Marquer occupe',
+                  label: 'Marquer occupé',
                   color: const Color(0xFF4FC3F7),
                   onTap: () => _markOccupied(p),
                 )),

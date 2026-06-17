@@ -221,29 +221,55 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Featured badge
-                if (property.isFeatured && !property.isSold && !property.isRented)
+                // Badge Offre Spéciale / Spécial (boost actif)
+                if (property.isBoostActive && !property.isSold && !property.isRented)
                   Positioned(
                     bottom: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.accentColor,
+                        gradient: property.isVip
+                            ? const LinearGradient(
+                                colors: [Color(0xFF7B1FA2), Color(0xFFE040FB)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : property.isPremium
+                                ? const LinearGradient(
+                                    colors: [Color(0xFFE65100), Color(0xFFFF9800)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : const LinearGradient(
+                                    colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                         borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.30),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.star, color: Colors.white, size: 11),
-                          SizedBox(width: 3),
+                          Icon(
+                            property.isVip ? Icons.workspace_premium_rounded : Icons.star_rounded,
+                            color: Colors.white,
+                            size: 11,
+                          ),
+                          const SizedBox(width: 3),
                           Text(
-                            'En vedette',
-                            style: TextStyle(
+                            property.boostBadge ?? 'Offre Spéciale',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                               fontFamily: 'Poppins',
                             ),
                           ),
