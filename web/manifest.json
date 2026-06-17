@@ -1,11 +1,11 @@
 {
-    "name": "ImmoZone — Immobilier RDC",
+    "name": "ImmoZone",
     "short_name": "ImmoZone",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#E65100",
-    "theme_color": "#E65100",
-    "description": "Trouvez votre bien immobilier en RDC. Achat, vente, location.",
+    "background_color": "#0175C2",
+    "theme_color": "#0175C2",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
