@@ -65,8 +65,9 @@ class PropertyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AspectRatio(
-        aspectRatio: _cardWidth / _cardHeight,
+      child: SizedBox(
+        width: _cardWidth,
+        height: _cardHeight,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(_cardRadius),
           child: Container(
@@ -90,13 +91,11 @@ class PropertyCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(_cardRadius)),
-                  child: LayoutBuilder(
-                    builder: (ctx, cons) => PropertyImage(
+                  child: PropertyImage(
                     src: property.mainImage,
-                    height: cons.maxWidth * (_cardHeight * 0.65 / _cardWidth),
+                    height: _cardHeight * 0.65,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                  ),
                   ),
                 ),
                 // Transaction Badge
@@ -316,7 +315,8 @@ class PropertyCard extends StatelessWidget {
               ],
             ),
             // ── Description (35% of card height) ──────────────────────
-            Expanded(child: SizedBox(
+            SizedBox(
+              height: _cardHeight * 0.35,
               child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
               child: Column(
@@ -519,7 +519,7 @@ class PropertyCard extends StatelessWidget {
                 ],
               ),
             ),
-            )), // Expanded+SizedBox description
+            ), // SizedBox description
           ],
             ), // Column
           ), // Container

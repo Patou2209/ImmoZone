@@ -1875,20 +1875,14 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
-  // ── GRILLE RESPONSIVE (1 col mobile / 2 col tablette / 3+ col desktop) ──
+  // ── GRILLE RESPONSIVE : colonnes de 400px, 1 col min si écran < 400px ──
   Widget _buildGrid(BuildContext context, List<PropertyModel> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final crossAxisCount = width < 600
-              ? 2        // mobile  : 2 colonnes
-              : width < 900
-                  ? 3    // tablette: 3 colonnes
-                  : width < 1200
-                      ? 4  // desktop : 4 colonnes
-                      : 5; // large   : 5 colonnes
+          final crossAxisCount = (width / 400).floor().clamp(1, 99);
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),

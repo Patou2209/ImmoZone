@@ -476,14 +476,8 @@ class _SearchScreenState extends State<SearchScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final crossCount = width < 600
-            ? 2
-            : width < 900
-                ? 3
-                : width < 1200
-                    ? 4
-                    : 5;
-        final hPad = width < 600 ? 12.0 : 16.0;
+        final crossCount = (width / 400).floor().clamp(1, 99);
+        final hPad = 12.0;
 
         return ListView(
           padding: EdgeInsets.symmetric(vertical: 8, horizontal: hPad),
