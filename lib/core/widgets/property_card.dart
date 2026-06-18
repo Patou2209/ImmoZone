@@ -59,17 +59,14 @@ class PropertyCard extends StatelessWidget {
   // Card dimensions: 400 × 450  (image 65% = 293px, description 35% = 157px)
   static const double _cardWidth       = 400;
   static const double _cardHeight      = 450;
-  static const double _imageHeight     = 293; // 65% of total
-  static const double _descHeight      = 157; // 35% of total
   static const double _cardRadius      = 18;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: _cardWidth,
-        height: _cardHeight,
+      child: AspectRatio(
+        aspectRatio: _cardWidth / _cardHeight,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(_cardRadius),
           child: Container(
@@ -95,7 +92,7 @@ class PropertyCard extends StatelessWidget {
                       const BorderRadius.vertical(top: Radius.circular(_cardRadius)),
                   child: PropertyImage(
                     src: property.mainImage,
-                    height: _imageHeight,
+                    height: _cardHeight * 0.65,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   ),
@@ -316,9 +313,8 @@ class PropertyCard extends StatelessWidget {
                   ),
               ],
             ),
-            // ── Description (1/4 of card height = 125px, no empty space) ──
-            SizedBox(
-              height: _descHeight,
+            // ── Description (35% of card height) ──────────────────────
+            Expanded(child: SizedBox(
               child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
               child: Column(
@@ -521,12 +517,12 @@ class PropertyCard extends StatelessWidget {
                 ],
               ),
             ),
-            ), // SizedBox description
+            )), // Expanded+SizedBox description
           ],
             ), // Column
           ), // Container
         ), // ClipRRect
-      ), // SizedBox 400×500
+      ), // AspectRatio
     );
   }
 
