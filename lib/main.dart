@@ -22,13 +22,12 @@ void main() async {
   );
 
   // ── Firebase App Check — debug token (APK sideload / hors Play Store) ────────
-  // Le token 3EBB85EC-B680-4076-A9E8-6A52F48A0A9F est déclaré dans
-  // AndroidManifest.xml via la meta-data force_debug_token.
-  // Sur un build Play Store signé, remplacer AndroidProvider.debug
-  // par AndroidProvider.playIntegrity pour la production.
-  await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-  );
+  // Désactivé sur Web : AppCheck Android ne s'applique pas au navigateur.
+  if (!kIsWeb) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+    );
+  }
 
   // ── Désactiver reCAPTCHA visible — forcer Play Integrity (Android) ──────────
   // Sans cette ligne, Firebase Auth 5.x affiche un reCAPTCHA web dans une
