@@ -476,7 +476,8 @@ class _SearchScreenState extends State<SearchScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final crossCount = (width / 400).floor().clamp(1, 99);
+        // crossCount basé sur la largeur réelle disponible (padding 12×2 = 24px déduit)
+        final crossCount = ((width - 24) / 400).floor().clamp(1, 99);
         final hPad = 12.0;
 
         return ListView(
@@ -547,26 +548,35 @@ class _SearchScreenState extends State<SearchScreen> {
     final n = properties.length;
     if (n == 0) return widgets;
 
-    // Helper : construire une grille à partir d'une liste de PropertyModel
+    // Helper : construire une grille à partir d'une liste de PropertyModel.
+    // On enveloppe dans un LayoutBuilder pour que crossAxisCount soit recalculé
+    // sur la largeur réelle disponible (hors padding du ListView parent).
     Widget buildGrid(List<PropertyModel> items) {
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossCount,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 400 / 450,
-        ),
-        itemCount: items.length,
-        itemBuilder: (ctx, i) {
-          final p = items[i];
-          return PropertyCard(
-            property: p,
-            isFavorite: _favorites.contains(p.id),
-            onFavorite: () => _toggleFavorite(p.id),
-            onTap: () => Navigator.push(ctx,
-                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+      return LayoutBuilder(
+        builder: (ctx, constraints) {
+          // La largeur ici est déjà SANS le padding du ListView (géré par le parent).
+          // On recalcule pour garantir la cohérence.
+          final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 400 / 450,
+            ),
+            itemCount: items.length,
+            itemBuilder: (gridCtx, i) {
+              final p = items[i];
+              return PropertyCard(
+                property: p,
+                isFavorite: _favorites.contains(p.id),
+                onFavorite: () => _toggleFavorite(p.id),
+                onTap: () => Navigator.push(gridCtx,
+                    MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+              );
+            },
           );
         },
       );

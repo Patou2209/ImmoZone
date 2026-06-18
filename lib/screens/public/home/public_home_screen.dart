@@ -1914,9 +1914,9 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   /// Construit la liste principale en intercalant 1 ou 2 publicités
-  /// selon la règle de position fixe :
-  ///   • 0–4 annonces  → 1 pub à la dernière position
-  ///   • 5+ annonces   → 2 pubs : position 4 (index 3) + dernière position
+  /// avec une vraie GridView responsive (colonnes de 400px).
+  ///   • 0–4 annonces  → 1 pub à la fin
+  ///   • 5+ annonces   → 2 pubs : position 4 (index 3) + fin
   ///
   /// Rotation : chaque chargement avance _adRotationIndex de +1 ou +2
   /// pour que toutes les pubs soient vues à fréquence égale.
@@ -1934,41 +1934,67 @@ class _HomeTabState extends State<_HomeTab>
     // Avancer l'index pour le prochain chargement et persister
     _persistAdRotation(twoAds ? 2 : 1);
 
-    // Construire la liste avec insertions
-    final widgets = <Widget>[];
-    int insertedAds = 0; // nombre de pubs déjà insérées
-
-    for (int i = 0; i < n; i++) {
-      final p = items[i];
-      widgets.add(Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        child: PropertyCard(
-          property: p,
-          isFavorite: _favorites.contains(p.id),
-          onFavorite: () => _toggleFavorite(p.id),
-          selectedCountry: _country,
-          onTap: () async {
-            await Navigator.push(context,
-                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-            if (mounted) _loadData();
+    // Helper : grille responsive pour un sous-ensemble d'items
+    Widget buildSubGrid(List<PropertyModel> subItems) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: LayoutBuilder(
+          builder: (ctx, constraints) {
+            final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 400 / 450,
+              ),
+              itemCount: subItems.length,
+              itemBuilder: (gridCtx, i) {
+                final p = subItems[i];
+                return PropertyCard(
+                  property: p,
+                  isFavorite: _favorites.contains(p.id),
+                  onFavorite: () => _toggleFavorite(p.id),
+                  selectedCountry: _country,
+                  onTap: () async {
+                    await Navigator.push(gridCtx,
+                        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+                    if (mounted) _loadData();
+                  },
+                );
+              },
+            );
           },
         ),
-      ));
-
-      // Insérer la première pub après la 4e annonce (si twoAds)
-      if (twoAds && i == 3 && insertedAds == 0) {
-        widgets.add(AdBannerCard(
-            key: ValueKey('ad_first_${adFirst.id}'), ad: adFirst));
-        insertedAds++;
-      }
+      );
     }
 
-    // Dernière position : ajouter la pub finale
-    final AdModel adLast = twoAds ? adSecond : adFirst;
-    widgets.add(AdBannerCard(
-        key: ValueKey('ad_last_${adLast.id}'), ad: adLast));
+    // Construire la liste avec grilles et pubs intercalées
+    final widgets = <Widget>[];
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+    if (twoAds) {
+      // Grille 1 : annonces 0..3 → pub → grille 2 : reste → pub
+      widgets.add(buildSubGrid(items.sublist(0, 4)));
+      widgets.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: AdBannerCard(key: ValueKey('ad_first_${adFirst.id}'), ad: adFirst),
+      ));
+      widgets.add(buildSubGrid(items.sublist(4)));
+    } else {
+      // Grille unique → pub à la fin
+      widgets.add(buildSubGrid(items));
+    }
+
+    // Pub finale
+    final AdModel adLast = twoAds ? adSecond : adFirst;
+    widgets.add(Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: AdBannerCard(key: ValueKey('ad_last_${adLast.id}'), ad: adLast),
+    ));
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: widgets);
   }
 
   /// Persiste l'index de rotation dans shared_preferences
