@@ -1896,7 +1896,7 @@ class _HomeTabState extends State<_HomeTab>
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.72,
+              childAspectRatio: 400 / 450,
             ),
             itemCount: items.length,
             itemBuilder: (context, index) {

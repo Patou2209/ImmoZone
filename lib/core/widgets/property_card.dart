@@ -90,11 +90,13 @@ class PropertyCard extends StatelessWidget {
                 ClipRRect(
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(_cardRadius)),
-                  child: PropertyImage(
+                  child: LayoutBuilder(
+                    builder: (ctx, cons) => PropertyImage(
                     src: property.mainImage,
-                    height: _cardHeight * 0.65,
+                    height: cons.maxWidth * (_cardHeight * 0.65 / _cardWidth),
                     width: double.infinity,
                     fit: BoxFit.cover,
+                  ),
                   ),
                 ),
                 // Transaction Badge

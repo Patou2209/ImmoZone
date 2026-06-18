@@ -505,7 +505,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   crossAxisCount: crossCount,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 400 / 450,
                 ),
                 itemCount: boosted.length,
                 itemBuilder: (ctx, i) {
@@ -562,7 +562,7 @@ class _SearchScreenState extends State<SearchScreen> {
           crossAxisCount: crossCount,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
-          childAspectRatio: 0.72,
+          childAspectRatio: 400 / 450,
         ),
         itemCount: items.length,
         itemBuilder: (ctx, i) {
