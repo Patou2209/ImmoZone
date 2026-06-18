@@ -1913,13 +1913,14 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
-  /// Construit la liste principale en intercalant 1 ou 2 publicités
-  /// avec une vraie GridView responsive (colonnes de 400px).
-  ///   • 0–4 annonces  → 1 pub à la fin
-  ///   • 5+ annonces   → 2 pubs : position 4 (index 3) + fin
+  /// Construit la grille principale unifiée annonces + publicités.
   ///
-  /// Rotation : chaque chargement avance _adRotationIndex de +1 ou +2
-  /// pour que toutes les pubs soient vues à fréquence égale.
+  /// Les publicités occupent exactement 1 slot de grille (400×450, gridMode: true),
+  /// intercalées parmi les annonces :
+  ///   • 0–4 annonces → 1 pub après la dernière annonce
+  ///   • 5+ annonces  → 2 pubs : après l'index 3 + après la dernière
+  ///
+  /// Rotation : chaque chargement avance _adRotationIndex de +1 ou +2.
   Widget _buildGridWithAds(BuildContext context, List<PropertyModel> items) {
     if (_liveAds.isEmpty) return _buildGrid(context, items);
 
@@ -1934,67 +1935,62 @@ class _HomeTabState extends State<_HomeTab>
     // Avancer l'index pour le prochain chargement et persister
     _persistAdRotation(twoAds ? 2 : 1);
 
-    // Helper : grille responsive pour un sous-ensemble d'items
-    Widget buildSubGrid(List<PropertyModel> subItems) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: LayoutBuilder(
-          builder: (ctx, constraints) {
-            final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: cols,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 400 / 450,
-              ),
-              itemCount: subItems.length,
-              itemBuilder: (gridCtx, i) {
-                final p = subItems[i];
-                return PropertyCard(
-                  property: p,
-                  isFavorite: _favorites.contains(p.id),
-                  onFavorite: () => _toggleFavorite(p.id),
-                  selectedCountry: _country,
-                  onTap: () async {
-                    await Navigator.push(gridCtx,
-                        MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-                    if (mounted) _loadData();
-                  },
-                );
-              },
-            );
-          },
-        ),
-      );
-    }
-
-    // Construire la liste avec grilles et pubs intercalées
-    final widgets = <Widget>[];
-
+    // ── Construire la liste mixte (PropertyModel | AdModel) ─────────────────
+    final List<Object> mixedItems = [];
     if (twoAds) {
-      // Grille 1 : annonces 0..3 → pub → grille 2 : reste → pub
-      widgets.add(buildSubGrid(items.sublist(0, 4)));
-      widgets.add(Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: AdBannerCard(key: ValueKey('ad_first_${adFirst.id}'), ad: adFirst),
-      ));
-      widgets.add(buildSubGrid(items.sublist(4)));
+      mixedItems.addAll(items.sublist(0, 4));
+      mixedItems.add(adFirst);
+      mixedItems.addAll(items.sublist(4));
+      mixedItems.add(adSecond);
     } else {
-      // Grille unique → pub à la fin
-      widgets.add(buildSubGrid(items));
+      mixedItems.addAll(items);
+      mixedItems.add(adFirst);
     }
 
-    // Pub finale
-    final AdModel adLast = twoAds ? adSecond : adFirst;
-    widgets.add(Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: AdBannerCard(key: ValueKey('ad_last_${adLast.id}'), ad: adLast),
-    ));
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: widgets);
+    // ── Un seul GridView responsive avec slots mixtes ────────────────────────
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: cols,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 400 / 450,
+            ),
+            itemCount: mixedItems.length,
+            itemBuilder: (gridCtx, i) {
+              final item = mixedItems[i];
+              if (item is AdModel) {
+                // Slot publicitaire — même taille qu'une annonce
+                return AdBannerCard(
+                  key: ValueKey('ad_${item.id}_$i'),
+                  ad: item,
+                  gridMode: true,
+                );
+              }
+              // Slot annonce normale
+              final p = item as PropertyModel;
+              return PropertyCard(
+                property: p,
+                isFavorite: _favorites.contains(p.id),
+                onFavorite: () => _toggleFavorite(p.id),
+                selectedCountry: _country,
+                onTap: () async {
+                  await Navigator.push(gridCtx,
+                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+                  if (mounted) _loadData();
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 
   /// Persiste l'index de rotation dans shared_preferences

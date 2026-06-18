@@ -5,20 +5,21 @@ import '../../models/ad_model.dart';
 import '../../services/data_service.dart';
 import '../theme/app_theme.dart';
 
-/// Carte "Sponsorisé" pleine largeur affichée dans les listes d'annonces.
+/// Carte "Sponsorisé" affichée dans les listes d'annonces.
 ///
-/// Layout :
-/// ┌─────────────────────────────────────────────────────────┐
-/// │  [IMAGE PUBLICITAIRE - pleine largeur, ~180px de haut]  │
-/// │                                                          │
-/// │  ◉ Sponsorisé                           [→ Visiter]     │
-/// └─────────────────────────────────────────────────────────┘
+/// [gridMode] = false (défaut) : pleine largeur, hauteur fixe 230px,
+///              avec margin horizontal — pour usage standalone entre deux grilles.
+/// [gridMode] = true           : pas de margin, s'étire pour occuper
+///              exactement le slot de la grille (400×450, géré par childAspectRatio).
 ///
 /// Impression : comptée une seule fois à l'apparition du widget.
 /// Clic : comptabilisé + ouverture du lien (URL / WhatsApp / Téléphone).
 class AdBannerCard extends StatefulWidget {
   final AdModel ad;
-  const AdBannerCard({super.key, required this.ad});
+  /// Quand true, la carte s'adapte au slot de grille (400×450).
+  /// Quand false (défaut), pleine largeur autonome.
+  final bool gridMode;
+  const AdBannerCard({super.key, required this.ad, this.gridMode = false});
 
   @override
   State<AdBannerCard> createState() => _AdBannerCardState();
@@ -143,10 +144,15 @@ class _AdBannerCardState extends State<AdBannerCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isGrid = widget.gridMode;
     return GestureDetector(
       onTap: _handleTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        // gridMode : pas de margin (la grille gère l'espacement via mainAxisSpacing/crossAxisSpacing)
+        // standalone : margin horizontal pour s'aligner avec les grilles autour
+        margin: isGrid
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
@@ -165,12 +171,16 @@ class _AdBannerCardState extends State<AdBannerCard> {
         // ── Stack : image en fond + overlay bas ─────────────────────────────
         child: ClipRRect(
           borderRadius: BorderRadius.circular(13),
-          child: Stack(
-            children: [
-              // ── Image pleine largeur ──────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 230,
+          // gridMode : taille imposée par le slot GridView (400×450 via childAspectRatio)
+          // standalone : hauteur fixe 230px, largeur infinie
+          child: SizedBox(
+            width: double.infinity,
+            height: isGrid ? double.infinity : 230,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+              // ── Image couvre tout le slot ──────────────────────────────────
+              Positioned.fill(
                 child: _buildImage(),
               ),
 
@@ -293,9 +303,10 @@ class _AdBannerCardState extends State<AdBannerCard> {
                   ),
                 ),
             ],
-          ),
-        ),
-      ),
-    );
+            ), // Stack
+          ), // SizedBox
+        ),   // ClipRRect
+      ),     // Container
+    );       // GestureDetector
   }
 }

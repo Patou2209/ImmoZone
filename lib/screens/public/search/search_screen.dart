@@ -536,26 +536,54 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Construit la liste normale en intercalant 1 ou 2 publicités
-  /// selon la même règle que HomeTab :
-  ///   • 0–4 annonces → 1 pub en dernière position
-  ///   • 5+ annonces  → 2 pubs : position 4 + dernière
+  /// Construit la grille unifiée annonces + publicités.
   ///
-  /// L'index de rotation est partagé avec HomeTab (même clé SharedPrefs).
-  /// Grille responsive avec publicités intercalées
+  /// Les publicités occupent exactement 1 slot de grille (400×450),
+  /// intercalées parmi les annonces :
+  ///   • 0–4 annonces → 1 pub insérée après la dernière annonce
+  ///   • 5+ annonces  → 2 pubs : après l'index 3 + après la dernière
+  ///
+  /// Retourne [Widget] — un seul GridView avec items mixtes.
   List<Widget> _buildNormalGridWithAds(BuildContext context, List<PropertyModel> properties, int crossCount) {
-    final widgets = <Widget>[];
-    final n = properties.length;
-    if (n == 0) return widgets;
+    if (properties.isEmpty) return [];
 
-    // Helper : construire une grille à partir d'une liste de PropertyModel.
-    // On enveloppe dans un LayoutBuilder pour que crossAxisCount soit recalculé
-    // sur la largeur réelle disponible (hors padding du ListView parent).
-    Widget buildGrid(List<PropertyModel> items) {
-      return LayoutBuilder(
+    final n = properties.length;
+
+    // ── Construire la liste d'items (PropertyModel | AdModel) ────────────────
+    // Un item peut être soit une annonce (PropertyModel) soit une pub (AdModel).
+    // On utilise Object comme type commun.
+    final List<Object> mixedItems = [];
+
+    if (_liveAds.isEmpty) {
+      // Pas de pubs : juste les annonces
+      mixedItems.addAll(properties);
+    } else {
+      final totalAds = _liveAds.length;
+      final twoAds   = n >= 5;
+      final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
+      final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
+
+      // Persister la rotation
+      final next = (_adRotationIndex + (twoAds ? 2 : 1)) % totalAds;
+      SharedPreferences.getInstance().then((p) => p.setInt(_kAdRotKey, next));
+
+      if (twoAds) {
+        // Annonces 0..3 → pub → annonces 4..n-1 → pub
+        mixedItems.addAll(properties.sublist(0, 4));
+        mixedItems.add(adFirst);
+        mixedItems.addAll(properties.sublist(4));
+        mixedItems.add(adSecond);
+      } else {
+        // Toutes les annonces → pub à la fin
+        mixedItems.addAll(properties);
+        mixedItems.add(adFirst);
+      }
+    }
+
+    // ── Un seul GridView avec items mixtes ────────────────────────────────────
+    return [
+      LayoutBuilder(
         builder: (ctx, constraints) {
-          // La largeur ici est déjà SANS le padding du ListView (géré par le parent).
-          // On recalcule pour garantir la cohérence.
           final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
           return GridView.builder(
             shrinkWrap: true,
@@ -566,9 +594,19 @@ class _SearchScreenState extends State<SearchScreen> {
               crossAxisSpacing: 10,
               childAspectRatio: 400 / 450,
             ),
-            itemCount: items.length,
+            itemCount: mixedItems.length,
             itemBuilder: (gridCtx, i) {
-              final p = items[i];
+              final item = mixedItems[i];
+              if (item is AdModel) {
+                // Slot publicitaire — même taille qu'une annonce
+                return AdBannerCard(
+                  key: ValueKey('ad_${item.id}_$i'),
+                  ad: item,
+                  gridMode: true,
+                );
+              }
+              // Slot annonce normale
+              final p = item as PropertyModel;
               return PropertyCard(
                 property: p,
                 isFavorite: _favorites.contains(p.id),
@@ -579,44 +617,8 @@ class _SearchScreenState extends State<SearchScreen> {
             },
           );
         },
-      );
-    }
-
-    // Pas de pubs — grille simple
-    if (_liveAds.isEmpty) {
-      widgets.add(buildGrid(properties));
-      return widgets;
-    }
-
-    final totalAds = _liveAds.length;
-    final twoAds = n >= 5;
-    final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
-    final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
-
-    final next = (_adRotationIndex + (twoAds ? 2 : 1)) % totalAds;
-    SharedPreferences.getInstance().then((p) => p.setInt(_kAdRotKey, next));
-
-    if (twoAds) {
-      // Grille 1 : annonces 0..3 → puis pub → grille 2 : reste → puis pub
-      widgets.add(buildGrid(properties.sublist(0, 4)));
-      widgets.add(Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: AdBannerCard(key: ValueKey('ads_first_${adFirst.id}'), ad: adFirst),
-      ));
-      widgets.add(buildGrid(properties.sublist(4)));
-    } else {
-      // Grille unique → pub à la fin
-      widgets.add(buildGrid(properties));
-    }
-
-    widgets.add(Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: AdBannerCard(
-          key: ValueKey('ads_last_${(twoAds ? adSecond : adFirst).id}'),
-          ad: twoAds ? adSecond : adFirst),
-    ));
-
-    return widgets;
+      ),
+    ];
   }
 
   Widget _buildBoostSectionHeader({required IconData icon, required String label, required Color color}) {
