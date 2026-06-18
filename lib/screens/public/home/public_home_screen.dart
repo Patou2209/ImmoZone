@@ -1875,31 +1875,46 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
-  // ── LISTE 1 CARTE PAR LIGNE ───────────────────────────────────────────────
+  // ── GRILLE RESPONSIVE (1 col mobile / 2 col tablette / 3+ col desktop) ──
   Widget _buildGrid(BuildContext context, List<PropertyModel> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: GridView.extent(
-        maxCrossAxisExtent: 400,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.889,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: items.map((p) {
-          return PropertyCard(
-            property: p,
-            isFavorite: _favorites.contains(p.id),
-            onFavorite: () => _toggleFavorite(p.id),
-            selectedCountry: _country,
-            onTap: () async {
-              await Navigator.push(context,
-                MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-              // Recharger les annonces au retour pour mettre à jour les vues
-              if (mounted) _loadData();
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final crossAxisCount = width < 600
+              ? 2        // mobile  : 2 colonnes
+              : width < 900
+                  ? 3    // tablette: 3 colonnes
+                  : width < 1200
+                      ? 4  // desktop : 4 colonnes
+                      : 5; // large   : 5 colonnes
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.72,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final p = items[index];
+              return PropertyCard(
+                property: p,
+                isFavorite: _favorites.contains(p.id),
+                onFavorite: () => _toggleFavorite(p.id),
+                selectedCountry: _country,
+                onTap: () async {
+                  await Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+                  if (mounted) _loadData();
+                },
+              );
             },
           );
-        }).toList(),
+        },
       ),
     );
   }
