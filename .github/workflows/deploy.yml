@@ -3,8 +3,8 @@ name: Build & Deploy ImmoZone Web
 on:
   push:
     branches:
-      - main          # Se déclenche uniquement sur push vers main
-  workflow_dispatch:  # Permet aussi de lancer manuellement depuis GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
@@ -13,38 +13,45 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # ── 1. Récupérer le code ───────────────────────────────────────────────
+      # ── 1. Récupérer le code ──────────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Installer Flutter avec cache ───────────────────────────────────
+      # ── 2. Installer Flutter avec cache ──────────────────────────────────
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.35.4'
           channel: 'stable'
-          cache: true                   # Cache le SDK Flutter → build 2x plus rapide
+          cache: true
 
-      # ── 3. Installer les dépendances ──────────────────────────────────────
+      # ── 3. Installer les dépendances ─────────────────────────────────────
       - name: Install dependencies
         run: flutter pub get
 
-      # ── 4. Build web release (sans Service Worker) ────────────────────────
+      # ── 4. Build web release (sans Service Worker) ───────────────────────
       - name: Build Flutter Web
         run: |
           flutter build web --release \
             --pwa-strategy=none \
             --dart-define=flutter.inspector.structuredErrors=false
 
-      # ── 5. Supprimer le Service Worker (cause des erreurs sur Firebase) ────
+      # ── 5. Supprimer le Service Worker ───────────────────────────────────
       - name: Remove Service Worker
         run: rm -f build/web/flutter_service_worker.js
 
-      # ── 6. Déployer sur Firebase Hosting ──────────────────────────────────
+      # ── 6. Installer Firebase CLI ────────────────────────────────────────
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      # ── 7. Déployer sur Firebase Hosting via Service Account ─────────────
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: immozone-d9a68
-          channelId: live              # Déploie sur le canal production (live)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          firebase deploy --only hosting \
+            --project immozone-d9a68 \
+            --non-interactive
+          rm /tmp/sa.json
