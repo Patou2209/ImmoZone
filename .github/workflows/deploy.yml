@@ -1,4 +1,4 @@
-name: Build & Deploy ImmoZone Web
+name: Build and Deploy ImmoZone Web
 
 on:
   push:
@@ -6,18 +6,21 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build_and_deploy:
     name: Flutter Build + Firebase Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-      # ── 1. Récupérer le code ──────────────────────────────────────────────
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Installer Flutter avec cache ──────────────────────────────────
+      # 2. Setup Flutter SDK
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -25,33 +28,28 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # ── 3. Installer les dépendances ─────────────────────────────────────
+      # 3. Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # ── 4. Build web release (sans Service Worker) ───────────────────────
+      # 4. Build Flutter web (no Service Worker)
       - name: Build Flutter Web
-        run: |
-          flutter build web --release \
-            --pwa-strategy=none \
-            --dart-define=flutter.inspector.structuredErrors=false
+        run: flutter build web --release --pwa-strategy=none --dart-define=flutter.inspector.structuredErrors=false
 
-      # ── 5. Supprimer le Service Worker ───────────────────────────────────
+      # 5. Remove Service Worker if it exists
       - name: Remove Service Worker
         run: rm -f build/web/flutter_service_worker.js
 
-      # ── 6. Installer Firebase CLI ────────────────────────────────────────
+      # 6. Install Firebase CLI
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      # ── 7. Déployer sur Firebase Hosting via Service Account ─────────────
+      # 7. Deploy to Firebase Hosting
       - name: Deploy to Firebase Hosting
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > /tmp/sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
-          firebase deploy --only hosting \
-            --project immozone-d9a68 \
-            --non-interactive
+          firebase deploy --only hosting --project immozone-d9a68 --non-interactive
           rm /tmp/sa.json
