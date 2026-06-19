@@ -384,3 +384,30 @@ await FirebaseAppCheck.instance.activate(
 ---
 
 *Document généré le 18/06/2026 — ImmoZone v1.2.59*
+
+
+4. Domaine personnalisé GoDaddy → Firebase
+Etape 1 — Acheter le domaine chez GoDaddy
+Copyhttps://www.godaddy.com
+→ Recherchez : immozone.cd  /  immozone.com  /  immo-zone.net
+→ Achetez le domaine souhaite
+Etape 2 — Ajouter le domaine dans Firebase Console
+Copy1. https://console.firebase.google.com/project/immozone-d9a68/hosting
+2. Cliquez "Add custom domain"
+3. Entrez : www.votredomaine.com
+4. Firebase vous fournit les enregistrements DNS a configurer
+Etape 3 — Configurer les DNS chez GoDaddy
+CopyGoDaddy → Mon compte → Mes domaines → Gerer DNS
+→ Supprimer les enregistrements A existants (parking GoDaddy)
+→ Ajouter les enregistrements fournis par Firebase :
+Type	Nom	Valeur	                 TTL
+A	     @	(IP fournie par Firebase)	600
+A	     @	(IP fournie par Firebase)	600
+CNAME	www	immozone-d9a68.web.app.	  3600
+Les adresses IP exactes sont generees par Firebase au moment de l'ajout du domaine. Utiliser toujours les valeurs affichees dans la console Firebase.
+
+Etape 4 — Verification et SSL automatique
+Copy→ Firebase verifie les DNS automatiquement
+→ Delai de propagation : 24 a 48 heures
+→ Certificat SSL (HTTPS) genere automatiquement par Firebase — GRATUIT
+→ Aucune configuration supplementaire necessaire
