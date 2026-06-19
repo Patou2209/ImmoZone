@@ -1,0 +1,50 @@
+name: Build & Deploy ImmoZone Web
+
+on:
+  push:
+    branches:
+      - main          # Se déclenche uniquement sur push vers main
+  workflow_dispatch:  # Permet aussi de lancer manuellement depuis GitHub
+
+jobs:
+  build_and_deploy:
+    name: Flutter Build + Firebase Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # ── 1. Récupérer le code ───────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Installer Flutter avec cache ───────────────────────────────────
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: 'stable'
+          cache: true                   # Cache le SDK Flutter → build 2x plus rapide
+
+      # ── 3. Installer les dépendances ──────────────────────────────────────
+      - name: Install dependencies
+        run: flutter pub get
+
+      # ── 4. Build web release (sans Service Worker) ────────────────────────
+      - name: Build Flutter Web
+        run: |
+          flutter build web --release \
+            --pwa-strategy=none \
+            --dart-define=flutter.inspector.structuredErrors=false
+
+      # ── 5. Supprimer le Service Worker (cause des erreurs sur Firebase) ────
+      - name: Remove Service Worker
+        run: rm -f build/web/flutter_service_worker.js
+
+      # ── 6. Déployer sur Firebase Hosting ──────────────────────────────────
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: immozone-d9a68
+          channelId: live              # Déploie sur le canal production (live)
