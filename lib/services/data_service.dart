@@ -977,6 +977,20 @@ class DataService {
     await _notificationsCol.doc(notif.id).set(notif.toMap());
   }
 
+  /// Récupère toutes les notifications (tous utilisateurs) — Admin Service Client
+  Future<List<AppNotification>> getGlobalNotifications() async {
+    try {
+      final snap = await _notificationsCol.get();
+      final list = snap.docs
+          .map((d) => AppNotification.fromMap(d.data() as Map<String, dynamic>))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> markNotificationRead(String notifId) async {
     await _notificationsCol.doc(notifId).update({'isRead': true});
   }

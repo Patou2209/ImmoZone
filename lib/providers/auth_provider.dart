@@ -25,6 +25,9 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == 'admin';
+  bool get isAdminFinancier => _currentUser?.role == 'admin_financier';
+  bool get isAdminServiceClient => _currentUser?.role == 'admin_service_client';
+  bool get isAnyAdmin => _currentUser?.isAdminRole ?? false;
   bool get isAnnonceur => _currentUser?.role == 'annonceur';
   bool get isDemandeur => _currentUser?.role == 'demandeur';
 
@@ -131,9 +134,10 @@ class AuthProvider extends ChangeNotifier {
       }
 
       // ── ÉTAPE 3 : Connexion réussie ──────────────────────────────────────────
-      // Pour l'admin : tenter aussi la connexion Firebase Auth (email virtuel)
-      // pour maintenir la session Firebase (accès Firestore sécurisé).
-      if (userProfile.role == 'admin') {
+      // Pour tous les rôles admin (admin, admin_financier, admin_service_client) :
+      // tenter la connexion Firebase Auth (email virtuel) pour maintenir la
+      // session Firebase et accéder à Firestore de façon sécurisée.
+      if (userProfile.isAdminRole) {
         try {
           final virtualEmail = phoneToVirtualEmail(normalizedPhone);
           await _auth.signInWithEmailAndPassword(

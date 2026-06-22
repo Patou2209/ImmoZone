@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/constants/app_constants.dart';
 import '../../services/data_service.dart';
 import 'dashboard/admin_dashboard_screen.dart';
 import 'reception/admin_reception_screen.dart';
@@ -7,6 +8,8 @@ import 'properties/admin_properties_screen.dart';
 import 'users/admin_users_screen.dart';
 import 'settings/admin_settings_screen.dart';
 import 'ads/admin_ads_screen.dart';
+import 'financier/admin_financier_home_screen.dart';
+import 'service_client/admin_service_client_home_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -19,6 +22,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _pendingCount = 0;
   final _ds = DataService();
 
+  // Rôle courant (lu depuis SharedPreferences)
+  String get _currentRole => _ds.currentUserRole;
+
+  bool get _isAdminFinancier => _currentRole == AppConstants.roleAdminFinancier;
+  bool get _isAdminServiceClient => _currentRole == AppConstants.roleAdminServiceClient;
+
   @override
   void initState() {
     super.initState();
@@ -26,8 +35,19 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _loadPendingCount() async {
+    if (_isAdminFinancier || _isAdminServiceClient) return; // pas besoin
     final pending = await _ds.getPendingProperties();
     if (mounted) setState(() => _pendingCount = pending.length);
+  }
+
+  // ── Admin Financier — écran unique ──────────────────────────────────────
+  Widget _buildFinancierScaffold() {
+    return const AdminFinancierHomeScreen();
+  }
+
+  // ── Admin Service Client — écran unique ─────────────────────────────────
+  Widget _buildServiceClientScaffold() {
+    return const AdminServiceClientHomeScreen();
   }
 
   final List<Widget> _screens = const [
@@ -41,6 +61,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Rôles spéciaux : écran dédié sans bottom nav
+    if (_isAdminFinancier) return _buildFinancierScaffold();
+    if (_isAdminServiceClient) return _buildServiceClientScaffold();
+
+    // Admin général : navigation complète
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,

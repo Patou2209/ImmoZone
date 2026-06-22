@@ -155,6 +155,10 @@ class UserModel {
     switch (role) {
       case 'admin':
         return 'Administrateur';
+      case 'admin_financier':
+        return 'Admin Financier';
+      case 'admin_service_client':
+        return 'Admin Service Client';
       case 'annonceur':
         return category ?? 'Annonceur';
       case 'demandeur':
@@ -163,6 +167,9 @@ class UserModel {
         return role;
     }
   }
+
+  bool get isAdminRole =>
+      role == 'admin' || role == 'admin_financier' || role == 'admin_service_client';
 
   /// Label court de la catégorie annonceur pour affichage badge
   String get categoryLabel => category ?? '';

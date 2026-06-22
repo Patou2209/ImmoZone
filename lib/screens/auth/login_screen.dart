@@ -63,7 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _fullPhone, _passwordCtrl.text.trim());
     if (!mounted) return;
     if (ok) {
-      if (auth.isAdmin) {
+      // Tous les rôles admin (admin, admin_financier, admin_service_client)
+      // sont redirigés vers /admin — AdminHomeScreen affiche l'écran approprié
+      if (auth.isAnyAdmin) {
         Navigator.of(context).pushReplacementNamed('/admin');
       } else {
         Navigator.of(context).pushReplacementNamed('/public');

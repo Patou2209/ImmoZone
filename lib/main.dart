@@ -115,7 +115,9 @@ class _SplashScreenState extends State<SplashScreen>
     await auth.checkAuth();
     if (!mounted) return;
     if (auth.isLoggedIn) {
-      if (auth.isAdmin) {
+      // Tous les rôles admin (general, financier, service client) → /admin
+      // AdminHomeScreen détecte ensuite le rôle et affiche l'écran approprié
+      if (auth.isAnyAdmin) {
         Navigator.of(context).pushReplacementNamed('/admin');
       } else {
         Navigator.of(context).pushReplacementNamed('/public');

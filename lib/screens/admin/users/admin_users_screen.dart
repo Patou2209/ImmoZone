@@ -3,6 +3,7 @@ import '../../../services/data_service.dart';
 import '../../../models/user_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import 'admin_create_subadmin_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   const AdminUsersScreen({super.key});
@@ -23,7 +24,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 3, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadUsers());
   }
 
@@ -35,7 +36,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
     try {
       final users = await _dataService.getUsers();
       setState(() {
-        _users = users.where((u) => u.role != AppConstants.roleAdmin).toList();
+        _users = users;
         _isLoading = false;
         _loadError = null;
       });
@@ -47,9 +48,17 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
     }
   }
 
+  List<UserModel> get _adminUsers => _users
+      .where((u) => AppConstants.allAdminRoles.contains(u.role))
+      .toList();
+
   List<UserModel> _filtered(String role) {
-    return _users.where((u) {
-      final matchRole = role == 'Tous' || u.role == role;
+    // Onglet Tous / Annonceurs / Demandeurs: exclure les comptes admin
+    final baseList = (role == 'Admins')
+        ? _adminUsers
+        : _users.where((u) => !AppConstants.allAdminRoles.contains(u.role)).toList();
+    return baseList.where((u) {
+      final matchRole = role == 'Tous' || role == 'Admins' || u.role == role;
       final matchSearch = _searchQuery.isEmpty ||
           u.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           u.email.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -62,6 +71,21 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
   void dispose() {
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  /// Seul l'admin avec le numéro 0821908888 est le principal admin protégé.
+  /// Les autres admins créés avec role=='admin' peuvent être supprimés.
+  bool _isPrincipalAdminPhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+    // Formes stockées possibles :
+    //   "0821908888"        → local
+    //   "+243821908888"     → international avec +
+    //   "243821908888"      → international sans +
+    //   "+2430821908888"    → international avec 0 local conservé
+    return digits == '0821908888' ||
+        digits == '243821908888' ||
+        digits == '2430821908888' ||
+        digits.endsWith('0821908888');
   }
 
   @override
@@ -117,6 +141,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
                   Tab(
                       text:
                           'Demandeurs (${_filtered(AppConstants.roleDemandeur).length})'),
+                  Tab(
+                      text: 'Admins (${_adminUsers.length})'),
                 ],
               ),
             ],
@@ -158,8 +184,24 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
                 _buildList('Tous'),
                 _buildList(AppConstants.roleAnnonceur),
                 _buildList(AppConstants.roleDemandeur),
+                _buildAdminList(),
               ],
             ),
+      floatingActionButton: AnimatedBuilder(
+        animation: _tabCtrl,
+        builder: (context, _) {
+          // FAB visible uniquement sur l'onglet Admins
+          if (_tabCtrl.index != 3) return const SizedBox.shrink();
+          return FloatingActionButton.extended(
+            onPressed: _openCreateSubAdmin,
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.admin_panel_settings_rounded),
+            label: const Text('Créer admin',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          );
+        },
+      ),
     );
   }
 
@@ -221,6 +263,86 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
                 }
               }
             },
+            onViewDetails: () => _showUserDetails(context, user),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openCreateSubAdmin() async {
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminCreateSubAdminScreen()),
+    );
+    if (created == true) {
+      _loadUsers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Compte admin créé avec succès',
+              style: TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
+  }
+
+  Widget _buildAdminList() {
+    final items = _adminUsers;
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.admin_panel_settings_outlined,
+                size: 64,
+                color: AppTheme.textHint.withValues(alpha: 0.5)),
+            const SizedBox(height: 12),
+            const Text('Aucun sous-admin créé',
+                style: TextStyle(
+                    color: AppTheme.textSecondary, fontFamily: 'Poppins')),
+            const SizedBox(height: 6),
+            const Text('Appuyez sur + pour créer un compte admin',
+                style: TextStyle(
+                    color: AppTheme.textHint,
+                    fontFamily: 'Poppins',
+                    fontSize: 11)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadUsers,
+      color: AppTheme.accentColor,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: items.length,
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, indent: 72, endIndent: 16),
+        itemBuilder: (context, index) {
+          final user = items[index];
+          // L'Administrateur Général (role == 'admin') est protégé contre la suppression
+          final isPrincipalAdmin = _isPrincipalAdminPhone(user.phone);
+          return _AdminUserTile(
+            user: user,
+            canDelete: !isPrincipalAdmin,
+            onDelete: isPrincipalAdmin
+                ? () {}
+                : () async {
+                    final confirm = await _confirmDelete(context, user.name);
+                    if (confirm == true) {
+                      await _dataService.deleteUser(user.id);
+                      _loadUsers();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Compte admin supprimé'),
+                              backgroundColor: AppTheme.errorColor),
+                        );
+                      }
+                    }
+                  },
             onViewDetails: () => _showUserDetails(context, user),
           );
         },
@@ -528,6 +650,170 @@ class _UserTile extends StatelessWidget {
                         fontSize: 13,
                         color: AppTheme.errorColor)),
               ])),
+        ],
+      ),
+      onTap: onViewDetails,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _AdminUserTile — tuile spéciale pour les comptes admin
+// ─────────────────────────────────────────────────────────────────────────────
+class _AdminUserTile extends StatelessWidget {
+  final UserModel user;
+  final bool canDelete;
+  final VoidCallback onDelete;
+  final VoidCallback onViewDetails;
+
+  const _AdminUserTile({
+    required this.user,
+    this.canDelete = true,
+    required this.onDelete,
+    required this.onViewDetails,
+  });
+
+  Color _roleColor() {
+    switch (user.role) {
+      case AppConstants.roleAdmin:
+        return AppTheme.primaryColor;
+      case AppConstants.roleAdminFinancier:
+        return const Color(0xFF2E7D32);
+      case AppConstants.roleAdminServiceClient:
+        return const Color(0xFF1565C0);
+      default:
+        return AppTheme.accentColor;
+    }
+  }
+
+  IconData _roleIcon() {
+    switch (user.role) {
+      case AppConstants.roleAdmin:
+        return Icons.shield_rounded;
+      case AppConstants.roleAdminFinancier:
+        return Icons.account_balance_wallet_rounded;
+      case AppConstants.roleAdminServiceClient:
+        return Icons.support_agent_rounded;
+      default:
+        return Icons.admin_panel_settings_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final roleColor = _roleColor();
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: roleColor.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(_roleIcon(), color: roleColor, size: 22),
+      ),
+      title: Row(children: [
+        Expanded(
+          child: Text(user.name,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: AppTheme.textPrimary)),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: roleColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            user.roleLabel,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: roleColor),
+          ),
+        ),
+      ]),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(user.phone,
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  fontFamily: 'Poppins')),
+          if (user.email.isNotEmpty && !user.email.contains('@immozone.app'))
+            Text(user.email,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textHint,
+                    fontFamily: 'Poppins')),
+        ],
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Bouclier visible pour l'Administrateur Général (protégé)
+          if (!canDelete)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Tooltip(
+                message: 'Administrateur principal — suppression désactivée',
+                child: Icon(Icons.lock_rounded,
+                    size: 16,
+                    color: AppTheme.primaryColor.withValues(alpha: 0.5)),
+              ),
+            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+            onSelected: (value) {
+              if (value == 'details') onViewDetails();
+              if (value == 'delete') onDelete();
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                  value: 'details',
+                  child: Row(children: [
+                    Icon(Icons.info_outline,
+                        size: 18, color: AppTheme.accentColor),
+                    SizedBox(width: 10),
+                    Text('Voir détails',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                  ])),
+              // Option supprimer seulement pour les sous-admins
+              if (canDelete)
+                const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(children: [
+                      Icon(Icons.delete_outline,
+                          size: 18, color: AppTheme.errorColor),
+                      SizedBox(width: 10),
+                      Text('Supprimer',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              color: AppTheme.errorColor)),
+                    ])),
+              // Message d'info pour l'admin principal
+              if (!canDelete)
+                const PopupMenuItem(
+                    enabled: false,
+                    child: Row(children: [
+                      Icon(Icons.lock_rounded,
+                          size: 18, color: AppTheme.textHint),
+                      SizedBox(width: 10),
+                      Text('Admin principal protégé',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: AppTheme.textHint,
+                              fontStyle: FontStyle.italic)),
+                    ])),
+            ],
+          ),
         ],
       ),
       onTap: onViewDetails,
