@@ -411,3 +411,18 @@ Copy→ Firebase verifie les DNS automatiquement
 → Delai de propagation : 24 a 48 heures
 → Certificat SSL (HTTPS) genere automatiquement par Firebase — GRATUIT
 → Aucune configuration supplementaire necessaire
+
+///////////////////===============/////////////////////////////////////
+
+# BASH POUR METTRE A JOUR LE COTE WEB APRES CHAQUE MODIFICATION
+# Dans le project Immozone:
+git pull origin main  //pour pull les modification faites sur Genspark
+flutter build web --release  // pour build la version web du plateforme(conformement a l'application android)
+npm install -g firebase-tools  // pour installer le Firebase CLI (si pas deja faites)
+Si npm n'est pas reconnu non plus, installez d'abord Node.js : https://nodejs.org (version LTS) puis relancez PowerShell.
+firebase login  // pour se connecter a firebase qui contient votre project; Un navigateur va s'ouvrir → connectez-vous avec le compte Google lié à votre projet Firebase (immozone-d9a68).
+firebase deploy --only hosting  // pour le deployement.
+
+
+
+
