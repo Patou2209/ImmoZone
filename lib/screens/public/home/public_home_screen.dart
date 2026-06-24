@@ -2141,6 +2141,7 @@ class _HomeTabState extends State<_HomeTab>
       _buildStatsCard(
         icon: Icons.store_rounded,
         titleIcon: Icons.fiber_manual_record_rounded, // petit point orange
+        accentIconColor: const Color(0xFFFFA726),     // icône container orange
         title: 'Marché Immobilier — Disponibilités',
         tooltipMsg: 'Cliquez sur une catégorie pour filtrer les annonces',
         rows: !_statsLoading ? [
@@ -2157,9 +2158,9 @@ class _HomeTabState extends State<_HomeTab>
           _statRow('Bureaux en vente',                    _stats['bureauVente'] ?? 0,        const Color(0xFFA0C4FF),
               typeFilter: 'Bureau',                   transactionFilter: 'Vente'),
           _statRow('Propriétés commerciales',             _stats['propCommerciale'] ?? 0,    Colors.teal.shade300,
-              typeFilter: 'Propriété Commerciale'),
+              typeFilter: 'Propriété commerciale'),
           _statRow('Propriétés industrielles',            _stats['propIndustrielle'] ?? 0,   Colors.teal.shade200,
-              typeFilter: 'Propriété Industrielle'),
+              typeFilter: 'Propriété industrielle'),
           _statRow('Terrains disponibles',                _stats['terrainDispo'] ?? 0,       AppTheme.warningColor,
               typeFilter: 'Terrain à bâtir',         transactionFilter: 'Vente'),
           _statRow('Concessions disponibles',             _stats['concessionDispo'] ?? 0,    Colors.orange.shade200,
@@ -2167,11 +2168,11 @@ class _HomeTabState extends State<_HomeTab>
           _statRow('Chambres d’hôtel en location',       _stats['chambreHotel'] ?? 0,       Colors.pink.shade200,
               typeFilter: 'Chambre d’hôtel',          transactionFilter: 'Location'),
           _statRow('Salles des fêtes disponibles',        _stats['salleFetes'] ?? 0,         Colors.purple.shade300,
-              typeFilter: 'Salle de Fêtes'),
+              typeFilter: 'Salle de fêtes'),
           _statRow('Salles polyvalentes disponibles',      _stats['sallePolyvalente'] ?? 0,   Colors.purple.shade200,
               typeFilter: 'Salle polyvalente'),
           _statRow('Espaces funéraires disponibles',      _stats['espaceFuneraire'] ?? 0,    Colors.blueGrey.shade300,
-              typeFilter: 'Espace Funéraire'),
+              typeFilter: 'Espace funéraire'),
           const Divider(height: 1, color: Colors.white12),
           _statRow('Total annonces actives',              _stats['totalActif'] ?? 0,         AppTheme.accentColor,
               total: true),
@@ -2201,7 +2202,7 @@ class _HomeTabState extends State<_HomeTab>
           _statRow('Bureaux occupés',          _stats['hist72_bureauOccupe'] ?? 0,  Colors.orange.shade200,
               typeFilter: 'Bureau',          transactionFilter: 'Location', initialHistorique: true),
           _statRow('Salles occupées',          _stats['hist72_salleOccupee'] ?? 0,  Colors.amber.shade200,
-              typeFilter: 'Salle de Fêtes',                                 initialHistorique: true),
+              typeFilter: 'Salle de fêtes',                                 initialHistorique: true),
           const Divider(height: 1, color: Colors.white12),
           _statRow('Total transactions récentes', _stats['hist72_total'] ?? 0,     Colors.amber.shade300,
               total: true),

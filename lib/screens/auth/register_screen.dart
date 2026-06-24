@@ -419,11 +419,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -461,11 +461,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -635,11 +635,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.group_add_outlined, color: AppTheme.accentColor),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
