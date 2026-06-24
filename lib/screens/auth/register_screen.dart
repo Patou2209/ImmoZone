@@ -33,6 +33,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool    _obscureConfirm   = true;
   bool    _isSending        = false;
   String? _selectedCategory;
+  String? _selectedProvince; // province de résidence (obligatoire)
+  String? _selectedCity;     // ville de résidence (obligatoire)
 
   String get _fullPhone => '$_phoneCountryCode${_phoneNumberCtrl.text.trim()}';
 
@@ -50,6 +52,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _sendOtpAndRegister() async {
     if (_selectedCategory == null) {
       _showError('Veuillez sélectionner votre catégorie.');
+      return;
+    }
+    if (_selectedProvince == null) {
+      _showError('Veuillez sélectionner votre province de résidence.');
+      return;
+    }
+    if (_selectedCity == null) {
+      _showError('Veuillez sélectionner votre ville de résidence.');
       return;
     }
     if (!_formKey.currentState!.validate()) return;
@@ -75,6 +85,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             verificationId: verificationId,
             phoneAuthSvc:   _phoneAuthSvc,
             sponsorCode:    _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
+            province:       _selectedProvince,
+            city:           _selectedCity,
           ),
         ));
       },
@@ -91,6 +103,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           role:        AppConstants.roleAnnonceur,
           category:    _selectedCategory,
           sponsorCode: _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
+          province:    _selectedProvince,
+          city:        _selectedCity,
         );
         if (!mounted) return;
         if (ok) {
@@ -419,6 +433,105 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   validator: (v) =>
                       v != _passwordCtrl.text ? 'Les mots de passe ne correspondent pas' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Province + Ville de résidence (obligatoire) ──────────
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.location_on_rounded, color: AppTheme.accentColor, size: 16),
+                        const SizedBox(width: 6),
+                        const Text('Lieu de résidence *',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentColor)),
+                      ]),
+                      const SizedBox(height: 4),
+                      const Text(
+                          'Ces informations ne vous empêchent pas de poster '
+                          'des annonces partout ailleurs en RDC.',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10.5,
+                              color: AppTheme.textSecondary,
+                              height: 1.4)),
+                      const SizedBox(height: 10),
+                      // Province dropdown
+                      DropdownButtonFormField<String>(
+                        value: _selectedProvince,
+                        decoration: InputDecoration(
+                          labelText: 'Province de résidence *',
+                          prefixIcon: const Icon(Icons.map_outlined, color: AppTheme.accentColor),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                        ),
+                        hint: const Text('Sélectionner une province',
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+                        isExpanded: true,
+                        items: AppConstants.getProvincesForCountry('Congo (RDC)')
+                            .map((p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(p, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          _selectedProvince = v;
+                          _selectedCity = null;
+                        }),
+                      ),
+                      const SizedBox(height: 10),
+                      // Ville dropdown (cascadé par province)
+                      DropdownButtonFormField<String>(
+                        value: _selectedCity,
+                        decoration: InputDecoration(
+                          labelText: 'Ville de résidence *',
+                          prefixIcon: const Icon(Icons.location_city_rounded, color: AppTheme.accentColor),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                        ),
+                        hint: Text(
+                            _selectedProvince == null
+                                ? 'Choisissez d\'abord une province'
+                                : 'Sélectionner une ville',
+                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+                        isExpanded: true,
+                        items: _selectedProvince == null
+                            ? []
+                            : AppConstants.getCitiesForProvince('Congo (RDC)', _selectedProvince!)
+                                .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
+                                .toList(),
+                        onChanged: _selectedProvince == null
+                            ? null
+                            : (v) => setState(() => _selectedCity = v),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 14),
 

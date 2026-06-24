@@ -21,6 +21,8 @@ class OtpRegisterScreen extends StatefulWidget {
   final String          verificationId;
   final PhoneAuthService phoneAuthSvc;
   final String?         sponsorCode; // code parrainage optionnel
+  final String?         province;    // province de résidence (obligatoire)
+  final String?         city;        // ville de résidence (obligatoire)
 
   const OtpRegisterScreen({
     super.key,
@@ -31,6 +33,8 @@ class OtpRegisterScreen extends StatefulWidget {
     required this.verificationId,
     required this.phoneAuthSvc,
     this.sponsorCode,
+    this.province,
+    this.city,
   });
 
   @override
@@ -141,6 +145,8 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
         role:        AppConstants.roleAnnonceur,
         category:    widget.category,
         sponsorCode: widget.sponsorCode,
+        province:    widget.province,
+        city:        widget.city,
       );
 
       if (!mounted) return;

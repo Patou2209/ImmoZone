@@ -116,6 +116,7 @@ class _StatsTabState extends State<_StatsTab> {
   String? _country;
   String? _province;
   String? _city;
+  String? _commune;
 
   bool _loading = true;
   PlatformStats _stats = PlatformStats.empty();
@@ -158,6 +159,7 @@ class _StatsTabState extends State<_StatsTab> {
         country: _country,
         province: _province,
         city: _city,
+        commune: _commune,
       );
       if (!mounted) return;
       setState(() {
@@ -205,6 +207,11 @@ class _StatsTabState extends State<_StatsTab> {
     return AppConstants.getCitiesForProvince(_country ?? 'Congo (RDC)', _province!);
   }
 
+  List<String> get _communes {
+    if (_city == null || _city!.isEmpty) return [];
+    return AppConstants.getCommunesForCity(_city!);
+  }
+
   // ── Export CSV — Statistiques plateforme ──────────────────────────────────
   Future<void> _exportStatsCsv() async {
     final r = _range;
@@ -216,6 +223,7 @@ class _StatsTabState extends State<_StatsTab> {
     if (_country != null) buf.writeln('Pays,${CsvExportService.q(_country)}');
     if (_province != null) buf.writeln('Province,${CsvExportService.q(_province)}');
     if (_city != null) buf.writeln('Ville,${CsvExportService.q(_city)}');
+    if (_commune != null) buf.writeln('Commune,${CsvExportService.q(_commune)}');
     buf.writeln('Généré le,${CsvExportService.fmtDateTime(DateTime.now())}');
     buf.writeln();
 
@@ -276,7 +284,7 @@ class _StatsTabState extends State<_StatsTab> {
       onRefresh: _load,
       color: AppTheme.accentColor,
       child: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + MediaQuery.of(context).padding.bottom),
         children: [
           // ── Filtres période ──────────────────────────────────────────────
           _PeriodFilter(
@@ -301,13 +309,16 @@ class _StatsTabState extends State<_StatsTab> {
             country: _country,
             province: _province,
             city: _city,
+            commune: _commune,
             provinces: _provinces,
             cities: _cities,
+            communes: _communes,
             onCountryChanged: (v) {
               setState(() {
                 _country = v;
                 _province = null;
                 _city = null;
+                _commune = null;
               });
               _load();
             },
@@ -315,11 +326,19 @@ class _StatsTabState extends State<_StatsTab> {
               setState(() {
                 _province = v;
                 _city = null;
+                _commune = null;
               });
               _load();
             },
             onCityChanged: (v) {
-              setState(() => _city = v);
+              setState(() {
+                _city = v;
+                _commune = null;
+              });
+              _load();
+            },
+            onCommuneChanged: (v) {
+              setState(() => _commune = v);
               _load();
             },
             onClear: () {
@@ -327,6 +346,7 @@ class _StatsTabState extends State<_StatsTab> {
                 _country = null;
                 _province = null;
                 _city = null;
+                _commune = null;
               });
               _load();
             },
@@ -360,7 +380,7 @@ class _StatsTabState extends State<_StatsTab> {
 
             // ── Bouton Export CSV ─────────────────────────────────────────
             _ExportCsvButton(onPressed: _exportStatsCsv, label: 'Exporter Statistiques CSV'),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ],
       ),
@@ -917,28 +937,34 @@ class _GeoFilter extends StatelessWidget {
   final String? country;
   final String? province;
   final String? city;
+  final String? commune;
   final List<String> provinces;
   final List<String> cities;
+  final List<String> communes;
   final void Function(String?) onCountryChanged;
   final void Function(String?) onProvinceChanged;
   final void Function(String?) onCityChanged;
+  final void Function(String?) onCommuneChanged;
   final VoidCallback onClear;
 
   const _GeoFilter({
     required this.country,
     required this.province,
     required this.city,
+    required this.commune,
     required this.provinces,
     required this.cities,
+    required this.communes,
     required this.onCountryChanged,
     required this.onProvinceChanged,
     required this.onCityChanged,
+    required this.onCommuneChanged,
     required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
-    final hasFilter = country != null || province != null || city != null;
+    final hasFilter = country != null || province != null || city != null || commune != null;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -976,12 +1002,13 @@ class _GeoFilter extends StatelessWidget {
             ),
         ]),
         const SizedBox(height: 8),
+        // Ligne 1 : Pays + Province
         Row(children: [
           // Pays
           Expanded(
               child: _DropdownGeo<String>(
             value: country,
-            hint: 'Tous les pays',
+            hint: 'Pays',
             items: AppConstants.filterCountries,
             onChanged: onCountryChanged,
           )),
@@ -994,7 +1021,10 @@ class _GeoFilter extends StatelessWidget {
             items: provinces,
             onChanged: provinces.isEmpty ? null : onProvinceChanged,
           )),
-          const SizedBox(width: 8),
+        ]),
+        const SizedBox(height: 8),
+        // Ligne 2 : Ville + Commune
+        Row(children: [
           // Ville
           Expanded(
               child: _DropdownGeo<String>(
@@ -1002,6 +1032,15 @@ class _GeoFilter extends StatelessWidget {
             hint: 'Ville',
             items: cities,
             onChanged: cities.isEmpty ? null : onCityChanged,
+          )),
+          const SizedBox(width: 8),
+          // Commune
+          Expanded(
+              child: _DropdownGeo<String>(
+            value: commune,
+            hint: 'Commune',
+            items: communes,
+            onChanged: communes.isEmpty ? null : onCommuneChanged,
           )),
         ]),
       ]),

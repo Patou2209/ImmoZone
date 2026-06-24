@@ -442,6 +442,8 @@ class DataService {
     String? uid, // Firebase Auth UID
     bool isVerified = false, // true pour les comptes vérifiés par OTP
     String? sponsorCode, // code parrainage saisi à l'inscription
+    String? province,    // province de résidence
+    String? city,        // ville de résidence
   }) async {
     final userId = uid ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -470,6 +472,8 @@ class DataService {
       createdAt: DateTime.now(),
       isVerified: isVerified, // transmis depuis le flux d'inscription
       sponsorCode: sponsorCode,
+      province: province,
+      city: city,
     );
 
     // Écriture Firestore — on laisse remonter l'exception pour un vrai message d'erreur
@@ -1960,6 +1964,7 @@ class DataService {
     String? country,
     String? province,
     String? city,
+    String? commune,
   }) async {
     final allUsers = await getUsers();
     final allProperties = await getProperties();
@@ -1979,6 +1984,7 @@ class DataService {
       if (country != null && country.isNotEmpty && (u.country ?? '') != country) return false;
       if (province != null && province.isNotEmpty && (u.province ?? '') != province) return false;
       if (city != null && city.isNotEmpty && (u.city ?? '') != city) return false;
+      if (commune != null && commune.isNotEmpty && (u.commune ?? '') != commune) return false;
       return true;
     }
 
@@ -1987,6 +1993,7 @@ class DataService {
       if (country != null && country.isNotEmpty && p.country != country) return false;
       if (province != null && province.isNotEmpty && p.province != province) return false;
       if (city != null && city.isNotEmpty && p.city != city) return false;
+      // commune : on filtre sur les annonces si le champ exist dans PropertyModel
       return true;
     }
 

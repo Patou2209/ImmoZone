@@ -559,6 +559,8 @@ class AuthProvider extends ChangeNotifier {
     required String role,
     String? category,
     String? sponsorCode,
+    String? province,
+    String? city,
   }) async {
     _isLoading = true;
     _error = null;
@@ -619,6 +621,8 @@ class AuthProvider extends ChangeNotifier {
             uid: uid,
             isVerified: true,   // ✅ OTP validé = numéro vérifié
             sponsorCode: sponsorCode,
+            province: province,
+            city: city,
           );
           lastError = null;
           break;
@@ -666,6 +670,8 @@ class AuthProvider extends ChangeNotifier {
               category: category,
               uid: uid,
               isVerified: true, // ✅ OTP validé = numéro vérifié
+              province: province,
+              city: city,
             );
             if (retryUser != null) {
               _currentUser = retryUser;
