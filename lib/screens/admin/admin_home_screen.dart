@@ -10,6 +10,7 @@ import 'settings/admin_settings_screen.dart';
 import 'ads/admin_ads_screen.dart';
 import 'financier/admin_financier_home_screen.dart';
 import 'service_client/admin_service_client_home_screen.dart';
+import 'marketing/admin_marketing_home_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -27,6 +28,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   bool get _isAdminFinancier => _currentRole == AppConstants.roleAdminFinancier;
   bool get _isAdminServiceClient => _currentRole == AppConstants.roleAdminServiceClient;
+  bool get _isAdminMarketing => _currentRole == AppConstants.roleAdminMarketing;
 
   @override
   void initState() {
@@ -35,7 +37,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Future<void> _loadPendingCount() async {
-    if (_isAdminFinancier || _isAdminServiceClient) return; // pas besoin
+    if (_isAdminFinancier || _isAdminServiceClient || _isAdminMarketing) return; // pas besoin
     final pending = await _ds.getPendingProperties();
     if (mounted) setState(() => _pendingCount = pending.length);
   }
@@ -48,6 +50,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   // ── Admin Service Client — écran unique ─────────────────────────────────
   Widget _buildServiceClientScaffold() {
     return const AdminServiceClientHomeScreen();
+  }
+
+  // ── Admin Marketing — écran unique ──────────────────────────────────────
+  Widget _buildMarketingScaffold() {
+    return const AdminMarketingHomeScreen();
   }
 
   final List<Widget> _screens = const [
@@ -64,6 +71,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     // Rôles spéciaux : écran dédié sans bottom nav
     if (_isAdminFinancier) return _buildFinancierScaffold();
     if (_isAdminServiceClient) return _buildServiceClientScaffold();
+    if (_isAdminMarketing) return _buildMarketingScaffold();
 
     // Admin général : navigation complète
     return Scaffold(

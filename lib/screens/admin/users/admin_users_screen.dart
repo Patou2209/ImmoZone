@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/data_service.dart';
+import '../../../services/csv_export_service.dart';
 import '../../../models/user_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
@@ -97,6 +98,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
         automaticallyImplyLeading: false,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadUsers),
+          IconButton(
+            icon: const Icon(Icons.download_outlined),
+            tooltip: 'Exporter CSV',
+            onPressed: _isLoading ? null : _exportCsv,
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(100),
@@ -285,6 +291,58 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
           behavior: SnackBarBehavior.floating,
         ));
       }
+    }
+  }
+
+  // ── Export CSV — tous les utilisateurs selon l'onglet actif ──────────────
+  Future<void> _exportCsv() async {
+    if (_users.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Aucun utilisateur à exporter',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.errorColor,
+      ));
+      return;
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('Export Utilisateurs ImmoZone');
+    buf.writeln('Généré le,${CsvExportService.fmtDateTime(DateTime.now())}');
+    buf.writeln('Total,${_users.length}');
+    buf.writeln();
+    buf.writeln('Nom,Téléphone,Email,Rôle,Ville,Actif,Vérifié,Date Inscription');
+    for (final u in _users) {
+      buf.writeln(
+          '${CsvExportService.q(u.name)},'
+          '${CsvExportService.q(u.phone)},'
+          '${CsvExportService.q(u.email)},'
+          '${CsvExportService.q(u.roleLabel)},'
+          '${CsvExportService.q(u.city)},'
+          '${u.isActive ? "Oui" : "Non"},'
+          '${u.isVerified ? "Oui" : "Non"},'
+          '${CsvExportService.fmtDate(u.createdAt)}');
+    }
+
+    final csv = buf.toString();
+    final fname = CsvExportService.fileName('utilisateurs');
+    final path = await CsvExportService.export(csvContent: csv, fileName: fname);
+
+    if (!mounted) return;
+    if (path != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('CSV exporté : $fname',
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erreur lors de l\'export',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.errorColor,
+      ));
     }
   }
 
@@ -681,6 +739,8 @@ class _AdminUserTile extends StatelessWidget {
         return const Color(0xFF2E7D32);
       case AppConstants.roleAdminServiceClient:
         return const Color(0xFF1565C0);
+      case AppConstants.roleAdminMarketing:
+        return const Color(0xFFE65100);
       default:
         return AppTheme.accentColor;
     }
@@ -694,6 +754,8 @@ class _AdminUserTile extends StatelessWidget {
         return Icons.account_balance_wallet_rounded;
       case AppConstants.roleAdminServiceClient:
         return Icons.support_agent_rounded;
+      case AppConstants.roleAdminMarketing:
+        return Icons.campaign_rounded;
       default:
         return Icons.admin_panel_settings_rounded;
     }

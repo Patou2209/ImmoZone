@@ -8,6 +8,7 @@ import '../../../models/app_notification_model.dart';
 import '../../../models/credit_model.dart';
 import '../../../models/user_model.dart';
 import '../../../services/data_service.dart';
+import '../../../services/csv_export_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AdminServiceClientHomeScreen
@@ -110,6 +111,45 @@ class _AdminServiceClientHomeScreenState
     ));
   }
 
+  // ── Export CSV — toutes les transactions Service Client ───────────────────
+  Future<void> _exportCsv() async {
+    if (_allPayments.isEmpty) {
+      _snackErr('Aucune transaction à exporter');
+      return;
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('Export Service Client ImmoZone');
+    buf.writeln('Généré le,${CsvExportService.fmtDateTime(DateTime.now())}');
+    buf.writeln('Total transactions,${_allPayments.length}');
+    buf.writeln('En attente validation,${_awaitingManual.length}');
+    buf.writeln('Transactions (dernière heure),${_lastHourConfirmed.length}');
+    buf.writeln();
+
+    buf.writeln('Date/Heure,Utilisateur,Téléphone,Type,Montant (USD),Statut,Référence');
+    for (final p in _allPayments) {
+      buf.writeln(
+          '${CsvExportService.fmtDateTime(p.createdAt)},'
+          '${CsvExportService.q(p.userName)},'
+          '${CsvExportService.q(p.phoneNumber)},'
+          '${CsvExportService.q(p.productLabel)},'
+          '${CsvExportService.fmtAmount(p.amount)},'
+          '${CsvExportService.q(p.status)},'
+          '${CsvExportService.q(p.transactionReference)}');
+    }
+
+    final csv = buf.toString();
+    final fname = CsvExportService.fileName('service_client_transactions');
+    final path = await CsvExportService.export(csvContent: csv, fileName: fname);
+
+    if (!mounted) return;
+    if (path != null) {
+      _snackOk('CSV exporté : $fname');
+    } else {
+      _snackErr('Erreur lors de l\'export');
+    }
+  }
+
   // ── Validate manual payment (service client can approve/reject) ──────────
   Future<void> _onValidate(
       String paymentId, bool approve, String? note) async {
@@ -158,6 +198,11 @@ class _AdminServiceClientHomeScreenState
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             onPressed: _load,
             tooltip: 'Actualiser',
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_outlined, color: Colors.white),
+            tooltip: 'Exporter CSV',
+            onPressed: _isLoading ? null : _exportCsv,
           ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),

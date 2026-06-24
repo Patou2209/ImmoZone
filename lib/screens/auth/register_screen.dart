@@ -25,6 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneNumberCtrl = TextEditingController();
   final _passwordCtrl    = TextEditingController();
   final _confirmCtrl     = TextEditingController();
+  final _sponsorCtrl     = TextEditingController(); // code parrainage (optionnel)
   final _phoneAuthSvc    = PhoneAuthService();
 
   String  _phoneCountryCode = '+243';
@@ -41,6 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneNumberCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
+    _sponsorCtrl.dispose();
     super.dispose();
   }
 
@@ -72,6 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             category:       _selectedCategory!,
             verificationId: verificationId,
             phoneAuthSvc:   _phoneAuthSvc,
+            sponsorCode:    _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
           ),
         ));
       },
@@ -87,6 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password:    _passwordCtrl.text.trim(),
           role:        AppConstants.roleAnnonceur,
           category:    _selectedCategory,
+          sponsorCode: _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
         );
         if (!mounted) return;
         if (ok) {
@@ -415,6 +419,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   validator: (v) =>
                       v != _passwordCtrl.text ? 'Les mots de passe ne correspondent pas' : null,
+                ),
+                const SizedBox(height: 14),
+
+                // ── Code parrainage (optionnel) ──────────────────────────
+                TextFormField(
+                  controller: _sponsorCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Code parrainage (optionnel)',
+                    hintText: 'Ex : PATOU2025',
+                    prefixIcon: Icon(Icons.group_add_outlined, color: AppTheme.accentColor),
+                  ),
                 ),
                 const SizedBox(height: 24),
 

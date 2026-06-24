@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../models/payment_model.dart';
 import '../../../services/data_service.dart';
+import '../../../services/csv_export_service.dart';
 
 class AdminFinancierHomeScreen extends StatefulWidget {
   const AdminFinancierHomeScreen({super.key});
@@ -145,81 +146,61 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
     return months[m - 1];
   }
 
-  // Export CSV
-  void _exportCsv() {
+  // ── Export CSV — transactions financières ──────────────────────────────────
+  Future<void> _exportCsv() async {
+    if (_filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Aucune transaction à exporter',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.errorColor,
+      ));
+      return;
+    }
+
     final buf = StringBuffer();
-    buf.writeln('Date,Utilisateur,Telephone,Type,Montant (USD),Reference');
+
+    // En-tête
+    buf.writeln('Export Finance & Revenus ImmoZone');
+    buf.writeln('Période,${_selectedPeriod.toUpperCase()}');
+    buf.writeln('Total Revenus (\$),${CsvExportService.fmtAmount(_totalRevenue)}');
+    buf.writeln('Recharges (\$),${CsvExportService.fmtAmount(_rechargeRevenue)}');
+    buf.writeln('Boosts (\$),${CsvExportService.fmtAmount(_boostRevenue)}');
+    buf.writeln('Publicités (\$),${CsvExportService.fmtAmount(_adsRevenue)}');
+    buf.writeln('Généré le,${CsvExportService.fmtDateTime(DateTime.now())}');
+    buf.writeln();
+
+    // Détail transactions
+    buf.writeln('Date/Heure,Utilisateur,Téléphone,Type,Montant (USD),Référence');
     for (final p in _filtered) {
-      final date =
-          '${p.createdAt.day}/${p.createdAt.month}/${p.createdAt.year}';
       buf.writeln(
-          '$date,"${p.userName}","${p.phoneNumber}","${p.productLabel}",${p.amount},"${p.transactionReference ?? ''}"');
+          '${CsvExportService.fmtDateTime(p.createdAt)},'
+          '${CsvExportService.q(p.userName)},'
+          '${CsvExportService.q(p.phoneNumber)},'
+          '${CsvExportService.q(p.productLabel)},'
+          '${CsvExportService.fmtAmount(p.amount)},'
+          '${CsvExportService.q(p.transactionReference)}');
     }
+
     final csv = buf.toString();
+    final fname = CsvExportService.fileName('finance_revenus');
+    final path = await CsvExportService.export(csvContent: csv, fileName: fname);
 
-    // Sur web, afficher dans une dialog; sur mobile, copier dans le presse-papiers
-    if (kIsWeb) {
-      _showCsvDialog(csv);
+    if (!mounted) return;
+    if (path != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('CSV exporté : $fname',
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ));
     } else {
-      _showCsvDialog(csv);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erreur lors de l\'export',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.errorColor,
+      ));
     }
-  }
-
-  void _showCsvDialog(String csv) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.download_outlined, color: AppTheme.accentColor),
-            const SizedBox(width: 8),
-            const Text('Export CSV',
-                style: TextStyle(
-                    fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: Column(
-            children: [
-              const Text(
-                'Copiez ce contenu dans un fichier .csv',
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFDDD)),
-                  ),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      csv,
-                      style: const TextStyle(
-                          fontFamily: 'monospace', fontSize: 10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer',
-                style: TextStyle(fontFamily: 'Poppins')),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

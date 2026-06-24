@@ -20,6 +20,7 @@ class OtpRegisterScreen extends StatefulWidget {
   final String          category;
   final String          verificationId;
   final PhoneAuthService phoneAuthSvc;
+  final String?         sponsorCode; // code parrainage optionnel
 
   const OtpRegisterScreen({
     super.key,
@@ -29,6 +30,7 @@ class OtpRegisterScreen extends StatefulWidget {
     required this.category,
     required this.verificationId,
     required this.phoneAuthSvc,
+    this.sponsorCode,
   });
 
   @override
@@ -132,12 +134,13 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
       // 2. Créer le compte Firestore avec les infos d'inscription
       final auth = context.read<app_auth.AuthProvider>();
       final ok = await auth.registerWithPhoneCredential(
-        credential: credential,
-        name:       widget.name,
-        phone:      widget.phoneNumber,
-        password:   widget.password,
-        role:       AppConstants.roleAnnonceur,
-        category:   widget.category,
+        credential:  credential,
+        name:        widget.name,
+        phone:       widget.phoneNumber,
+        password:    widget.password,
+        role:        AppConstants.roleAnnonceur,
+        category:    widget.category,
+        sponsorCode: widget.sponsorCode,
       );
 
       if (!mounted) return;

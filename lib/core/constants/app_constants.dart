@@ -16,17 +16,19 @@ class AppConstants {
   static const String keyFavorites   = 'favorites';
 
   // User Roles
-  static const String roleAdmin            = 'admin';
-  static const String roleAdminFinancier   = 'admin_financier';
+  static const String roleAdmin              = 'admin';
+  static const String roleAdminFinancier     = 'admin_financier';
   static const String roleAdminServiceClient = 'admin_service_client';
-  static const String roleAnnonceur        = 'annonceur';
-  static const String roleDemandeur        = 'demandeur';
+  static const String roleAdminMarketing     = 'admin_marketing';
+  static const String roleAnnonceur          = 'annonceur';
+  static const String roleDemandeur          = 'demandeur';
 
   // Sous-roles admin (tous les roles admin)
   static const List<String> allAdminRoles = [
     roleAdmin,
     roleAdminFinancier,
     roleAdminServiceClient,
+    roleAdminMarketing,
   ];
 
   // Catégories d'annonceur (obligatoire à la création du compte)

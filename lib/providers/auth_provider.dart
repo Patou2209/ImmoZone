@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin => _currentUser?.role == 'admin';
   bool get isAdminFinancier => _currentUser?.role == 'admin_financier';
   bool get isAdminServiceClient => _currentUser?.role == 'admin_service_client';
+  bool get isAdminMarketing => _currentUser?.role == 'admin_marketing';
   bool get isAnyAdmin => _currentUser?.isAdminRole ?? false;
   bool get isAnnonceur => _currentUser?.role == 'annonceur';
   bool get isDemandeur => _currentUser?.role == 'demandeur';
@@ -557,6 +558,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String role,
     String? category,
+    String? sponsorCode,
   }) async {
     _isLoading = true;
     _error = null;
@@ -616,6 +618,7 @@ class AuthProvider extends ChangeNotifier {
             category: category,
             uid: uid,
             isVerified: true,   // ✅ OTP validé = numéro vérifié
+            sponsorCode: sponsorCode,
           );
           lastError = null;
           break;

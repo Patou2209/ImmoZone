@@ -48,6 +48,13 @@ class _AdminCreateSubAdminScreenState
       'icon': Icons.support_agent_rounded,
       'color': const Color(0xFF4A148C),
     },
+    {
+      'value': AppConstants.roleAdminMarketing,
+      'label': 'Responsable Mktg & Commercial',
+      'desc': 'Statistiques, parrains, suivi commercial',
+      'icon': Icons.campaign_rounded,
+      'color': const Color(0xFFE65100),
+    },
   ];
 
   @override

@@ -16,6 +16,9 @@ class UserModel {
   final int totalProperties;
   final String? description;
   final String? whatsApp;
+  final String? sponsorCode;   // code parrainage saisi à l'inscription
+  final String? country;       // pays de l'utilisateur
+  final String? province;      // province
 
   UserModel({
     required this.id,
@@ -35,6 +38,9 @@ class UserModel {
     this.totalProperties = 0,
     this.description,
     this.whatsApp,
+    this.sponsorCode,
+    this.country,
+    this.province,
   });
 
   UserModel copyWith({
@@ -55,6 +61,9 @@ class UserModel {
     int? totalProperties,
     String? description,
     String? whatsApp,
+    String? sponsorCode,
+    String? country,
+    String? province,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -74,6 +83,9 @@ class UserModel {
       totalProperties: totalProperties ?? this.totalProperties,
       description: description ?? this.description,
       whatsApp: whatsApp ?? this.whatsApp,
+      sponsorCode: sponsorCode ?? this.sponsorCode,
+      country: country ?? this.country,
+      province: province ?? this.province,
     );
   }
 
@@ -96,6 +108,9 @@ class UserModel {
       'totalProperties': totalProperties,
       'description': description,
       'whatsApp': whatsApp,
+      'sponsorCode': sponsorCode,
+      'country': country,
+      'province': province,
     };
   }
 
@@ -140,6 +155,9 @@ class UserModel {
       totalProperties: map['totalProperties'] ?? 0,
       description: map['description'],
       whatsApp: map['whatsApp'],
+      sponsorCode: map['sponsorCode'],
+      country: map['country'],
+      province: map['province'],
     );
   }
 
@@ -159,6 +177,8 @@ class UserModel {
         return 'Admin Financier';
       case 'admin_service_client':
         return 'Admin Service Client';
+      case 'admin_marketing':
+        return 'Resp. Mktg & Commercial';
       case 'annonceur':
         return category ?? 'Annonceur';
       case 'demandeur':
@@ -169,7 +189,10 @@ class UserModel {
   }
 
   bool get isAdminRole =>
-      role == 'admin' || role == 'admin_financier' || role == 'admin_service_client';
+      role == 'admin' ||
+      role == 'admin_financier' ||
+      role == 'admin_service_client' ||
+      role == 'admin_marketing';
 
   /// Label court de la catégorie annonceur pour affichage badge
   String get categoryLabel => category ?? '';

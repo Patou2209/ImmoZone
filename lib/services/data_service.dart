@@ -14,6 +14,8 @@ import '../models/credit_model.dart';
 import '../models/report_model.dart';
 import '../models/audit_log_model.dart';
 import '../models/app_notification_model.dart';
+import '../models/parrain_model.dart';
+import '../models/platform_stats_model.dart';
 import '../core/constants/app_constants.dart';
 
 class DataService {
@@ -38,6 +40,7 @@ class DataService {
   CollectionReference get _logsCol => _db.collection('audit_logs');
   CollectionReference get _quotasCol => _db.collection('quotas');
   DocumentReference get _settingsDoc => _db.collection('config').doc('system_settings');
+  CollectionReference get _parrainCol => _db.collection('parrains');
   CollectionReference get _adsCol => _db.collection('ads');
   DocumentReference get _zonesDoc => _db.collection('config').doc('geographic_zones');
   DocumentReference get _zonesConfigDoc => _db.collection('config').doc('zones_config');
@@ -438,6 +441,7 @@ class DataService {
     String? category,
     String? uid, // Firebase Auth UID
     bool isVerified = false, // true pour les comptes vérifiés par OTP
+    String? sponsorCode, // code parrainage saisi à l'inscription
   }) async {
     final userId = uid ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -465,6 +469,7 @@ class DataService {
       whatsApp: whatsApp ?? phone,
       createdAt: DateTime.now(),
       isVerified: isVerified, // transmis depuis le flux d'inscription
+      sponsorCode: sponsorCode,
     );
 
     // Écriture Firestore — on laisse remonter l'exception pour un vrai message d'erreur
@@ -473,6 +478,10 @@ class DataService {
     // (ces comptes n'ont pas de session Firebase Auth email, la vérif se fait côté Firestore)
     if (password.isNotEmpty) {
       firestoreData['password'] = password;
+    }
+    // Stocker le code parrainage si fourni
+    if (sponsorCode != null && sponsorCode.isNotEmpty) {
+      firestoreData['sponsorCode'] = sponsorCode;
     }
     await _usersCol.doc(userId).set(firestoreData);
     await _saveSession(newUser);
@@ -1893,5 +1902,265 @@ class DataService {
   Future<void> refreshAllCaches() async {
     await _refreshSettingsCache();
     await refreshZonesCache();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PARRAINS — CRUD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Génère un code parrainage unique à partir du nom (ex: PATOU-A3F2)
+  String generateSponsorCode(String name) {
+    final base = name.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '').substring(0, name.length.clamp(0, 6));
+    final suffix = (DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0');
+    return '$base$suffix';
+  }
+
+  /// Crée un parrain avec un code unique.
+  Future<ParrainModel> createParrain({required String name}) async {
+    final code = generateSponsorCode(name);
+    final id = 'parrain_${DateTime.now().millisecondsSinceEpoch}';
+    final parrain = ParrainModel(
+      id: id,
+      name: name,
+      code: code,
+      createdById: currentUserId,
+      createdAt: DateTime.now(),
+    );
+    await _parrainCol.doc(id).set(parrain.toMap());
+    return parrain;
+  }
+
+  /// Retourne tous les parrains.
+  Future<List<ParrainModel>> getParrains() async {
+    try {
+      final snap = await _parrainCol.get();
+      return snap.docs
+          .map((d) => ParrainModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Supprime un parrain.
+  Future<void> deleteParrain(String id) async {
+    await _parrainCol.doc(id).delete();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // STATISTIQUES PLATEFORME (Marketing + Admin)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Retourne toutes les données brutes nécessaires aux stats en un seul appel
+  /// (users, properties, payments, credits) avec filtre géographique optionnel.
+  Future<PlatformStats> getPlatformStats({
+    required DateTime from,
+    required DateTime to,
+    String? country,
+    String? province,
+    String? city,
+  }) async {
+    final allUsers = await getUsers();
+    final allProperties = await getProperties();
+    final allPayments = await getPayments();
+
+    // Crédits consommés (source != 'admin_manuel' pour ne compter que les vrais achats)
+    List<Map<String, dynamic>> allCreditsRaw = [];
+    try {
+      final snap = await _creditsCol.get();
+      allCreditsRaw = snap.docs
+          .map((d) => d.data() as Map<String, dynamic>)
+          .toList();
+    } catch (_) {}
+
+    // Filtre géographique sur les utilisateurs
+    bool matchUserGeo(UserModel u) {
+      if (country != null && country.isNotEmpty && (u.country ?? '') != country) return false;
+      if (province != null && province.isNotEmpty && (u.province ?? '') != province) return false;
+      if (city != null && city.isNotEmpty && (u.city ?? '') != city) return false;
+      return true;
+    }
+
+    // Filtre géographique sur les annonces
+    bool matchPropGeo(PropertyModel p) {
+      if (country != null && country.isNotEmpty && p.country != country) return false;
+      if (province != null && province.isNotEmpty && p.province != province) return false;
+      if (city != null && city.isNotEmpty && p.city != city) return false;
+      return true;
+    }
+
+    // Filtre période
+    bool inPeriod(DateTime dt) => dt.isAfter(from) && dt.isBefore(to.add(const Duration(days: 1)));
+
+    final cutoff90 = DateTime.now().subtract(const Duration(days: 90));
+
+    // ── Calculs ──
+    final geoUsers = allUsers.where(matchUserGeo).toList();
+    final geoProps = allProperties.where(matchPropGeo).toList();
+
+    // 1. Total dépôts (paiements confirmés dans la période)
+    final deposits = allPayments
+        .where((p) => p.isConfirmed && inPeriod(p.createdAt))
+        .fold(0.0, (s, p) => s + p.amount);
+
+    // 2. Total crédits consommés dans la période
+    double creditsConsumed = 0;
+    for (final c in allCreditsRaw) {
+      final used = (c['quantity'] as num? ?? 0) - (c['remaining'] as num? ?? 0);
+      if (used > 0) {
+        DateTime? dt;
+        try { dt = (c['createdAt'] as dynamic)?.toDate() as DateTime?; } catch (_) {
+          try { dt = DateTime.parse(c['createdAt'].toString()); } catch (_) {}
+        }
+        if (dt != null && inPeriod(dt)) creditsConsumed += used;
+      }
+    }
+
+    // 3. Annonces postées dans la période
+    final postedProps = geoProps.where((p) => inPeriod(p.createdAt)).toList();
+
+    // 4. Annonces expirées dans la période
+    final expiredProps = geoProps
+        .where((p) => p.status == AppConstants.statusExpired && inPeriod(p.createdAt))
+        .toList();
+
+    // 5. Annonces clôturées par les annonceurs (Vendu / Loué) dans la période
+    final closedByType = <String, int>{};
+    for (final p in geoProps) {
+      if ((p.isSold || p.isRented) && inPeriod(p.createdAt)) {
+        final key = '${p.transactionType} / ${p.type}';
+        closedByType[key] = (closedByType[key] ?? 0) + 1;
+      }
+    }
+
+    // 6. Nouveaux utilisateurs dans la période (hors admins)
+    final newUsers = geoUsers
+        .where((u) => !u.isAdminRole && inPeriod(u.createdAt))
+        .toList();
+
+    // 7. Total utilisateurs (hors admins)
+    final totalUsers = geoUsers.where((u) => !u.isAdminRole).toList();
+
+    // 8. Utilisateurs actifs (lastLogin dans les 30 derniers jours)
+    final activeUsers = totalUsers
+        .where((u) => u.lastLogin != null &&
+            u.lastLogin!.isAfter(DateTime.now().subtract(const Duration(days: 30))))
+        .toList();
+
+    // 9. Utilisateurs inactifs depuis 90 jours
+    final inactiveUsers = totalUsers
+        .where((u) => u.lastLogin == null || u.lastLogin!.isBefore(cutoff90))
+        .toList();
+
+    // Bar chart data : dépôts par jour/semaine/mois selon la plage
+    final chartData = _buildChartData(allPayments, from, to);
+
+    return PlatformStats(
+      totalDeposits: deposits,
+      creditsConsumed: creditsConsumed,
+      postedProperties: postedProps.length,
+      expiredProperties: expiredProps.length,
+      closedByType: closedByType,
+      newUsersCount: newUsers.length,
+      totalUsersCount: totalUsers.length,
+      activeUsersCount: activeUsers.length,
+      inactiveUsersCount: inactiveUsers.length,
+      chartData: chartData,
+    );
+  }
+
+  Map<String, double> _buildChartData(
+      List<PaymentModel> payments, DateTime from, DateTime to) {
+    final diff = to.difference(from).inDays;
+    final result = <String, double>{};
+
+    if (diff <= 31) {
+      // Par jour
+      for (int i = 0; i <= diff; i++) {
+        final day = from.add(Duration(days: i));
+        final label = '${day.day.toString().padLeft(2, '0')}/${day.month.toString().padLeft(2, '0')}';
+        result[label] = payments
+            .where((p) =>
+                p.isConfirmed &&
+                p.createdAt.year == day.year &&
+                p.createdAt.month == day.month &&
+                p.createdAt.day == day.day)
+            .fold(0.0, (s, p) => s + p.amount);
+      }
+    } else {
+      // Par mois
+      final months = <String>{};
+      for (int i = 0; i <= diff; i++) {
+        final day = from.add(Duration(days: i));
+        months.add('${day.month.toString().padLeft(2, '0')}/${day.year}');
+      }
+      for (final m in months) {
+        final parts = m.split('/');
+        final month = int.parse(parts[0]);
+        final year = int.parse(parts[1]);
+        const monthNames = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+        final label = '${monthNames[month - 1]} $year';
+        result[label] = payments
+            .where((p) =>
+                p.isConfirmed &&
+                p.createdAt.month == month &&
+                p.createdAt.year == year)
+            .fold(0.0, (s, p) => s + p.amount);
+      }
+    }
+    return result;
+  }
+
+  /// Stats d'un parrain spécifique sur une période.
+  Future<ParrainStats> getParrainStats({
+    required String sponsorCode,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final allUsers = await getUsers();
+    final allProperties = await getProperties();
+    final allPayments = await getPayments();
+
+    bool inPeriod(DateTime dt) => dt.isAfter(from) && dt.isBefore(to.add(const Duration(days: 1)));
+    final cutoff90 = DateTime.now().subtract(const Duration(days: 90));
+
+    // Comptes associés à ce parrain
+    final sponsored = allUsers
+        .where((u) => (u.sponsorCode ?? '').toUpperCase() == sponsorCode.toUpperCase())
+        .toList();
+
+    // 10. Comptes associés dans la période
+    final associatedInPeriod = sponsored.where((u) => inPeriod(u.createdAt)).toList();
+
+    // 11. Comptes actifs dans la période (lastLogin dans la période)
+    final activeInPeriod = sponsored
+        .where((u) => u.lastLogin != null && inPeriod(u.lastLogin!))
+        .toList();
+
+    // 12. Dépôts en $ dans la période
+    final sponsoredIds = sponsored.map((u) => u.id).toSet();
+    final depositsInPeriod = allPayments
+        .where((p) => p.isConfirmed && inPeriod(p.createdAt) && sponsoredIds.contains(p.userId))
+        .fold(0.0, (s, p) => s + p.amount);
+
+    // 13. Annonces réalisées dans la période
+    final propsInPeriod = allProperties
+        .where((p) => inPeriod(p.createdAt) && sponsoredIds.contains(p.ownerId))
+        .length;
+
+    // 14. Comptes inactifs depuis 90 jours
+    final inactiveCount = sponsored
+        .where((u) => u.lastLogin == null || u.lastLogin!.isBefore(cutoff90))
+        .length;
+
+    return ParrainStats(
+      sponsorCode: sponsorCode,
+      associatedCount: associatedInPeriod.length,
+      activeCount: activeInPeriod.length,
+      depositsUsd: depositsInPeriod,
+      propertiesCount: propsInPeriod,
+      inactiveCount: inactiveCount,
+    );
   }
 }
