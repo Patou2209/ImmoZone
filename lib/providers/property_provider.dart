@@ -92,7 +92,7 @@ class PropertyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Charge UNIQUEMENT les annonces vendues ou occupées dans les 72 dernières heures.
+  /// Charge UNIQUEMENT les annonces vendues ou occupées dans les 3 derniers jours (72h).
   /// Utilisé exclusivement depuis SearchScreen en mode historique.
   Future<void> loadHistoriqueProperties() async {
     _isLoading = true;
@@ -104,7 +104,7 @@ class PropertyProvider extends ChangeNotifier {
       _properties = all.where((p) {
         if (!(p.isSold || p.isRented)) return false;
         if (p.updatedAt == null) return false;
-        return now.difference(p.updatedAt!).inHours < 72;
+        return now.difference(p.updatedAt!).inHours < 72; // 3 jours
       }).toList();
       _applyFilters();
     } catch (e) {

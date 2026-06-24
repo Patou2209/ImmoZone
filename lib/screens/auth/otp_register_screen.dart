@@ -23,6 +23,7 @@ class OtpRegisterScreen extends StatefulWidget {
   final String?         sponsorCode; // code parrainage optionnel
   final String?         province;    // province de résidence (obligatoire)
   final String?         city;        // ville de résidence (obligatoire)
+  final String?         commune;     // commune de résidence (optionnel)
 
   const OtpRegisterScreen({
     super.key,
@@ -35,6 +36,7 @@ class OtpRegisterScreen extends StatefulWidget {
     this.sponsorCode,
     this.province,
     this.city,
+    this.commune,
   });
 
   @override
@@ -147,6 +149,7 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
         sponsorCode: widget.sponsorCode,
         province:    widget.province,
         city:        widget.city,
+        commune:     widget.commune,
       );
 
       if (!mounted) return;

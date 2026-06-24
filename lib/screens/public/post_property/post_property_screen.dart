@@ -62,7 +62,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final _avenueCtrl     = TextEditingController();
   final _numeroCtrl     = TextEditingController();
   final _referenceCtrl  = TextEditingController(); // Référence — Chambre hôtel, Salle fêtes, Espace funéraire
-  // Salle de fêtes / Espace Funéraire / Salle Polyvalente
+  // Salle de fêtes / Espace Funéraire / Salle polyvalente
   final _capacityCtrl    = TextEditingController();
   final _pricePerDayCtrl = TextEditingController();
   // Concession (superficie en ha)
@@ -146,7 +146,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 color: AppTheme.accentColor, size: 18),
             const SizedBox(width: 8),
             const Expanded(
-              child: Text('Tarification — Appartement / Flat',
+              child: Text('Tarification — Appartement / flat',
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12,
@@ -236,13 +236,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   /// Label du champ prix en mode Location selon le type de bien :
   /// • Loyer  → Maison, Appartement, Bureau, Propriété Commerciale, Propriété Industrielle
-  /// • Tarif  → Salle de Fêtes, Chambre d'hôtel, Espace Funéraire, Salle Polyvalente
+  /// • Tarif  → Salle de Fêtes, Chambre d'hôtel, Espace Funéraire, Salle polyvalente
   String get _priceLabelForLocation {
     const tarifTypes = [
       'Salle de Fêtes',
       'Chambre d\'hôtel',
       'Espace Funéraire',
-      'Salle Polyvalente',
+      'Salle polyvalente',
     ];
     return tarifTypes.contains(_selectedType) ? 'Tarif *' : 'Loyer *';
   }
@@ -419,8 +419,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _err('Prix requis');
       return false;
     }
-    // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
-    if (_selectedType == 'Salle de Fêtes' || _selectedType == 'Salle Polyvalente') {
+    // Capacité obligatoire pour Salle de Fêtes et Salle polyvalente
+    if (_selectedType == 'Salle de Fêtes' || _selectedType == 'Salle polyvalente') {
       if (_capacityCtrl.text.trim().isEmpty || int.tryParse(_capacityCtrl.text.trim()) == null) {
       if (_establishmentNameCtrl.text.trim().isEmpty) {
         _err('Nom de l\'\u00e9tablissement obligatoire'); return false;
@@ -429,7 +429,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       }
     }
     // Chambres & SDB obligatoires pour Maison et Appartement/Flat
-    final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Appartement / Flat';
+    final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Appartement / flat';
     if (requiresRooms) {
       if (_bedroomsCtrl.text.trim().isEmpty || int.tryParse(_bedroomsCtrl.text.trim()) == null) {
         _err('Nombre de chambres requis pour ce type de bien'); return false;
@@ -998,7 +998,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         // Prix affiché selon le type de bien (label adapté selon type + transaction)
         // Chambre d'hôtel : toujours "Prix par nuitée" (gestion spéciale indépendante)
         // Location        : Loyer (Maison/Appart/Bureau/Commercial/Industriel)
-        //                   Tarif (Salle de Fêtes/Chambre hôtel/Espace Funéraire/Salle Polyvalente)
+        //                   Tarif (Salle de Fêtes/Chambre hôtel/Espace Funéraire/Salle polyvalente)
         // Vente           : Prix
         _selectedType == 'Chambre d\'hôtel'
             ? _field(_priceCtrl, 'Prix par nuitée *', Icons.nights_stay_outlined, '0',
@@ -1081,7 +1081,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         if (_selectedType == 'Chambre d\'h\u00f4tel' ||
             _selectedType == 'Salle de F\u00eates' ||
             _selectedType == 'Espace Fun\u00e9raire' ||
-            _selectedType == 'Salle Polyvalente') ...[
+            _selectedType == 'Salle polyvalente') ...[
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1418,8 +1418,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
     final fields = <Widget>[];
 
-    // ── Maison & Appartement / Flat ─────────────────────────────────────────
-    if (type == 'Maison' || type == 'Appartement / Flat') {
+    // ── Maison & Appartement / flat ─────────────────────────────────────────
+    if (type == 'Maison' || type == 'Appartement / flat') {
       fields.addAll([
         _field(_surfaceCtrl, 'Superficie (m²) — optionnel', Icons.square_foot, '',
             type: TextInputType.number),
@@ -1537,17 +1537,17 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       ]);
     }
 
-    // ── Salle de Fêtes / Espace Funéraire / Salle Polyvalente ───────────────
+    // ── Salle de Fêtes / Espace Funéraire / Salle polyvalente ───────────────
     else if (type == 'Salle de Fêtes' ||
         type == 'Espace Funéraire' ||
-        type == 'Salle Polyvalente') {
-      // Capacité obligatoire pour Salle de Fêtes et Salle Polyvalente
-      final capLabel = (type == 'Salle de Fêtes' || type == 'Salle Polyvalente')
+        type == 'Salle polyvalente') {
+      // Capacité obligatoire pour Salle de Fêtes et Salle polyvalente
+      final capLabel = (type == 'Salle de Fêtes' || type == 'Salle polyvalente')
           ? 'Capacité (personnes) *'
           : 'Capacité (personnes)';
       fields.addAll([
         _field(_establishmentNameCtrl,
-            (type == 'Salle de Fêtes' || type == 'Salle Polyvalente')
+            (type == 'Salle de Fêtes' || type == 'Salle polyvalente')
                 ? 'Nom de la salle *'
                 : 'Nom de l\'espace funéraire *',
             Icons.business_rounded,

@@ -370,7 +370,7 @@ class PropertyCard extends StatelessWidget {
                                           ? '/nuitée'
                                           : (property.type == 'Salle de Fêtes' ||
                                              property.type == 'Espace Funéraire' ||
-                                             property.type == 'Salle Polyvalente')
+                                             property.type == 'Salle polyvalente')
                                               ? '/jour'
                                               : '/mois',
                                       style: const TextStyle(
@@ -452,7 +452,7 @@ class PropertyCard extends StatelessWidget {
                           property.type != 'Chambre d\'hôtel' &&
                           property.type != 'Salle de Fêtes' &&
                           property.type != 'Espace Funéraire' &&
-                          property.type != 'Salle Polyvalente' &&
+                          property.type != 'Salle polyvalente' &&
                           property.garantieMois != null &&
                           property.garantieMois! > 0)
                         Container(

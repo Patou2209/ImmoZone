@@ -35,8 +35,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _selectedCategory;
   String? _selectedProvince; // province de résidence (obligatoire)
   String? _selectedCity;     // ville de résidence (obligatoire)
+  String? _selectedCommune;  // commune de résidence (optionnel)
 
   String get _fullPhone => '$_phoneCountryCode${_phoneNumberCtrl.text.trim()}';
+
+  /// Mappe un indicatif téléphonique vers le nom de pays utilisé par AppConstants.
+  String _phoneCountryToAppCountry(String code) {
+    if (code == '+242') return 'Congo (Brazzaville)';
+    return 'Congo (RDC)'; // default : +243 et tout autre code
+  }
 
   @override
   void dispose() {
@@ -87,6 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             sponsorCode:    _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
             province:       _selectedProvince,
             city:           _selectedCity,
+            commune:        _selectedCommune,
           ),
         ));
       },
@@ -105,6 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           sponsorCode: _sponsorCtrl.text.trim().isEmpty ? null : _sponsorCtrl.text.trim().toUpperCase(),
           province:    _selectedProvince,
           city:        _selectedCity,
+          commune:     _selectedCommune,
         );
         if (!mounted) return;
         if (ok) {
@@ -408,6 +417,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           color: AppTheme.textSecondary),
                       onPressed: () => setState(() => _obscure = !_obscure),
                     ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 1.5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 2),
+                    ),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Mot de passe requis';
@@ -430,13 +459,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           color: AppTheme.textSecondary),
                       onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                     ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 1.5),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 2),
+                    ),
                   ),
                   validator: (v) =>
                       v != _passwordCtrl.text ? 'Les mots de passe ne correspondent pas' : null,
                 ),
                 const SizedBox(height: 14),
 
-                // ── Province + Ville de résidence (obligatoire) ──────────
+                // ── Localisation du compte (obligatoire) ──────────────
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -450,7 +499,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Row(children: [
                         const Icon(Icons.location_on_rounded, color: AppTheme.accentColor, size: 16),
                         const SizedBox(width: 6),
-                        const Text('Lieu de résidence *',
+                        const Text('Localisation du compte *',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 12,
@@ -460,18 +509,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const SizedBox(height: 4),
                       const Text(
                           'Ces informations ne vous empêchent pas de poster '
-                          'des annonces partout ailleurs en RDC.',
+                          'des annonces partout ailleurs.',
                           style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 10.5,
                               color: AppTheme.textSecondary,
                               height: 1.4)),
                       const SizedBox(height: 10),
-                      // Province dropdown
+                      // Province dropdown (dynamique selon préfixe téléphonique)
                       DropdownButtonFormField<String>(
                         value: _selectedProvince,
                         decoration: InputDecoration(
-                          labelText: 'Province de résidence *',
+                          labelText: 'Province *',
                           prefixIcon: const Icon(Icons.map_outlined, color: AppTheme.accentColor),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           filled: true,
@@ -486,7 +535,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hint: const Text('Sélectionner une province',
                             style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
                         isExpanded: true,
-                        items: AppConstants.getProvincesForCountry('Congo (RDC)')
+                        items: AppConstants.getProvincesForCountry(
+                                _phoneCountryToAppCountry(_phoneCountryCode))
                             .map((p) => DropdownMenuItem(
                                 value: p,
                                 child: Text(p, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
@@ -494,6 +544,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onChanged: (v) => setState(() {
                           _selectedProvince = v;
                           _selectedCity = null;
+                          _selectedCommune = null;
                         }),
                       ),
                       const SizedBox(height: 10),
@@ -501,7 +552,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       DropdownButtonFormField<String>(
                         value: _selectedCity,
                         decoration: InputDecoration(
-                          labelText: 'Ville de résidence *',
+                          labelText: 'Ville *',
                           prefixIcon: const Icon(Icons.location_city_rounded, color: AppTheme.accentColor),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           filled: true,
@@ -515,20 +566,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         hint: Text(
                             _selectedProvince == null
-                                ? 'Choisissez d\'abord une province'
+                                ? "Choisissez d'abord une province"
                                 : 'Sélectionner une ville',
                             style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
                         isExpanded: true,
                         items: _selectedProvince == null
                             ? []
-                            : AppConstants.getCitiesForProvince('Congo (RDC)', _selectedProvince!)
+                            : AppConstants.getCitiesForProvince(
+                                    _phoneCountryToAppCountry(_phoneCountryCode),
+                                    _selectedProvince!)
                                 .map((c) => DropdownMenuItem(
                                     value: c,
                                     child: Text(c, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
                                 .toList(),
                         onChanged: _selectedProvince == null
                             ? null
-                            : (v) => setState(() => _selectedCity = v),
+                            : (v) => setState(() {
+                                _selectedCity = v;
+                                _selectedCommune = null;
+                              }),
+                      ),
+                      const SizedBox(height: 10),
+                      // Commune dropdown (cascadé par ville)
+                      DropdownButtonFormField<String>(
+                        value: _selectedCommune,
+                        decoration: InputDecoration(
+                          labelText: 'Commune',
+                          prefixIcon: const Icon(Icons.holiday_village_outlined, color: AppTheme.accentColor),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          filled: true,
+                          fillColor: Colors.white,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+                        ),
+                        hint: Text(
+                            _selectedCity == null
+                                ? "Choisissez d'abord une ville"
+                                : 'Sélectionner une commune',
+                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+                        isExpanded: true,
+                        items: _selectedCity == null
+                            ? []
+                            : AppConstants.getCommunesForCity(_selectedCity!)
+                                .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
+                                .toList(),
+                        onChanged: _selectedCity == null
+                            ? null
+                            : (v) => setState(() => _selectedCommune = v),
                       ),
                     ],
                   ),
@@ -539,10 +629,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _sponsorCtrl,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Code parrainage (optionnel)',
                     hintText: 'Ex : PATOU2025',
-                    prefixIcon: Icon(Icons.group_add_outlined, color: AppTheme.accentColor),
+                    prefixIcon: const Icon(Icons.group_add_outlined, color: AppTheme.accentColor),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.dividerColor, width: 1.5),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -772,7 +874,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     final isSel = c['code'] == _phoneCountryCode;
                     return ListTile(
                       onTap: () {
-                        setState(() => _phoneCountryCode = c['code']!);
+                        setState(() {
+                          _phoneCountryCode = c['code']!;
+                          // Réinitialiser la localisation si le pays change
+                          _selectedProvince = null;
+                          _selectedCity     = null;
+                          _selectedCommune  = null;
+                        });
                         Navigator.pop(ctx);
                       },
                       leading: Text(c['flag'] ?? '', style: const TextStyle(fontSize: 24)),

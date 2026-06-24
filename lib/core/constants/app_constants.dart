@@ -56,66 +56,60 @@ class AppConstants {
   static const List<String> countries = [
     'Congo (RDC)',
     'Congo (Brazzaville)',
-    'Angola',
-    'Rwanda',
-    'Burundi',
-    'Tanzanie',
-    'Zambie',
-    'Autre',
   ];
 
   // ── Categories par mode ──────────────────────────────────────────────────
   static const List<String> categoriesLocation = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
-    'Salle de Fêtes',
+    'Propriété commerciale',
+    'Propriété industrielle',
+    'Salle de fêtes',
     'Chambre d\'hôtel',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
 
   static const List<String> categoriesAchat = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
+    'Propriété commerciale',
+    'Propriété industrielle',
     'Concession',
     'Terrain à bâtir',
-    'Salle de Fêtes',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Salle de fêtes',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
 
   static const List<String> categoriesPublication = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
+    'Propriété commerciale',
+    'Propriété industrielle',
     'Concession',
     'Terrain à bâtir',
-    'Salle de Fêtes',
+    'Salle de fêtes',
     'Chambre d\'hôtel',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
 
   static const List<String> propertyTypes = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
+    'Propriété commerciale',
+    'Propriété industrielle',
     'Concession',
     'Terrain à bâtir',
-    'Salle de Fêtes',
+    'Salle de fêtes',
     'Chambre d\'hôtel',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
 
   static const List<String> transactionTypes = [
@@ -126,7 +120,7 @@ class AppConstants {
   // ── Filtres avances par categorie ───────────────────────────────────────
   static const List<String> catWithRooms = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
   ];
   static const List<String> catWithBeds = [
     'Chambre d\'hotel',
@@ -134,32 +128,32 @@ class AppConstants {
   // Superficie OBLIGATOIRE pour ces types
   static const List<String> catWithSurfaceRequired = [
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
+    'Propriété commerciale',
+    'Propriété industrielle',
   ];
   // Superficie OPTIONNELLE pour ces types
   static const List<String> catWithSurfaceOptional = [
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Chambre d\'hôtel',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
   // Garde l'ancien nom pour compatibilité (union des deux)
   static const List<String> catWithSurface = [
     'Bureau',
-    'Propriété Commerciale',
-    'Propriété Industrielle',
+    'Propriété commerciale',
+    'Propriété industrielle',
     'Maison',
-    'Appartement / Flat',
+    'Appartement / flat',
     'Chambre d\'hôtel',
-    'Espace Funéraire',
-    'Salle Polyvalente',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
   static const List<String> catWithSeats = [
-    'Salle de Fetes',
-    'Espace Funeraire',
-    'Salle Polyvalente',
+    'Salle de fêtes',
+    'Espace funéraire',
+    'Salle polyvalente',
   ];
   // Superficie en hectares (ha) pour Concession
   static const List<String> catWithHectares = [
@@ -440,48 +434,5 @@ class AppConstants {
   static const List<Map<String, String>> countryCodes = [
     {'code': '+243', 'country': 'Congo (RDC)',         'flag': '🇨🇩'},
     {'code': '+242', 'country': 'Congo (Brazzaville)', 'flag': '🇨🇬'},
-    {'code': '+244', 'country': 'Angola',              'flag': '🇦🇴'},
-    {'code': '+250', 'country': 'Rwanda',              'flag': '🇷🇼'},
-    {'code': '+257', 'country': 'Burundi',             'flag': '🇧🇮'},
-    {'code': '+255', 'country': 'Tanzanie',            'flag': '🇹🇿'},
-    {'code': '+260', 'country': 'Zambie',              'flag': '🇿🇲'},
-    {'code': '+256', 'country': 'Ouganda',             'flag': '🇺🇬'},
-    {'code': '+254', 'country': 'Kenya',               'flag': '🇰🇪'},
-    {'code': '+251', 'country': 'Éthiopie',           'flag': '🇪🇹'},
-    {'code': '+234', 'country': 'Nigeria',             'flag': '🇳🇬'},
-    {'code': '+233', 'country': 'Ghana',               'flag': '🇬🇭'},
-    {'code': '+225', 'country': "Côte d'Ivoire",     'flag': '🇨🇮'},
-    {'code': '+237', 'country': 'Cameroun',            'flag': '🇨🇲'},
-    {'code': '+241', 'country': 'Gabon',               'flag': '🇬🇦'},
-    {'code': '+240', 'country': 'Guinée Équatoriale','flag': '🇬🇶'},
-    {'code': '+236', 'country': 'Rep. Centrafricaine', 'flag': '🇨🇫'},
-    {'code': '+235', 'country': 'Tchad',               'flag': '🇹🇩'},
-    {'code': '+249', 'country': 'Soudan',              'flag': '🇸🇩'},
-    {'code': '+212', 'country': 'Maroc',               'flag': '🇲🇦'},
-    {'code': '+213', 'country': 'Algérie',            'flag': '🇩🇿'},
-    {'code': '+216', 'country': 'Tunisie',             'flag': '🇹🇳'},
-    {'code': '+20',  'country': 'Égypte',             'flag': '🇪🇬'},
-    {'code': '+27',  'country': 'Afrique du Sud',      'flag': '🇿🇦'},
-    {'code': '+258', 'country': 'Mozambique',          'flag': '🇲🇿'},
-    {'code': '+263', 'country': 'Zimbabwe',            'flag': '🇿🇼'},
-    {'code': '+267', 'country': 'Botswana',            'flag': '🇧🇼'},
-    {'code': '+264', 'country': 'Namibie',             'flag': '🇳🇦'},
-    {'code': '+261', 'country': 'Madagascar',          'flag': '🇲🇬'},
-    {'code': '+230', 'country': 'Maurice',             'flag': '🇲🇺'},
-    {'code': '+33',  'country': 'France',              'flag': '🇫🇷'},
-    {'code': '+32',  'country': 'Belgique',            'flag': '🇧🇪'},
-    {'code': '+41',  'country': 'Suisse',              'flag': '🇨🇭'},
-    {'code': '+1',   'country': 'USA / Canada',        'flag': '🇺🇸'},
-    {'code': '+44',  'country': 'Royaume-Uni',         'flag': '🇬🇧'},
-    {'code': '+49',  'country': 'Allemagne',           'flag': '🇩🇪'},
-    {'code': '+39',  'country': 'Italie',              'flag': '🇮🇹'},
-    {'code': '+34',  'country': 'Espagne',             'flag': '🇪🇸'},
-    {'code': '+351', 'country': 'Portugal',            'flag': '🇵🇹'},
-    {'code': '+55',  'country': 'Brésil',             'flag': '🇧🇷'},
-    {'code': '+86',  'country': 'Chine',               'flag': '🇨🇳'},
-    {'code': '+81',  'country': 'Japon',               'flag': '🇯🇵'},
-    {'code': '+91',  'country': 'Inde',                'flag': '🇮🇳'},
-    {'code': '+971', 'country': 'Émirats Arabes Unis','flag': '🇦🇪'},
-    {'code': '+966', 'country': 'Arabie Saoudite',     'flag': '🇸🇦'},
   ];
 }

@@ -644,7 +644,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ? 'par nuitée'
                             : (p.type == 'Salle de Fêtes' ||
                                p.type == 'Espace Funéraire' ||
-                               p.type == 'Salle Polyvalente')
+                               p.type == 'Salle polyvalente')
                                 ? 'par jour'
                                 : p.type.contains('Appartement')
                                     ? (p.pricePeriod == 'journalier' ? 'par jour' : 'par mois')
@@ -656,7 +656,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       if (p.type != 'Chambre d\'hôtel' &&
                           p.type != 'Salle de Fêtes' &&
                           p.type != 'Espace Funéraire' &&
-                          p.type != 'Salle Polyvalente') ...[  
+                          p.type != 'Salle polyvalente') ...[  
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -698,7 +698,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           p.type != 'Chambre d\'hôtel' &&
                           p.type != 'Salle de Fêtes' &&
                           p.type != 'Espace Funéraire' &&
-                          p.type != 'Salle Polyvalente') ...[  
+                          p.type != 'Salle polyvalente') ...[  
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

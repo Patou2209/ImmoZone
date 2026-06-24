@@ -444,6 +444,7 @@ class DataService {
     String? sponsorCode, // code parrainage saisi à l'inscription
     String? province,    // province de résidence
     String? city,        // ville de résidence
+    String? commune,     // commune de résidence
   }) async {
     final userId = uid ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -474,6 +475,7 @@ class DataService {
       sponsorCode: sponsorCode,
       province: province,
       city: city,
+      commune: commune,
     );
 
     // Écriture Firestore — on laisse remonter l'exception pour un vrai message d'erreur
@@ -1254,27 +1256,32 @@ class DataService {
     final all   = await getProperties();
     final now   = DateTime.now();
 
-    // Annonces fermées dans les 72 dernières heures (vendues ou louées/occupées)
+    // Annonces fermées dans les 3 derniers jours (72h) — vendues ou louées/occupées
     final recentes = all.where((p) {
       if (!(p.isSold || p.isRented)) return false;
       if (p.updatedAt == null) return false;
-      return now.difference(p.updatedAt!).inHours < 72;
+      return now.difference(p.updatedAt!).inHours < 72; // 3 jours
     }).toList();
 
     return {
-      // ── Disponibilités (annonces actives) ──────────────────────────────────
-      'maisonVente':     props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
-      'maisonLocation':  props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
-      'terrainDispo':    props.where((p) => p.type.contains('Terrain')).length,
-      'parcelleDispo':   props.where((p) => p.type == 'Parcelle').length,
-      'salleFetes':      props.where((p) => p.type.contains('Salle')).length,
-      'espaceFuneraire': props.where((p) => p.type.contains('Funer')).length,
-      'bureauLocation':  props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
-      'appartVente':     props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
-      'appartLocation':  props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
-      'totalActif':      props.length,
+      // ── Disponibilités (annonces actives) — toutes catégories ──────────────
+      'maisonVente':       props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
+      'maisonLocation':    props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
+      'appartVente':       props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
+      'appartLocation':    props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
+      'bureauLocation':    props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
+      'bureauVente':       props.where((p) => p.type == 'Bureau' && p.transactionType == 'Vente').length,
+      'propCommerciale':   props.where((p) => p.type.contains('Commerciale')).length,
+      'propIndustrielle':  props.where((p) => p.type.contains('Industrielle')).length,
+      'terrainDispo':      props.where((p) => p.type.contains('Terrain')).length,
+      'concessionDispo':   props.where((p) => p.type == 'Concession').length,
+      'chambreHotel':      props.where((p) => p.type.contains('h\u00f4tel') || p.type.contains('hotel')).length,
+      'salleFetes':        props.where((p) => p.type == 'Salle de F\u00eates').length,
+      'sallePolyvalente':  props.where((p) => p.type == 'Salle polyvalente').length,
+      'espaceFuneraire':   props.where((p) => p.type.contains('Fun\u00e9r') || p.type.contains('Funer')).length,
+      'totalActif':        props.length,
 
-      // ── Historique 72h (vendus / occupés récemment) ──────────────────────
+      // ── Historique 3 jours (72h) — vendus / occup\u00e9s r\u00e9cemment ──────────────
       'hist72_maisonVendue':   recentes.where((p) => p.type == 'Maison' && p.isSold).length,
       'hist72_maisonOccupee':  recentes.where((p) => p.type == 'Maison' && p.isRented).length,
       'hist72_terrainVendu':   recentes.where((p) => p.type.contains('Terrain') && p.isSold).length,
