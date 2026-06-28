@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
@@ -79,9 +79,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   String _pricePeriod = 'mensuel';
 
   // ── Étape 2 — Images ──────────────────────────────────────────────────────
-  // Photo principale (obligatoire) + 3 photos secondaires (obligatoires) = 4 exactement
+  // Photo principale (obligatoire) + 3 photos obligatoires + 6 optionnelles = max 10
+  static const int _maxSecondaryRequired = 3;   // obligatoires
+  static const int _maxOptionalPhotos    = 6;   // facultatives
+  static const int _maxTotalPhotos       = 10;  // 1 + 3 + 6
   XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
-  final List<XFile> _secondaryPhotos = []; // max 3 photos secondaires
+  final List<XFile> _secondaryPhotos = []; // 3 obligatoires + 6 optionnelles (max 9)
   final ImagePicker _picker = ImagePicker();
   // Compatibilité avec l'ancien système URL (conserver pour _addSampleImages)
   final List<String> _imageUrls = [];
@@ -460,9 +463,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     if (_mainPhoto == null && _imageUrls.isEmpty) {
       _err('Veuillez sélectionner une photo principale'); return false;
     }
-    if (_secondaryPhotos.length < 3 && _imageUrls.length < 4) {
+    if (_secondaryPhotos.length < _maxSecondaryRequired && _imageUrls.length < (_maxSecondaryRequired + 1)) {
       final done = (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length + _imageUrls.length;
-      _err('Veuillez ajouter les 4 photos requises ($done/4)'); return false;
+      _err('Veuillez ajouter les ${_maxSecondaryRequired + 1} photos requises ($done/${_maxSecondaryRequired + 1})'); return false;
     }
     return true;
   }
@@ -2041,19 +2044,20 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ÉTAPE 2 — Photos du bien (exactement 4 : 1 principale + 3 secondaires)
+  // ÉTAPE 2 — Photos du bien (1 principale + 3 obligatoires + 6 optionnelles)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep2() {
     final bool hasSampleUrls = _imageUrls.isNotEmpty;
-    final int total = (hasSampleUrls)
+    final int total = hasSampleUrls
         ? _imageUrls.length
         : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length;
-    final bool complete = total >= 4;
+    final int required = _maxSecondaryRequired + 1; // 4 photos minimum
+    final bool complete = total >= required;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _stepHeader('Étape 2', 'Photos du bien (4 photos requises)', Icons.photo_library_rounded),
+        _stepHeader('Étape 2', 'Photos du bien (max $_maxTotalPhotos photos)', Icons.photo_library_rounded),
         const SizedBox(height: 8),
 
         // Bannière info
@@ -2068,7 +2072,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Icon(Icons.info_outline, color: AppTheme.accentColor, size: 18),
             SizedBox(width: 10),
             Expanded(child: Text(
-              'Sélectionnez exactement 4 photos : 1 photo principale (couverture) puis 3 photos secondaires.',
+              "1 photo principale + 3 obligatoires + jusqu'à 6 optionnelles (10 max).",
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor),
             )),
           ]),
@@ -2091,142 +2095,101 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 14, color: AppTheme.textPrimary)),
           const Spacer(),
+          const Text('Obligatoire',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                  color: AppTheme.errorColor, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 6),
           if (_mainPhoto != null)
-            Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
+            const Icon(Icons.check_circle_rounded, color: AppTheme.successColor, size: 20),
         ]),
         const SizedBox(height: 10),
 
-        // Zone photo principale
-        GestureDetector(
-          onTap: hasSampleUrls ? null : () async {
-            await _pickMainPhoto();
-          },
-          child: Container(
-            height: 180,
-            decoration: BoxDecoration(
-              color: _mainPhoto != null
-                  ? Colors.transparent
-                  : AppTheme.primaryColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
+        // Zone principale photo
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: GestureDetector(
+            onTap: () async { await _pickMainPhoto(fromCamera: false); },
+            child: Container(
+              decoration: BoxDecoration(
                 color: _mainPhoto != null
-                    ? AppTheme.successColor.withValues(alpha: 0.5)
-                    : AppTheme.accentColor.withValues(alpha: 0.4),
-                width: _mainPhoto != null ? 2 : 1.5,
+                    ? Colors.transparent
+                    : AppTheme.primaryColor.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _mainPhoto != null
+                      ? AppTheme.successColor.withValues(alpha: 0.5)
+                      : AppTheme.accentColor.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
               ),
-            ),
-            child: hasSampleUrls && _imageUrls.isNotEmpty
-                ? Stack(fit: StackFit.expand, children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
-                      child: Image.network(_imageUrls[0], fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                            Icons.broken_image, color: AppTheme.accentColor)),
-                    ),
-                    Positioned(bottom: 8, left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.star_rounded, color: Colors.white, size: 12),
-                          SizedBox(width: 4),
-                          Text('Photo principale',
-                              style: TextStyle(color: Colors.white, fontSize: 10,
-                                  fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-                        ]),
-                      ),
-                    ),
-                  ])
-                : _mainPhoto != null
+              child: _mainPhoto != null
                   ? Stack(fit: StackFit.expand, children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(13),
-                        child: kIsWeb
-                            ? Container(color: AppTheme.accentColor.withValues(alpha: 0.1),
-                                child: const Icon(Icons.image, color: AppTheme.accentColor, size: 48))
-                            : Image.file(File(_mainPhoto!.path), fit: BoxFit.cover),
+                        borderRadius: BorderRadius.circular(11),
+                        child: hasSampleUrls && _imageUrls.isNotEmpty
+                            ? Image.network(_imageUrls[0], fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.broken_image, color: AppTheme.accentColor))
+                            : kIsWeb
+                                ? Container(
+                                    color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                    child: const Icon(Icons.image, color: AppTheme.accentColor, size: 48))
+                                : Image.file(File(_mainPhoto!.path), fit: BoxFit.cover),
                       ),
-                      // Badge principale
                       Positioned(bottom: 8, left: 8,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppTheme.accentColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.star_rounded, color: Colors.white, size: 12),
-                            SizedBox(width: 4),
-                            Text('Photo principale',
-                                style: TextStyle(color: Colors.white, fontSize: 10,
-                                    fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-                          ]),
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(6)),
+                          child: const Text('Photo principale',
+                              style: TextStyle(color: Colors.white,
+                                  fontSize: 10, fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ),
-                      // Bouton supprimer
                       Positioned(top: 6, right: 6,
                         child: GestureDetector(
                           onTap: () => setState(() => _mainPhoto = null),
                           child: Container(
-                            padding: const EdgeInsets.all(5),
+                            padding: const EdgeInsets.all(4),
                             decoration: const BoxDecoration(
                                 color: AppTheme.errorColor, shape: BoxShape.circle),
-                            child: const Icon(Icons.close, color: Colors.white, size: 12),
-                          ),
-                        ),
-                      ),
-                      // Bouton changer
-                      Positioned(top: 6, left: 6,
-                        child: GestureDetector(
-                          onTap: () async { await _pickMainPhoto(); },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.edit_rounded, color: Colors.white, size: 12),
-                              SizedBox(width: 4),
-                              Text('Changer', style: TextStyle(color: Colors.white,
-                                  fontSize: 10, fontFamily: 'Poppins')),
-                            ]),
+                            child: const Icon(Icons.close, color: Colors.white, size: 10),
                           ),
                         ),
                       ),
                     ])
                   : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.add_photo_alternate_outlined,
-                          size: 42, color: AppTheme.accentColor.withValues(alpha: 0.7)),
-                      const SizedBox(height: 10),
+                      const Icon(Icons.add_photo_alternate_outlined,
+                          size: 48, color: AppTheme.accentColor),
+                      const SizedBox(height: 8),
                       const Text('Appuyez pour sélectionner\nla photo principale',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
                               color: AppTheme.textSecondary)),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text('Cette photo sera la couverture de votre annonce',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                              color: AppTheme.textHint.withValues(alpha: 0.8))),
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                              color: AppTheme.textHint)),
                     ]),
+            ),
           ),
         ),
 
-        // Boutons galerie/caméra pour photo principale
-        if (_mainPhoto == null && !hasSampleUrls) ...([
+        // Boutons galerie / caméra (photo principale)
+        if (_mainPhoto == null) ...([
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () async { await _pickMainPhoto(fromCamera: false); },
                 icon: const Icon(Icons.photo_library_outlined, size: 16),
-                label: const Text('Galerie', style: TextStyle(
-                    fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600)),
+                label: const Text('Galerie',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primaryColor,
+                  foregroundColor: AppTheme.accentColor,
                   side: const BorderSide(color: AppTheme.accentColor),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2243,8 +2206,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                     fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
                     color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor)),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                      color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                  side: BorderSide(color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -2255,7 +2217,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
         const SizedBox(height: 24),
 
-        // ── SECTION 2 : 3 photos secondaires ─────────────────────────────────
+        // ── SECTION 2 : 3 photos obligatoires ────────────────────────────────
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2263,31 +2225,30 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               color: AppTheme.primaryColor.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text('2', style: TextStyle(color: Colors.white,
+            child: const Text('2–4', style: TextStyle(color: Colors.white,
                 fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
           ),
           const SizedBox(width: 10),
-          const Text('3 photos secondaires',
+          const Text('Photos obligatoires',
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 14, color: AppTheme.textPrimary)),
           const Spacer(),
-          Text('${hasSampleUrls ? (_imageUrls.length - 1).clamp(0, 3) : _secondaryPhotos.length}/3',
-              style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700,
-                color: (hasSampleUrls ? (_imageUrls.length >= 4) : (_secondaryPhotos.length >= 3))
-                    ? AppTheme.successColor : AppTheme.textSecondary,
-              )),
+          Text(
+            '${hasSampleUrls ? (_imageUrls.length - 1).clamp(0, _maxSecondaryRequired) : _secondaryPhotos.length.clamp(0, _maxSecondaryRequired)}/$_maxSecondaryRequired',
+            style: TextStyle(
+              fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700,
+              color: (hasSampleUrls ? _imageUrls.length >= required : _secondaryPhotos.length >= _maxSecondaryRequired)
+                  ? AppTheme.successColor : AppTheme.errorColor,
+            )),
         ]),
         const SizedBox(height: 10),
 
-        // Grille 3 slots secondaires
-        Row(children: List.generate(3, (i) {
+        // Grille 3 slots obligatoires
+        Row(children: List.generate(_maxSecondaryRequired, (i) {
           final hasUrl  = hasSampleUrls && _imageUrls.length > (i + 1);
           final hasFile = !hasSampleUrls && i < _secondaryPhotos.length;
           final isEmpty = !hasUrl && !hasFile;
-          final isNextToFill = !hasSampleUrls &&
-              i == _secondaryPhotos.length &&
-              _mainPhoto != null;
+          final isNextToFill = !hasSampleUrls && i == _secondaryPhotos.length && _mainPhoto != null;
 
           return Expanded(
             child: Padding(
@@ -2309,7 +2270,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                             ? AppTheme.successColor.withValues(alpha: 0.5)
                             : isNextToFill
                                 ? AppTheme.accentColor.withValues(alpha: 0.5)
-                                : AppTheme.dividerColor,
+                                : AppTheme.errorColor.withValues(alpha: 0.3),
                         width: hasFile || hasUrl ? 1.5 : 1,
                       ),
                     ),
@@ -2324,13 +2285,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                             Positioned(bottom: 3, left: 3,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: Colors.black54,
+                                decoration: BoxDecoration(color: Colors.black54,
                                     borderRadius: BorderRadius.circular(4)),
                                 child: Text('Photo ${i + 2}',
                                     style: const TextStyle(color: Colors.white,
-                                        fontSize: 8, fontFamily: 'Poppins',
-                                        fontWeight: FontWeight.w600)),
+                                        fontSize: 8, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
                               ),
                             ),
                           ])
@@ -2341,35 +2300,27 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                 child: kIsWeb
                                     ? Container(
                                         color: AppTheme.accentColor.withValues(alpha: 0.1),
-                                        child: const Icon(Icons.image,
-                                            color: AppTheme.accentColor))
-                                    : Image.file(File(_secondaryPhotos[i].path),
-                                        fit: BoxFit.cover),
+                                        child: const Icon(Icons.image, color: AppTheme.accentColor))
+                                    : Image.file(File(_secondaryPhotos[i].path), fit: BoxFit.cover),
                               ),
-                              // Badge numéro
                               Positioned(bottom: 3, left: 3,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                  decoration: BoxDecoration(
-                                      color: Colors.black54,
+                                  decoration: BoxDecoration(color: Colors.black54,
                                       borderRadius: BorderRadius.circular(4)),
                                   child: Text('Photo ${i + 2}',
                                       style: const TextStyle(color: Colors.white,
-                                          fontSize: 8, fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w600)),
+                                          fontSize: 8, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
                                 ),
                               ),
-                              // Bouton supprimer
                               Positioned(top: 3, right: 3,
                                 child: GestureDetector(
                                   onTap: () => setState(() => _secondaryPhotos.removeAt(i)),
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: const BoxDecoration(
-                                        color: AppTheme.errorColor,
-                                        shape: BoxShape.circle),
-                                    child: const Icon(Icons.close,
-                                        color: Colors.white, size: 9),
+                                        color: AppTheme.errorColor, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, color: Colors.white, size: 9),
                                   ),
                                 ),
                               ),
@@ -2383,16 +2334,16 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                   size: 26,
                                   color: isNextToFill
                                       ? AppTheme.accentColor
-                                      : AppTheme.dividerColor,
+                                      : AppTheme.errorColor.withValues(alpha: 0.4),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  isNextToFill ? 'Ajouter' : 'En attente',
+                                  isNextToFill ? 'Ajouter' : 'Requis',
                                   style: TextStyle(
                                     fontFamily: 'Poppins', fontSize: 9,
                                     color: isNextToFill
                                         ? AppTheme.accentColor
-                                        : AppTheme.textHint,
+                                        : AppTheme.errorColor.withValues(alpha: 0.6),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -2405,8 +2356,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           );
         })),
 
-        // Bouton ajouter photo secondaire
-        if (!hasSampleUrls && _mainPhoto != null && _secondaryPhotos.length < 3) ...([
+        // Bouton ajouter photo obligatoire
+        if (!hasSampleUrls && _mainPhoto != null && _secondaryPhotos.length < _maxSecondaryRequired) ...([
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
@@ -2434,8 +2385,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                     fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
                     color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor)),
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                      color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
+                  side: BorderSide(color: kIsWeb ? AppTheme.textHint : AppTheme.accentColor),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -2444,15 +2394,146 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ]),
         ]),
 
-        const SizedBox(height: 20),
+        // ── SECTION 3 : 6 photos optionnelles ────────────────────────────────
+        if (!hasSampleUrls && _secondaryPhotos.length >= _maxSecondaryRequired) ...([
+          const SizedBox(height: 24),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade700,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('5–10', style: TextStyle(color: Colors.white,
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
+            ),
+            const SizedBox(width: 10),
+            const Text('Photos optionnelles',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 14, color: AppTheme.textPrimary)),
+            const Spacer(),
+            Text(
+              '${(_secondaryPhotos.length - _maxSecondaryRequired).clamp(0, _maxOptionalPhotos)}/$_maxOptionalPhotos',
+              style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700,
+                color: AppTheme.textSecondary,
+              )),
+            const SizedBox(width: 4),
+            const Text('facultatif',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                  color: AppTheme.textHint)),
+          ]),
+          const SizedBox(height: 10),
 
-        // ── Exemples de test ──────────────────────────────────────────────────
-        TextButton.icon(
-          onPressed: _addSampleImages,
-          icon: const Icon(Icons.auto_fix_high, size: 16, color: AppTheme.accentColor),
-          label: const Text('Utiliser des exemples (test)',
-              style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor)),
-        ),
+          // Grille 3x2 des photos optionnelles
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: List.generate(_maxOptionalPhotos, (i) {
+              final idx  = _maxSecondaryRequired + i; // index dans _secondaryPhotos
+              final hasFile = idx < _secondaryPhotos.length;
+              final isNextToFill = idx == _secondaryPhotos.length;
+
+              return SizedBox(
+                width: (MediaQuery.of(context).size.width - 40 - 12) / 3,
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: GestureDetector(
+                    onTap: isNextToFill && _secondaryPhotos.length < (_maxSecondaryRequired + _maxOptionalPhotos)
+                        ? () async { await _pickSecondaryPhoto(); }
+                        : null,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: hasFile ? Colors.transparent : Colors.green.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: hasFile
+                              ? Colors.green.withValues(alpha: 0.5)
+                              : isNextToFill
+                                  ? Colors.green.withValues(alpha: 0.4)
+                                  : AppTheme.dividerColor,
+                          width: 1,
+                        ),
+                      ),
+                      child: hasFile
+                          ? Stack(fit: StackFit.expand, children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: kIsWeb
+                                    ? Container(
+                                        color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                        child: const Icon(Icons.image, color: AppTheme.accentColor))
+                                    : Image.file(File(_secondaryPhotos[idx].path), fit: BoxFit.cover),
+                              ),
+                              Positioned(bottom: 3, left: 3,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(4)),
+                                  child: Text('Photo ${idx + 2}',
+                                      style: const TextStyle(color: Colors.white,
+                                          fontSize: 8, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                              Positioned(top: 3, right: 3,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _secondaryPhotos.removeAt(idx)),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: const BoxDecoration(
+                                        color: AppTheme.errorColor, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, color: Colors.white, size: 9),
+                                  ),
+                                ),
+                              ),
+                            ])
+                          : Center(
+                              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Icon(
+                                  isNextToFill
+                                      ? Icons.add_photo_alternate_outlined
+                                      : Icons.image_outlined,
+                                  size: 22,
+                                  color: isNextToFill
+                                      ? Colors.green
+                                      : AppTheme.dividerColor,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  isNextToFill ? 'Ajouter' : 'Optionnel',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 8,
+                                    color: isNextToFill ? Colors.green : AppTheme.textHint,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ]),
+                            ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+
+          // Bouton ajouter photo optionnelle
+          if (_secondaryPhotos.length < (_maxSecondaryRequired + _maxOptionalPhotos)) ...([
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async { await _pickSecondaryPhoto(fromCamera: false); },
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 16),
+              label: Text('Ajouter une photo (${_secondaryPhotos.length - _maxSecondaryRequired}/$_maxOptionalPhotos optionnelles)',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.green.shade700,
+                side: BorderSide(color: Colors.green.shade300),
+                minimumSize: const Size(double.infinity, 42),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ]),
+        ]),
 
         const SizedBox(height: 16),
 
@@ -2480,8 +2561,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Expanded(
               child: Text(
                 complete
-                    ? '4/4 photos sélectionnées — vous pouvez continuer'
-                    : '$total/4 photos — ${4 - total} restante(s)',
+                    ? '$total/$_maxTotalPhotos photos — vous pouvez continuer'
+                    : '$total/$required photos minimum — ${required - total} restante(s) obligatoire(s)',
                 style: TextStyle(
                   fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
                   color: complete ? AppTheme.successColor : AppTheme.textSecondary,
@@ -2490,6 +2571,23 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             ),
           ]),
         ),
+
+        // ── Exemples de test ──────────────────────────────────────────────────
+        if (kDebugMode || true) ...([
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _addSampleImages,
+            icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+            label: const Text('Remplir avec des exemples (test)',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.textHint,
+              side: const BorderSide(color: AppTheme.dividerColor),
+              minimumSize: const Size(double.infinity, 38),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ]),
 
         const SizedBox(height: 28),
         _navButtons(
@@ -2500,7 +2598,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       ]),
     );
   }
-
   // ── Sélection photo principale ─────────────────────────────────────────────
   Future<void> _pickMainPhoto({bool fromCamera = false}) async {
     try {
@@ -2523,7 +2620,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   // ── Sélection photo secondaire ─────────────────────────────────────────────
   Future<void> _pickSecondaryPhoto({bool fromCamera = false}) async {
-    if (_secondaryPhotos.length >= 3) return; // déjà 3 photos secondaires
+    if (_secondaryPhotos.length >= (_maxSecondaryRequired + _maxOptionalPhotos)) return; // déjà 9 photos secondaires
     try {
       final XFile? photo = await _picker.pickImage(
         source: fromCamera ? ImageSource.camera : ImageSource.gallery,

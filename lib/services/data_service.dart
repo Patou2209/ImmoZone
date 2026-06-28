@@ -127,6 +127,9 @@ class DataService {
     return _defaultSettings();
   }
 
+  /// Getter public async pour lire les settings depuis Firestore (ou cache).
+  Future<Map<String, dynamic>> getSettingsMap() => _getSettings();
+
   Future<void> _refreshSettingsCache() async {
     final s = await _getSettings();
     await _prefs?.setString('system_settings_cache', jsonEncode(s));
@@ -1489,6 +1492,20 @@ class DataService {
 
   // ─── STATS ADMIN ────────────────────────────────────────────────────────────
 
+  /// Sauvegarde la date de réinitialisation du CA dans Firestore settings.
+  Future<void> setRevenueResetDate(DateTime date) async {
+    try {
+      await _settingsDoc.set(
+        {'revenue_reset_date': date.toIso8601String()},
+        SetOptions(merge: true),
+      );
+      // Mettre à jour le cache local
+      await _refreshSettingsCache();
+    } catch (e) {
+      if (kDebugMode) debugPrint('setRevenueResetDate error: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> getAdminStats() async {
     final props = await getProperties();
     final users = await getUsers();
@@ -1496,9 +1513,19 @@ class DataService {
     final payments = await getPayments();
     final reports = await getPendingReports();
 
-    final revenue = payments
-        .where((p) => p.isConfirmed)
-        .fold(0.0, (sum, p) => sum + p.amount);
+    // Lire la date de reset CA (si définie, ne compter que les paiements après)
+    final settings = await _getSettings();
+    final resetDateStr = settings['revenue_reset_date'] as String?;
+    final resetDate = resetDateStr != null
+        ? DateTime.tryParse(resetDateStr)
+        : null;
+
+    final confirmedPayments = payments.where((p) => p.isConfirmed);
+    final revenuePayments = resetDate != null
+        ? confirmedPayments.where((p) => p.createdAt.isAfter(resetDate))
+        : confirmedPayments;
+
+    final revenue = revenuePayments.fold(0.0, (sum, p) => sum + p.amount);
 
     return {
       'totalProperties': props.length,
@@ -1513,6 +1540,7 @@ class DataService {
       'vente': props.where((p) => p.transactionType == 'Vente').length,
       'location': props.where((p) => p.transactionType == 'Location').length,
       'totalRevenue': revenue,
+      'revenueResetDate': resetDateStr,
       'pendingPayments': payments.where((p) => p.status == 'awaiting_manual').length,
       'pendingReports': reports.length,
       'boostedProperties': props.where((p) => p.isBoostActive).length,

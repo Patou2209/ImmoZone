@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -7,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_image.dart';
 import '../../../models/property_model.dart';
 import '../../../models/payment_model.dart';
+import '../../../models/user_model.dart';
 import '../../../services/data_service.dart';
 import '../properties/admin_property_detail_screen.dart';
 import '../payments/admin_payments_screen.dart';
@@ -26,6 +28,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   bool _isFreeTrial = false;
   bool _isTogglingTrial = false;
+  // ── KPI Performance du Marché & Monétisation ──────────────────────
+  List<PaymentModel> _confirmedPayments = [];
+  String _kpiPeriod = 'mois'; // jour | semaine | mois | annee
+  // ── KPI 2 Attraction & Engagement ────────────────────────────────────
+  List<UserModel> _allUsers = [];
+  List<PropertyModel> _allProperties = [];
 
   @override
   void initState() {
@@ -39,11 +47,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final stats = await provider.getStats();
     final pending = await provider.getPendingProperties();
     final pendingPays = await _ds.getPendingManualPayments();
+    // Charger les paiements confirmés pour KPI
+    final allPayments = await _ds.getPayments();
+    // Charger users + properties pour KPI 2
+    final allUsers = await _ds.getUsers();
+    final allProperties = await _ds.getProperties();
     setState(() {
       _stats = stats;
       _pendingProps = pending;
       _pendingPayments = pendingPays;
-      _isFreeTrial = _ds.isFreeTrial;
+        _confirmedPayments = allPayments.where((p) => p.isConfirmed).toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _allUsers = allUsers;
+        _allProperties = allProperties;
+        _isFreeTrial = _ds.isFreeTrial;
       _isLoading = false;
     });
   }
@@ -128,6 +145,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _isFreeTrial = _ds.isFreeTrial;
       _isTogglingTrial = false;
     });
+  }
+
+  // ── Réinitialiser le chiffre d'affaire ────────────────────────────────────
+  Future<void> _resetRevenue() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.restart_alt_rounded, color: Color(0xFF1A237E), size: 26),
+          SizedBox(width: 10),
+          Expanded(child: Text('Réinitialiser le CA',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 15,
+                  fontWeight: FontWeight.w700))),
+        ]),
+        content: const Text(
+          'Cette action remet le chiffre d\'affaire affiché à \$0.00 en posant une date de référence maintenant.\n\n'
+          'Les anciens paiements ne seront PAS supprimés — ils sont archivés et ne comptent plus dans les statistiques.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+              color: AppTheme.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler',
+                  style: TextStyle(fontFamily: 'Poppins'))),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.restart_alt_rounded, size: 16),
+            label: const Text('Réinitialiser',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A237E), foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    // Sauvegarder la date de reset dans les settings Firestore
+    await _ds.setRevenueResetDate(DateTime.now());
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('✅ Chiffre d\'affaire réinitialisé à \$0.00',
+          style: TextStyle(fontFamily: 'Poppins')),
+      backgroundColor: AppTheme.successColor,
+      behavior: SnackBarBehavior.floating,
+    ));
   }
 
   Future<void> _clearSoldProperties() async {
@@ -384,15 +451,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        Row(children: [
-                          _quickStat('${_stats['totalProperties'] ?? 0}', 'Annonces', Icons.home_work),
-                          const SizedBox(width: 10),
-                          _quickStat('${_stats['pendingProperties'] ?? 0}', 'En attente',
-                              Icons.pending_outlined, isAlert: (_stats['pendingProperties'] ?? 0) > 0),
-                          const SizedBox(width: 10),
-                          _quickStat('${_stats['totalUsers'] ?? 0}', 'Utilisateurs', Icons.people),
-                        ]),
+
                       ]),
                     ),
                   ),
@@ -546,6 +605,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         const SizedBox(height: 12),
 
+                        // ── RÉINITIALISER CHIFFRE D'AFFAIRE ───────────────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white, borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: const Color(0xFF1A237E).withValues(alpha: 0.2)),
+                            boxShadow: [BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+                          ),
+                          child: Row(children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A237E).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.restart_alt_rounded,
+                                  color: Color(0xFF1A237E), size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('Réinitialiser le CA',
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
+                              Text(
+                                'Revenu actuel : \$${(_stats['totalRevenue'] ?? 0.0).toStringAsFixed(2)}',
+                                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                                    color: AppTheme.textSecondary),
+                              ),
+                            ])),
+                            ElevatedButton(
+                              onPressed: _resetRevenue,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1A237E),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Remettre à 0',
+                                  style: TextStyle(fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(height: 12),
+
                         // ── EFFACER ANNONCES VENDUES ───────────────────────
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -692,8 +802,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 Icons.rocket_launch, Colors.purple),
                             _statCard('Annonceurs', '${_stats['annonceurs'] ?? 0}',
                                 Icons.home_outlined, AppTheme.primaryColor),
-                            _statCard('Demandeurs', '${_stats['demandeurs'] ?? 0}',
-                                Icons.search, AppTheme.accentColor),
+                            _statCard('Visiteurs', '${_stats['demandeurs'] ?? 0}',
+                                Icons.visibility_outlined, AppTheme.accentColor),
                           ],
                         ),
                         const SizedBox(height: 14),
@@ -730,6 +840,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       ]),
                     ),
                   ),
+
+                  // ── 1. Performance du Marché & Monétisation ──────────
+                  SliverToBoxAdapter(child: _buildKpiMarche()),
+
+                  // ── 2. Attraction & Engagement de l'Audience ─────────
+                  SliverToBoxAdapter(child: _buildKpiAudience()),
 
                   // ── Annonces en attente ───────────────────────────────────
                   if (_pendingProps.isNotEmpty) ...[
@@ -1100,6 +1216,1033 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (diff.inHours < 24) return 'Il y a ${diff.inHours}h';
     return 'Il y a ${diff.inDays}j';
   }
+
+  // ── Getters KPI Performance du Marché & Monétisation ─────────────────
+  List<PaymentModel> get _kpiFiltered {
+    final now = DateTime.now();
+    DateTime from;
+    switch (_kpiPeriod) {
+      case 'jour': from = DateTime(now.year, now.month, now.day); break;
+      case 'semaine': from = now.subtract(const Duration(days: 7)); break;
+      case 'annee': from = DateTime(now.year, 1, 1); break;
+      default: from = DateTime(now.year, now.month, 1); // mois
+    }
+    // Respecter aussi la date de réinitialisation du CA
+    final resetDateStr = _stats['revenueResetDate'] as String?;
+    final resetDate = resetDateStr != null ? DateTime.tryParse(resetDateStr) : null;
+    if (resetDate != null && resetDate.isAfter(from)) {
+      from = resetDate;
+    }
+    return _confirmedPayments.where((p) => p.createdAt.isAfter(from)).toList();
+  }
+
+  double get _kpiTotalRevenue => _kpiFiltered.fold(0.0, (s, p) => s + p.amount);
+
+  double get _kpiRechargeRevenue => _kpiFiltered
+      .where((p) => p.productType.contains('souscription') ||
+          p.productType.contains('pack') || p.productType == 'publication_unitaire')
+      .fold(0.0, (s, p) => s + p.amount);
+
+  double get _kpiBoostRevenue => _kpiFiltered
+      .where((p) => p.productType.contains('boost'))
+      .fold(0.0, (s, p) => s + p.amount);
+
+  double get _kpiAdsRevenue => _kpiFiltered
+      .where((p) => p.productType == 'ads')
+      .fold(0.0, (s, p) => s + p.amount);
+
+  int get _kpiUniqueAnnonceurs {
+    final ids = _kpiFiltered.map((p) => p.userId).toSet();
+    return ids.isEmpty ? 1 : ids.length;
+  }
+
+  double get _kpiArpa =>
+      _kpiUniqueAnnonceurs > 0 ? _kpiTotalRevenue / _kpiUniqueAnnonceurs : 0.0;
+
+  // Données périodiques (barres)
+  Map<String, double> _kpiBuildChartData() {
+    final result = <String, double>{};
+    final now = DateTime.now();
+    if (_kpiPeriod == 'annee') {
+      for (int m = 1; m <= 12; m++) {
+        const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+        final sum = _kpiFiltered
+            .where((p) => p.createdAt.month == m && p.createdAt.year == now.year)
+            .fold(0.0, (s, p) => s + p.amount);
+        result[months[m - 1]] = sum;
+      }
+    } else {
+      final days = _kpiPeriod == 'jour' ? 1 : _kpiPeriod == 'semaine' ? 7 : 30;
+      for (int i = days - 1; i >= 0; i--) {
+        final day = now.subtract(Duration(days: i));
+        final label = '${day.day}/${day.month}';
+        final sum = _kpiFiltered
+            .where((p) => p.createdAt.year == day.year &&
+                p.createdAt.month == day.month && p.createdAt.day == day.day)
+            .fold(0.0, (s, p) => s + p.amount);
+        result[label] = sum;
+      }
+    }
+    return result;
+  }
+
+  // Données cumulées (courbe)
+  List<MapEntry<String, double>> _kpiBuildCumulativeData() {
+    final entries = _kpiBuildChartData().entries.toList();
+    double cumul = 0.0;
+    return entries.map((e) { cumul += e.value; return MapEntry(e.key, cumul); }).toList();
+  }
+
+  // ── Construire le bloc KPI complet ────────────────────────────────────
+  Widget _buildKpiMarche() {
+    final chartData = _kpiBuildChartData();
+    final cumulData = _kpiBuildCumulativeData();
+    final entries = chartData.entries.toList();
+    final maxBar  = entries.isEmpty ? 1.0 : entries.fold(0.0, (m, e) => e.value > m ? e.value : m);
+    final maxCumul = cumulData.isEmpty ? 1.0 : cumulData.fold(0.0, (m, e) => e.value > m ? e.value : m);
+    // Segments donut
+    final segments = [
+      _KpiDonutSeg('Abonnements', _kpiRechargeRevenue, const Color(0xFF1B5E20)),
+      _KpiDonutSeg('Boosting',    _kpiBoostRevenue,   const Color(0xFFE65100)),
+      _KpiDonutSeg('Publicité',   _kpiAdsRevenue,     const Color(0xFF4A148C)),
+    ];
+    final periods = [
+      {'v': 'jour', 'l': 'Jour'}, {'v': 'semaine', 'l': 'Sem.'},
+      {'v': 'mois', 'l': 'Mois'}, {'v': 'annee', 'l': 'Année'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Titre de section ─────────────────────────────────────────────
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A237E),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('1',
+              style: TextStyle(color: Colors.white, fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Performance du Marché & Monétisation',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary, fontFamily: 'Poppins')),
+          ),
+        ]),
+        const SizedBox(height: 12),
+
+        // ── Filtre période ────────────────────────────────────────────────
+        Row(
+          children: periods.map((p) => Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _kpiPeriod = p['v']!),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: _kpiPeriod == p['v']
+                      ? const Color(0xFF1A237E)
+                      : AppTheme.dividerColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(child: Text(p['l']!,
+                  style: TextStyle(
+                    fontFamily: 'Poppins', fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _kpiPeriod == p['v'] ? Colors.white : AppTheme.textSecondary,
+                  ))),
+              ),
+            ),
+          )).toList(),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Cartes KPI Commerciaux ────────────────────────────────────────
+        // Ligne 1 : Recette + ARPA
+        Row(children: [
+          Expanded(child: _kpiCard(
+            label: 'Recette',
+            value: '\$${_kpiTotalRevenue.toStringAsFixed(2)}',
+            icon: Icons.monetization_on_outlined,
+            color: const Color(0xFF1A237E),
+            sub: '${_kpiFiltered.length} transactions',
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: _kpiCard(
+            label: 'ARPA',
+            value: '\$${_kpiArpa.toStringAsFixed(2)}',
+            icon: Icons.person_outline_rounded,
+            color: const Color(0xFF006064),
+            sub: 'Revenu / annonceur',
+          )),
+        ]),
+        const SizedBox(height: 10),
+        // Ligne 2 : Abonnements + Boosting + Publicité
+        Row(children: [
+          Expanded(child: _kpiCardSmall(
+            'Abonnements', '\$${_kpiRechargeRevenue.toStringAsFixed(0)}',
+            const Color(0xFF1B5E20))),
+          const SizedBox(width: 8),
+          Expanded(child: _kpiCardSmall(
+            'Boosting', '\$${_kpiBoostRevenue.toStringAsFixed(0)}',
+            const Color(0xFFE65100))),
+          const SizedBox(width: 8),
+          Expanded(child: _kpiCardSmall(
+            'Publicité', '\$${_kpiAdsRevenue.toStringAsFixed(0)}',
+            const Color(0xFF4A148C))),
+        ]),
+        const SizedBox(height: 16),
+
+        // ── Courbe : Recette périodique + cumulée ─────────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Sous-titre + badge ARPA
+            Row(children: [
+              const Icon(Icons.show_chart_rounded, color: Color(0xFF1A237E), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Courbe — Recette cumulée & périodique',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF006064).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text('ARA \$${_kpiArpa.toStringAsFixed(1)}',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                      fontWeight: FontWeight.w700, color: Color(0xFF006064))),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            // Légende
+            Row(children: [
+              Container(width: 12, height: 3,
+                decoration: BoxDecoration(color: const Color(0xFFFFA726),
+                    borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 5),
+              const Text('Périodique',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 9, color: AppTheme.textHint)),
+              const SizedBox(width: 14),
+              Container(width: 12, height: 3,
+                decoration: BoxDecoration(color: const Color(0xFF006064),
+                    borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 5),
+              const Text('Cumulée',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 9, color: AppTheme.textHint)),
+            ]),
+            const SizedBox(height: 8),
+            // Graphique superposé : barres (périodique) + courbe (cumulée)
+            SizedBox(
+              height: 150,
+              child: CustomPaint(
+                painter: _KpiDualChartPainter(
+                  barEntries: entries,
+                  lineEntries: cumulData,
+                  maxBar: maxBar,
+                  maxLine: maxCumul,
+                ),
+                child: Container(),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // Labels X
+            _kpiXLabels(entries),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Anneau (donut) : Répartition du revenu ───────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.donut_large_rounded, color: Color(0xFF4A148C), size: 16),
+              const SizedBox(width: 6),
+              const Text('Anneau — Répartition du revenu',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary)),
+            ]),
+            const SizedBox(height: 14),
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              // Donut
+              SizedBox(
+                width: 130, height: 130,
+                child: CustomPaint(
+                  painter: _KpiDonutPainter(segments: segments, total: _kpiTotalRevenue),
+                  child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Total', style: TextStyle(fontFamily: 'Poppins',
+                        fontSize: 9, color: AppTheme.textHint)),
+                    Text('\$${_kpiTotalRevenue.toStringAsFixed(0)}',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w800, fontSize: 15,
+                          color: AppTheme.textPrimary)),
+                  ])),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Légende
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: segments.map((s) {
+                  final pct = _kpiTotalRevenue > 0
+                      ? (s.amount / _kpiTotalRevenue * 100) : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 9),
+                    child: Row(children: [
+                      Container(width: 11, height: 11,
+                        decoration: BoxDecoration(color: s.color, shape: BoxShape.circle)),
+                      const SizedBox(width: 7),
+                      Expanded(child: Text(s.label,
+                        style: const TextStyle(fontFamily: 'Poppins',
+                            fontSize: 11, color: AppTheme.textPrimary))),
+                      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text('${pct.toStringAsFixed(0)}%',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontSize: 11, fontWeight: FontWeight.w700, color: s.color)),
+                        Text('\$${s.amount.toStringAsFixed(0)}',
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 9, color: AppTheme.textSecondary)),
+                      ]),
+                    ]),
+                  );
+                }).toList(),
+              )),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  // Carte KPI grande
+  Widget _kpiCard({required String label, required String value,
+      required IconData icon, required Color color, String? sub}) =>
+    Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.06), blurRadius: 6)],
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontFamily: 'Poppins',
+              fontSize: 10, color: AppTheme.textSecondary)),
+          Text(value, style: TextStyle(fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800, fontSize: 15, color: color)),
+          if (sub != null) Text(sub, style: const TextStyle(fontFamily: 'Poppins',
+              fontSize: 9, color: AppTheme.textHint)),
+        ])),
+      ]),
+    );
+
+  // Carte KPI petite (3 colonnes)
+  Widget _kpiCardSmall(String label, String value, Color color) =>
+    Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontFamily: 'Poppins',
+            fontWeight: FontWeight.w800, fontSize: 14, color: color)),
+        Text(label, style: const TextStyle(fontFamily: 'Poppins',
+            fontSize: 9, color: AppTheme.textSecondary), textAlign: TextAlign.center),
+      ]),
+    );
+
+
+  // ── Getters KPI 2 : Audience ──────────────────────────────────────────────
+
+  // Visiteurs = utilisateurs avec role 'demandeur', filtrés sur la période KPI
+  List<UserModel> get _kpi2Visitors {
+    final now = DateTime.now();
+    DateTime from;
+    switch (_kpiPeriod) {
+      case 'jour':    from = DateTime(now.year, now.month, now.day); break;
+      case 'semaine': from = now.subtract(const Duration(days: 7)); break;
+      case 'annee':   from = DateTime(now.year, 1, 1); break;
+      default:        from = DateTime(now.year, now.month, 1);
+    }
+    return _allUsers.where((u) =>
+        u.role == 'demandeur' && u.createdAt.isAfter(from)).toList();
+  }
+
+  // Tous les demandeurs (toutes périodes, pour le gauge)
+  List<UserModel> get _kpi2AllVisitors =>
+      _allUsers.where((u) => u.role == 'demandeur').toList();
+
+  // Annonceurs actifs (ont au moins 1 annonce active)
+  int get _kpi2ActiveAnnonceurs {
+    final ids = _allProperties
+        .where((p) => p.status == 'Actif' && !p.isExpired)
+        .map((p) => p.ownerId)
+        .toSet();
+    return ids.length;
+  }
+
+  // Taux de renouvellement = annonceurs qui ont republié (propriété créée dans
+  // les 15 jours après expiration d'une annonce précédente du même owner).
+  // Approx : ratio annonceurs ayant ≥2 annonces / total annonceurs.
+  double get _kpi2RenewalRate {
+    if (_allProperties.isEmpty) return 0.0;
+    final byOwner = <String, int>{};
+    for (final p in _allProperties) {
+      byOwner[p.ownerId] = (byOwner[p.ownerId] ?? 0) + 1;
+    }
+    final owners = byOwner.length;
+    if (owners == 0) return 0.0;
+    final renewed = byOwner.values.where((c) => c >= 2).length;
+    return renewed / owners;
+  }
+
+  // Classement villes par nombre d'utilisateurs (demandeurs)
+  List<MapEntry<String, int>> get _kpi2CityRanking {
+    final counts = <String, int>{};
+    for (final u in _kpi2AllVisitors) {
+      final city = (u.city ?? '').trim();
+      if (city.isEmpty) continue;
+      counts[city] = (counts[city] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(5).toList();
+  }
+
+  // Classement communes par nombre d'utilisateurs (demandeurs)
+  List<MapEntry<String, int>> get _kpi2CommuneRanking {
+    final counts = <String, int>{};
+    for (final u in _kpi2AllVisitors) {
+      final commune = (u.commune ?? '').trim();
+      if (commune.isEmpty) continue;
+      counts[commune] = (counts[commune] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(5).toList();
+  }
+
+  // Histogramme visiteurs par période (même logique que KPI1 mais avec users)
+  Map<String, int> _kpi2BuildVisitorChart() {
+    final result = <String, int>{};
+    final now = DateTime.now();
+    if (_kpiPeriod == 'annee') {
+      const months = ['Jan','Fév','Mar','Avr','Mai','Jun',
+                       'Jul','Aoû','Sep','Oct','Nov','Déc'];
+      for (int m = 1; m <= 12; m++) {
+        result[months[m - 1]] = _kpi2Visitors
+            .where((u) => u.createdAt.month == m && u.createdAt.year == now.year)
+            .length;
+      }
+    } else {
+      final days = _kpiPeriod == 'jour' ? 1 :
+                   _kpiPeriod == 'semaine' ? 7 : 30;
+      for (int i = days - 1; i >= 0; i--) {
+        final day = now.subtract(Duration(days: i));
+        final label = '${day.day}/${day.month}';
+        result[label] = _kpi2Visitors.where((u) =>
+          u.createdAt.year == day.year &&
+          u.createdAt.month == day.month &&
+          u.createdAt.day == day.day).length;
+      }
+    }
+    return result;
+  }
+
+  // ── Construire le bloc KPI 2 ───────────────────────────────────────────────
+  Widget _buildKpiAudience() {
+    final visitorChart = _kpi2BuildVisitorChart();
+    final chartEntries  = visitorChart.entries.toList();
+    final maxVisitors   = chartEntries.isEmpty ? 1.0
+        : chartEntries.fold(0.0, (m, e) => e.value > m ? e.value.toDouble() : m);
+    final cityRanking    = _kpi2CityRanking;
+    final communeRanking = _kpi2CommuneRanking;
+    final maxCity    = cityRanking.isEmpty    ? 1 : cityRanking.first.value;
+    final maxCommune = communeRanking.isEmpty ? 1 : communeRanking.first.value;
+    final totalVisitors  = _kpi2AllVisitors.length;
+    final activeAnnonc   = _kpi2ActiveAnnonceurs;
+    final renewalRate    = _kpi2RenewalRate;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+        // ── Titre ─────────────────────────────────────────────────────────
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00695C),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('2',
+              style: TextStyle(color: Colors.white, fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text("Attraction & Engagement de l'Audience",
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary, fontFamily: 'Poppins')),
+          ),
+        ]),
+        const SizedBox(height: 12),
+
+        // ── Ligne 1 : Visiteurs uniques + Annonceurs actifs ───────────────
+        Row(children: [
+          Expanded(child: _kpiCard(
+            label: 'Visiteurs uniques',
+            value: '$totalVisitors',
+            icon: Icons.people_outline_rounded,
+            color: const Color(0xFF00695C),
+            sub: '${_kpi2Visitors.length} ce mois',
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: _kpiCard(
+            label: 'Annonceurs actifs',
+            value: '$activeAnnonc',
+            icon: Icons.store_outlined,
+            color: const Color(0xFF1565C0),
+            sub: 'annonces non expirées',
+          )),
+        ]),
+        const SizedBox(height: 10),
+
+        // ── Jauge taux de renouvellement ─────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.speed_rounded, color: Color(0xFF6A1B9A), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Taux de renouvellement',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary))),
+              Text('${(renewalRate * 100).toStringAsFixed(1)}%',
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w800, fontSize: 14,
+                    color: Color(0xFF6A1B9A))),
+            ]),
+            const SizedBox(height: 10),
+            // Barre de jauge
+            Stack(children: [
+              Container(
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDE7F6),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: renewalRate.clamp(0.0, 1.0),
+                child: Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6A1B9A), Color(0xFFCE93D8)],
+                    ),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              'Annonceurs ayant au moins 2 annonces / total annonceurs',
+              style: const TextStyle(fontFamily: 'Poppins',
+                  fontSize: 9, color: AppTheme.textHint),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Histogramme visiteurs uniques par période ─────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.bar_chart_rounded,
+                  color: Color(0xFF00695C), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Visiteurs uniques — Histogramme',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary))),
+            ]),
+            const SizedBox(height: 10),
+            chartEntries.isEmpty
+                ? const Center(child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text('Aucune donnée',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                          color: AppTheme.textHint)),
+                  ))
+                : Column(children: [
+                    SizedBox(
+                      height: 120,
+                      child: CustomPaint(
+                        painter: _Kpi2BarPainter(
+                          entries: chartEntries
+                              .map((e) => MapEntry(e.key, e.value.toDouble()))
+                              .toList(),
+                          maxVal: maxVisitors,
+                          barColor: const Color(0xFF00695C),
+                        ),
+                        child: Container(),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _kpiXLabels(chartEntries
+                        .map((e) => MapEntry(e.key, e.value.toDouble()))
+                        .toList()),
+                  ]),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Classements villes + communes ─────────────────────────────────
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Villes
+          Expanded(child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white, borderRadius: BorderRadius.circular(14),
+              boxShadow: [BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.location_city_rounded,
+                    color: Color(0xFF1565C0), size: 14),
+                const SizedBox(width: 5),
+                const Expanded(child: Text('Villes',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 11,
+                      color: AppTheme.textPrimary))),
+              ]),
+              const SizedBox(height: 8),
+              if (cityRanking.isEmpty)
+                const Text('Aucune donnée',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                      color: AppTheme.textHint))
+              else
+                ...cityRanking.asMap().entries.map((e) {
+                  final rank = e.key + 1;
+                  final entry = e.value;
+                  final pct = maxCity > 0 ? entry.value / maxCity : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Row(children: [
+                        Container(
+                          width: 16, height: 16,
+                          decoration: BoxDecoration(
+                            color: rank == 1
+                                ? const Color(0xFF1565C0)
+                                : const Color(0xFF1565C0).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Center(child: Text('$rank',
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                              color: rank == 1 ? Colors.white
+                                  : const Color(0xFF1565C0)))),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(child: Text(entry.key,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 10, color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis)),
+                        Text('${entry.value}',
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 10, fontWeight: FontWeight.w700,
+                              color: Color(0xFF1565C0))),
+                      ]),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 4,
+                          backgroundColor: const Color(0xFFE3F2FD),
+                          valueColor: const AlwaysStoppedAnimation(
+                              Color(0xFF1565C0)),
+                        ),
+                      ),
+                    ]),
+                  );
+                }),
+            ]),
+          )),
+          const SizedBox(width: 10),
+          // Communes
+          Expanded(child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white, borderRadius: BorderRadius.circular(14),
+              boxShadow: [BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Icon(Icons.map_outlined,
+                    color: Color(0xFF00838F), size: 14),
+                const SizedBox(width: 5),
+                const Expanded(child: Text('Communes',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 11,
+                      color: AppTheme.textPrimary))),
+              ]),
+              const SizedBox(height: 8),
+              if (communeRanking.isEmpty)
+                const Text('Aucune donnée',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                      color: AppTheme.textHint))
+              else
+                ...communeRanking.asMap().entries.map((e) {
+                  final rank = e.key + 1;
+                  final entry = e.value;
+                  final pct = maxCommune > 0 ? entry.value / maxCommune : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Row(children: [
+                        Container(
+                          width: 16, height: 16,
+                          decoration: BoxDecoration(
+                            color: rank == 1
+                                ? const Color(0xFF00838F)
+                                : const Color(0xFF00838F).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Center(child: Text('$rank',
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                              color: rank == 1 ? Colors.white
+                                  : const Color(0xFF00838F)))),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(child: Text(entry.key,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 10, color: AppTheme.textPrimary),
+                          overflow: TextOverflow.ellipsis)),
+                        Text('${entry.value}',
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 10, fontWeight: FontWeight.w700,
+                              color: Color(0xFF00838F))),
+                      ]),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 4,
+                          backgroundColor: const Color(0xFFE0F7FA),
+                          valueColor: const AlwaysStoppedAnimation(
+                              Color(0xFF00838F)),
+                        ),
+                      ),
+                    ]),
+                  );
+                }),
+            ]),
+          )),
+        ]),
+        const SizedBox(height: 12),
+
+        // ── Classements : ville + type & commune + type (sans résultats) ──
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: AppTheme.dividerColor.withValues(alpha: 0.4)),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.search_off_rounded,
+                  color: Color(0xFFE65100), size: 15),
+              const SizedBox(width: 6),
+              const Expanded(child: Text(
+                'Recherches sans résultats (villes & communes / type)',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 11,
+                    color: AppTheme.textPrimary))),
+            ]),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(children: [
+                Icon(Icons.info_outline_rounded,
+                    color: Color(0xFFE65100), size: 14),
+                SizedBox(width: 8),
+                Expanded(child: Text(
+                  "Ce KPI nécessite l'enregistrement des requêtes "
+                  "de recherche dans Firestore (collection search_logs). "
+                  "Activez le suivi des recherches pour alimenter ce graphique.",
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                      color: Color(0xFFE65100)),
+                )),
+              ]),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  // Labels axe X
+  Widget _kpiXLabels(List<MapEntry<String, double>> entries) =>
+    SizedBox(
+      height: 18,
+      child: LayoutBuilder(builder: (ctx, constraints) {
+        if (entries.isEmpty) return const SizedBox.shrink();
+        final w = constraints.maxWidth / entries.length;
+        final showEvery = entries.length > 10 ? (entries.length ~/ 5) : 1;
+        return Stack(children: List.generate(entries.length, (i) {
+          if (i % showEvery != 0) return const SizedBox.shrink();
+          return Positioned(left: i * w, width: w,
+            child: Center(child: Text(entries[i].key,
+              style: const TextStyle(fontSize: 8, fontFamily: 'Poppins',
+                  color: AppTheme.textHint))));
+        }));
+      }),
+    );
+
+}
+
+
+
+// ── Painter : histogramme simple KPI 2 (visiteurs) ────────────────────────
+
+class _Kpi2BarPainter extends CustomPainter {
+  final List<MapEntry<String, double>> entries;
+  final double maxVal;
+  final Color barColor;
+  const _Kpi2BarPainter({
+    required this.entries,
+    required this.maxVal,
+    required this.barColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (entries.isEmpty) return;
+    final n     = entries.length;
+    final slotW = size.width / n;
+    final barW  = slotW * 0.55;
+    final maxH  = size.height - 4;
+
+    for (int i = 0; i < n; i++) {
+      final val = entries[i].value;
+      final h   = maxVal > 0 ? (val / maxVal) * maxH : 0.0;
+      final x   = i * slotW + (slotW - barW) / 2;
+      final y   = size.height - h;
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(x, y, barW, math.max(h, 2)),
+          topLeft: const Radius.circular(3),
+          topRight: const Radius.circular(3),
+        ),
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [barColor, barColor.withValues(alpha: 0.55)],
+          ).createShader(Rect.fromLTWH(x, y, barW, h)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Kpi2BarPainter old) =>
+      old.entries != entries || old.maxVal != maxVal;
+}
+
+// ── Painter : graphique dual (barres périodiques + courbe cumulée) ─────────────
+
+class _KpiDualChartPainter extends CustomPainter {
+  final List<MapEntry<String, double>> barEntries;
+  final List<MapEntry<String, double>> lineEntries;
+  final double maxBar;
+  final double maxLine;
+
+  _KpiDualChartPainter({
+    required this.barEntries,
+    required this.lineEntries,
+    required this.maxBar,
+    required this.maxLine,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (barEntries.isEmpty) return;
+    final n = barEntries.length;
+    final slotW = size.width / n;
+    final barW = slotW * 0.55;
+    final maxH = size.height - 4;
+
+    // ── Barres (recette périodique) ──
+    for (int i = 0; i < n; i++) {
+      final val = barEntries[i].value;
+      final h = maxBar > 0 ? (val / maxBar) * maxH : 0.0;
+      final x = i * slotW + (slotW - barW) / 2;
+      final y = size.height - h;
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          colors: [const Color(0xFFFFA726), const Color(0xFFE65100).withValues(alpha: 0.7)],
+        ).createShader(Rect.fromLTWH(x, y, barW, h));
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(x, y, barW, math.max(h, 2)),
+          topLeft: const Radius.circular(3), topRight: const Radius.circular(3),
+        ),
+        paint,
+      );
+    }
+
+    // ── Courbe (recette cumulée) ──
+    if (lineEntries.length < 2) return;
+    final stepX = size.width / (lineEntries.length - 1);
+    final points = <Offset>[];
+    for (int i = 0; i < lineEntries.length; i++) {
+      final x = i * stepX;
+      final y = size.height - (maxLine > 0 ? (lineEntries[i].value / maxLine) * maxH : 0.0);
+      points.add(Offset(x, y));
+    }
+
+    // Fill
+    final fillPath = Path()
+      ..moveTo(points.first.dx, size.height)
+      ..lineTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final p = points[i - 1]; final c = points[i];
+      final cp1 = Offset(p.dx + stepX * 0.4, p.dy);
+      final cp2 = Offset(c.dx - stepX * 0.4, c.dy);
+      fillPath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, c.dx, c.dy);
+    }
+    fillPath..lineTo(points.last.dx, size.height)..close();
+    canvas.drawPath(fillPath, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [const Color(0xFF006064).withValues(alpha: 0.25),
+                 const Color(0xFF006064).withValues(alpha: 0.02)],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill);
+
+    // Ligne
+    final linePath = Path()..moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final p = points[i - 1]; final c = points[i];
+      linePath.cubicTo(p.dx + stepX * 0.4, p.dy, c.dx - stepX * 0.4, c.dy, c.dx, c.dy);
+    }
+    canvas.drawPath(linePath, Paint()
+      ..color = const Color(0xFF006064)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round);
+
+    // Points clés
+    final showEvery = lineEntries.length > 12 ? (lineEntries.length ~/ 6) : 1;
+    for (int i = 0; i < points.length; i++) {
+      if (i % showEvery != 0 && i != points.length - 1) continue;
+      canvas.drawCircle(points[i], 4.5, Paint()..color = Colors.white..style = PaintingStyle.fill);
+      canvas.drawCircle(points[i], 3.0, Paint()..color = const Color(0xFF006064)..style = PaintingStyle.fill);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_KpiDualChartPainter old) =>
+      old.barEntries != barEntries || old.lineEntries != lineEntries;
+}
+
+// ── Modèle segment donut KPI ──────────────────────────────────────────────────
+
+class _KpiDonutSeg {
+  final String label;
+  final double amount;
+  final Color color;
+  const _KpiDonutSeg(this.label, this.amount, this.color);
+}
+
+// ── Painter : graphique anneau (donut) KPI ────────────────────────────────────
+
+class _KpiDonutPainter extends CustomPainter {
+  final List<_KpiDonutSeg> segments;
+  final double total;
+  const _KpiDonutPainter({required this.segments, required this.total});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2;
+    final strokeW = radius * 0.36;
+    if (total <= 0) {
+      canvas.drawCircle(center, radius - strokeW / 2, Paint()
+        ..color = const Color(0xFFEEEEEE)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW);
+      return;
+    }
+    double startAngle = -math.pi / 2;
+    for (final s in segments) {
+      if (s.amount <= 0) continue;
+      final sweep = (s.amount / total) * 2 * math.pi;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - strokeW / 2),
+        startAngle + 0.025, sweep - 0.05, false,
+        Paint()..color = s.color..style = PaintingStyle.stroke
+               ..strokeWidth = strokeW..strokeCap = StrokeCap.butt,
+      );
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_KpiDonutPainter old) =>
+      old.segments != segments || old.total != total;
 }
 
 class _PendingPropertyCard extends StatelessWidget {

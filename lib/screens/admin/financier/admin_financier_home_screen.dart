@@ -95,6 +95,28 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
       .where((p) => p.productType == 'ads')
       .fold(0, (s, p) => s + p.amount);
 
+  // ── ARPA : revenu moyen par annonceur unique ──────────────────────────────
+  int get _uniqueAnnonceurCount {
+    final ids = _filtered.map((p) => p.userId).toSet();
+    return ids.isEmpty ? 1 : ids.length;
+  }
+
+  double get _arpaRevenue {
+    if (_uniqueAnnonceurCount == 0) return 0.0;
+    return _totalRevenue / _uniqueAnnonceurCount;
+  }
+
+  // ── Données cumulées pour la courbe ──────────────────────────────────────
+  List<MapEntry<String, double>> _buildCumulativeData() {
+    final periodic = _buildChartData();
+    final entries = periodic.entries.toList();
+    double cumul = 0.0;
+    return entries.map((e) {
+      cumul += e.value;
+      return MapEntry(e.key, cumul);
+    }).toList();
+  }
+
   // Donnees par jour pour le graphique
   Map<String, double> _buildChartData() {
     final result = <String, double>{};
@@ -315,7 +337,7 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
   Widget _buildKpiCards() {
     return Column(
       children: [
-        // Total revenu - carte principale
+        // ── Carte principale : Recette totale ────────────────────────────────
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(20),
@@ -335,15 +357,41 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Revenu Total',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                ),
+              Row(
+                children: [
+                  const Icon(Icons.monetization_on_outlined,
+                      color: Colors.white70, size: 16),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Recette Totale',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _selectedPeriod == 'annee' ? 'Annuel' :
+                      _selectedPeriod == 'mois'  ? 'Mensuel' :
+                      _selectedPeriod == 'semaine' ? 'Hebdo' : 'Journalier',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Poppins',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 '\$${_totalRevenue.toStringAsFixed(2)}',
                 style: const TextStyle(
@@ -355,7 +403,7 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                '${_filtered.length} transaction(s) confirmee(s)',
+                '${_filtered.length} transaction(s) confirmee(s) · ${_uniqueAnnonceurCount} annonceur(s)',
                 style: const TextStyle(
                   color: Colors.white60,
                   fontFamily: 'Poppins',
@@ -366,11 +414,12 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
           ),
         ),
         const SizedBox(height: 10),
+        // ── Ligne 1 : Recharges + Boosts ─────────────────────────────────────
         Row(
           children: [
             Expanded(
               child: _KpiCard(
-                label: 'Recharges',
+                label: 'Recharges / Packs',
                 value: '\$${_rechargeRevenue.toStringAsFixed(2)}',
                 icon: Icons.account_balance_wallet_outlined,
                 color: const Color(0xFF1B5E20),
@@ -387,6 +436,30 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        // ── Ligne 2 : ARPA + Publicités ──────────────────────────────────────
+        Row(
+          children: [
+            Expanded(
+              child: _KpiCard(
+                label: 'ARPA',
+                value: '\$${_arpaRevenue.toStringAsFixed(2)}',
+                icon: Icons.person_outline_rounded,
+                color: const Color(0xFF006064),
+                subtitle: 'Revenu moyen / annonceur',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _KpiCard(
+                label: 'Publicites (Ads)',
+                value: '\$${_adsRevenue.toStringAsFixed(2)}',
+                icon: Icons.campaign_outlined,
+                color: const Color(0xFF4A148C),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -397,6 +470,225 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
 
     final maxVal = data.values.fold(0.0, (m, v) => v > m ? v : m);
     final entries = data.entries.toList();
+    final cumulData = _buildCumulativeData();
+    final maxCumul = cumulData.isEmpty ? 1.0 :
+        cumulData.fold(0.0, (m, e) => e.value > m ? e.value : m);
+
+    return Column(
+      children: [
+        // ── Graphique 1 : Recette périodique (barres) ────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.bar_chart_rounded,
+                      color: Color(0xFFFFA726), size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Recette périodique',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _selectedPeriod == 'annee' ? 'Par mois' : 'Par jour',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 10,
+                        color: AppTheme.accentColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Total période : \$${_totalRevenue.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 160,
+                child: CustomPaint(
+                  painter: _BarChartPainter(entries: entries, maxVal: maxVal),
+                  child: Container(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildXLabels(entries),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // ── Graphique 2 : Recette cumulée (courbe) ────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.show_chart_rounded,
+                      color: Color(0xFF006064), size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Recette cumulée',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  // ARPA badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF006064).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'ARPA \$${_arpaRevenue.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 10,
+                        color: Color(0xFF006064),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Cumul total : \$${cumulData.isEmpty ? '0.00' : cumulData.last.value.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 160,
+                child: CustomPaint(
+                  painter: _LineChartPainter(
+                    entries: cumulData,
+                    maxVal: maxCumul,
+                    lineColor: const Color(0xFF006064),
+                    fillColor: const Color(0xFF006064),
+                  ),
+                  child: Container(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildXLabels(cumulData),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Helper : labels axe X ─────────────────────────────────────────────────
+  Widget _buildXLabels(List<MapEntry<String, double>> entries) {
+    return SizedBox(
+      height: 20,
+      child: LayoutBuilder(
+        builder: (ctx, constraints) {
+          if (entries.isEmpty) return const SizedBox.shrink();
+          final w = constraints.maxWidth / entries.length;
+          final showEvery = entries.length > 10 ? (entries.length ~/ 5) : 1;
+          return Stack(
+            children: List.generate(entries.length, (i) {
+              if (i % showEvery != 0) return const SizedBox.shrink();
+              return Positioned(
+                left: i * w,
+                width: w,
+                child: Center(
+                  child: Text(
+                    entries[i].key,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontFamily: 'Poppins',
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChannelBreakdown() {
+    // ── Données pour le donut ─────────────────────────────────────────────────
+    final segments = [
+      _DonutSegment(
+        label: 'Abonnements',
+        amount: _rechargeRevenue,
+        color: const Color(0xFF1B5E20),
+        icon: Icons.account_balance_wallet_outlined,
+      ),
+      _DonutSegment(
+        label: 'Boosting',
+        amount: _boostRevenue,
+        color: const Color(0xFFE65100),
+        icon: Icons.rocket_launch_outlined,
+      ),
+      _DonutSegment(
+        label: 'Publicité',
+        amount: _adsRevenue,
+        color: const Color(0xFF4A148C),
+        icon: Icons.campaign_outlined,
+      ),
+    ];
+    final total = _totalRevenue;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -414,11 +706,14 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Titre ──────────────────────────────────────────────────────────
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Icon(Icons.donut_large_rounded,
+                  color: Color(0xFF4A148C), size: 18),
+              const SizedBox(width: 8),
               const Text(
-                'Evolution des revenus',
+                'Répartition du revenu',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
@@ -426,172 +721,108 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
                   color: AppTheme.textPrimary,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  _selectedPeriod == 'annee' ? 'Par mois' : 'Par jour',
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 10,
-                    color: AppTheme.accentColor,
-                    fontWeight: FontWeight.w600,
+            ],
+          ),
+          const SizedBox(height: 16),
+          // ── Donut + Légende côte à côte ────────────────────────────────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Donut chart
+              SizedBox(
+                width: 140,
+                height: 140,
+                child: CustomPaint(
+                  painter: _DonutChartPainter(
+                    segments: segments,
+                    total: total,
                   ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Total',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 10,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                        Text(
+                          '\$${total.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Légende
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: segments.map((s) {
+                    final pct = total > 0 ? (s.amount / total * 100) : 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: s.color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              s.label,
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${pct.toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: s.color,
+                                ),
+                              ),
+                              Text(
+                                '\$${s.amount.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 160,
-            child: CustomPaint(
-              painter: _BarChartPainter(entries: entries, maxVal: maxVal),
-              child: Container(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Labels X
-          SizedBox(
-            height: 20,
-            child: LayoutBuilder(
-              builder: (ctx, constraints) {
-                final w = constraints.maxWidth / entries.length;
-                final showEvery =
-                    entries.length > 10 ? (entries.length ~/ 5) : 1;
-                return Stack(
-                  children: List.generate(entries.length, (i) {
-                    if (i % showEvery != 0) return const SizedBox.shrink();
-                    return Positioned(
-                      left: i * w,
-                      width: w,
-                      child: Center(
-                        child: Text(
-                          entries[i].key,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontFamily: 'Poppins',
-                            color: AppTheme.textHint,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChannelBreakdown() {
-    final channels = [
-      {
-        'label': 'Recharges / Packs',
-        'amount': _rechargeRevenue,
-        'color': const Color(0xFF1B5E20),
-        'icon': Icons.account_balance_wallet_outlined,
-      },
-      {
-        'label': 'Boosts annonces',
-        'amount': _boostRevenue,
-        'color': const Color(0xFFE65100),
-        'icon': Icons.rocket_launch_outlined,
-      },
-      {
-        'label': 'Publicites (Ads)',
-        'amount': _adsRevenue,
-        'color': const Color(0xFF4A148C),
-        'icon': Icons.campaign_outlined,
-      },
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Repartition par canal',
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...channels.map((c) {
-            final amount = c['amount'] as double;
-            final pct = _totalRevenue > 0 ? (amount / _totalRevenue) : 0.0;
-            final color = c['color'] as Color;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(c['icon'] as IconData, color: color, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          c['label'] as String,
-                          style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '\$${amount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${(pct * 100).toStringAsFixed(0)}%',
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: AppTheme.textHint,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      backgroundColor: color.withValues(alpha: 0.1),
-                      valueColor: AlwaysStoppedAnimation<Color>(color),
-                      minHeight: 6,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
         ],
       ),
     );
@@ -707,7 +938,7 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
   }
 }
 
-// ── Painter pour le graphique en barres ──────────────────────────────────────
+// ── Painter pour le graphique en barres ────────────────────────────────────────
 
 class _BarChartPainter extends CustomPainter {
   final List<MapEntry<String, double>> entries;
@@ -754,6 +985,168 @@ class _BarChartPainter extends CustomPainter {
       old.entries != entries || old.maxVal != maxVal;
 }
 
+// ── Painter : courbe de recette cumulée ──────────────────────────────────────────
+
+class _LineChartPainter extends CustomPainter {
+  final List<MapEntry<String, double>> entries;
+  final double maxVal;
+  final Color lineColor;
+  final Color fillColor;
+
+  _LineChartPainter({
+    required this.entries,
+    required this.maxVal,
+    required this.lineColor,
+    required this.fillColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (entries.isEmpty || maxVal <= 0) return;
+    final n = entries.length;
+    final stepX = n <= 1 ? size.width : size.width / (n - 1);
+
+    // Calcul des points
+    final points = <Offset>[];
+    for (int i = 0; i < n; i++) {
+      final x = i * stepX;
+      final y = size.height - (entries[i].value / maxVal) * (size.height - 6);
+      points.add(Offset(x, y));
+    }
+
+    // Zone de remplissage (fill under curve)
+    final fillPath = Path();
+    fillPath.moveTo(points.first.dx, size.height);
+    fillPath.lineTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final prev = points[i - 1];
+      final curr = points[i];
+      final cp1 = Offset(prev.dx + stepX * 0.4, prev.dy);
+      final cp2 = Offset(curr.dx - stepX * 0.4, curr.dy);
+      fillPath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, curr.dx, curr.dy);
+    }
+    fillPath.lineTo(points.last.dx, size.height);
+    fillPath.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            fillColor.withValues(alpha: 0.3),
+            fillColor.withValues(alpha: 0.02),
+          ]).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Ligne de la courbe
+    final linePath = Path();
+    linePath.moveTo(points.first.dx, points.first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final prev = points[i - 1];
+      final curr = points[i];
+      final cp1 = Offset(prev.dx + stepX * 0.4, prev.dy);
+      final cp2 = Offset(curr.dx - stepX * 0.4, curr.dy);
+      linePath.cubicTo(cp1.dx, cp1.dy, cp2.dx, cp2.dy, curr.dx, curr.dy);
+    }
+
+    final linePaint = Paint()
+      ..color = lineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(linePath, linePaint);
+
+    // Points sur la courbe
+    final dotPaint = Paint()
+      ..color = lineColor
+      ..style = PaintingStyle.fill;
+    final dotBorder = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final showEvery = n > 12 ? (n ~/ 6) : 1;
+    for (int i = 0; i < points.length; i++) {
+      if (i % showEvery != 0 && i != points.length - 1) continue;
+      canvas.drawCircle(points[i], 5, dotBorder);
+      canvas.drawCircle(points[i], 3.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineChartPainter old) =>
+      old.entries != entries || old.maxVal != maxVal;
+}
+
+// ── Modèle segment donut ─────────────────────────────────────────────────────────
+
+class _DonutSegment {
+  final String label;
+  final double amount;
+  final Color color;
+  final IconData icon;
+
+  const _DonutSegment({
+    required this.label,
+    required this.amount,
+    required this.color,
+    required this.icon,
+  });
+}
+
+// ── Painter : graphique anneau (donut) ────────────────────────────────────────────
+
+class _DonutChartPainter extends CustomPainter {
+  final List<_DonutSegment> segments;
+  final double total;
+
+  _DonutChartPainter({required this.segments, required this.total});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2;
+    final strokeW = radius * 0.38;
+
+    if (total <= 0) {
+      // Anneau vide
+      final emptyPaint = Paint()
+        ..color = const Color(0xFFEEEEEE)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW;
+      canvas.drawCircle(center, radius - strokeW / 2, emptyPaint);
+      return;
+    }
+
+    double startAngle = -math.pi / 2; // démarre en haut
+
+    for (int i = 0; i < segments.length; i++) {
+      final s = segments[i];
+      if (s.amount <= 0) continue;
+      final sweep = (s.amount / total) * 2 * math.pi;
+      const gap = 0.03; // petit espace entre les segments
+
+      final paint = Paint()
+        ..color = s.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeW
+        ..strokeCap = StrokeCap.butt;
+
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - strokeW / 2),
+        startAngle + gap / 2,
+        sweep - gap,
+        false,
+        paint,
+      );
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DonutChartPainter old) =>
+      old.segments != segments || old.total != total;
+}
+
 // ── Widget KPI Card ──────────────────────────────────────────────────────────
 
 class _KpiCard extends StatelessWidget {
@@ -761,12 +1154,14 @@ class _KpiCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final Color color;
+  final String? subtitle;
 
   const _KpiCard({
     required this.label,
     required this.value,
     required this.icon,
     required this.color,
+    this.subtitle,
   });
 
   @override
@@ -817,6 +1212,17 @@ class _KpiCard extends StatelessWidget {
                     color: color,
                   ),
                 ),
+                if (subtitle != null) ...([
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 9,
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ]),
               ],
             ),
           ),

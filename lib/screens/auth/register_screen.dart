@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart' as app_auth;
+import '../../services/data_service.dart';
 import '../../services/phone_auth_service.dart';
 import 'otp_register_screen.dart';
 
@@ -37,12 +38,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _selectedCity;     // ville de résidence (obligatoire)
   String? _selectedCommune;  // commune de résidence (optionnel)
 
+  // Nombre d'annonces gratuites configuré par l'admin (lu depuis Firestore settings)
+  int _freeQuotaCount = 3; // valeur par défaut avant chargement
+
   String get _fullPhone => '$_phoneCountryCode${_phoneNumberCtrl.text.trim()}';
 
   /// Mappe un indicatif téléphonique vers le nom de pays utilisé par AppConstants.
   String _phoneCountryToAppCountry(String code) {
     if (code == '+242') return 'Congo (Brazzaville)';
     return 'Congo (RDC)'; // default : +243 et tout autre code
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFreeQuota();
+  }
+
+  Future<void> _loadFreeQuota() async {
+    try {
+      final ds = DataService();
+      final settings = await ds.getSettingsMap();
+      final count = (settings['free_quota_count'] as num?)?.toInt() ?? 3;
+      if (mounted) setState(() => _freeQuotaCount = count);
+    } catch (_) {
+      // Valeur par défaut conservée
+    }
   }
 
   @override
@@ -281,12 +302,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimary,
-                        fontFamily: 'Poppins')),
-                const SizedBox(height: 4),
-                const Text('3 annonces gratuites offertes à l\'inscription',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
                         fontFamily: 'Poppins')),
                 const SizedBox(height: 24),
 
@@ -649,7 +664,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Cadeau 3 annonces ────────────────────────────────────
+                // ── Cadeau annonces gratuites (valeur dynamique admin) ───
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -657,12 +672,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.3)),
                   ),
-                  child: const Row(children: [
-                    Icon(Icons.card_giftcard, color: AppTheme.successColor, size: 20),
-                    SizedBox(width: 10),
+                  child: Row(children: [
+                    const Icon(Icons.card_giftcard, color: AppTheme.successColor, size: 20),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text('3 annonces gratuites offertes à l\'inscription !',
-                          style: TextStyle(
+                      child: Text(
+                          '$_freeQuotaCount annonce${_freeQuotaCount > 1 ? 's' : ''} gratuite${_freeQuotaCount > 1 ? 's' : ''} offertes à l\'inscription !',
+                          style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
