@@ -38,6 +38,7 @@ class DataService {
   CollectionReference get _paymentsCol => _db.collection('payments');
   CollectionReference get _reportsCol => _db.collection('reports');
   CollectionReference get _logsCol => _db.collection('audit_logs');
+  CollectionReference get _contactLogsCol => _db.collection('contact_logs');
   CollectionReference get _quotasCol => _db.collection('quotas');
   DocumentReference get _settingsDoc => _db.collection('config').doc('system_settings');
   CollectionReference get _parrainCol => _db.collection('parrains');
@@ -2204,5 +2205,46 @@ class DataService {
       propertiesCount: propsInPeriod,
       inactiveCount: inactiveCount,
     );
+  }
+
+  // ── KPI 3 : Contact Logs (clics WhatsApp / Appel) ──────────────────────────
+
+  /// Enregistre un clic de contact dans Firestore.
+  /// [type] = 'whatsapp' | 'call'
+  Future<void> logContactClick({
+    required String propertyId,
+    required String propertyTitle,
+    required String ownerId,
+    required String type, // 'whatsapp' | 'call'
+    String? visitorId,
+  }) async {
+    try {
+      await _contactLogsCol.add({
+        'property_id':    propertyId,
+        'property_title': propertyTitle,
+        'owner_id':       ownerId,
+        'type':           type,
+        'visitor_id':     visitorId ?? '',
+        'created_at':     FieldValue.serverTimestamp(),
+        'created_at_iso': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.logContactClick] error: $e');
+    }
+  }
+
+  /// Retourne tous les logs de contact (triés du plus récent au plus ancien).
+  Future<List<Map<String, dynamic>>> getContactLogs() async {
+    try {
+      final snap = await _contactLogsCol
+          .orderBy('created_at', descending: true)
+          .get();
+      return snap.docs
+          .map((d) => d.data() as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getContactLogs] error: $e');
+      return [];
+    }
   }
 }

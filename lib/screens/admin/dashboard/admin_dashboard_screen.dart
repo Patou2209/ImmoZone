@@ -34,6 +34,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ── KPI 2 Attraction & Engagement ────────────────────────────────────
   List<UserModel> _allUsers = [];
   List<PropertyModel> _allProperties = [];
+  // ── KPI 3 Matchmaking ────────────────────────────────────────────────
+  List<Map<String, dynamic>> _contactLogs = [];
 
   @override
   void initState() {
@@ -52,6 +54,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     // Charger users + properties pour KPI 2
     final allUsers = await _ds.getUsers();
     final allProperties = await _ds.getProperties();
+    // Charger logs de contact pour KPI 3
+    final contactLogs = await _ds.getContactLogs();
     setState(() {
       _stats = stats;
       _pendingProps = pending;
@@ -60,6 +64,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         _allUsers = allUsers;
         _allProperties = allProperties;
+        _contactLogs = contactLogs;
         _isFreeTrial = _ds.isFreeTrial;
       _isLoading = false;
     });
@@ -846,6 +851,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
                   // ── 2. Attraction & Engagement de l'Audience ─────────
                   SliverToBoxAdapter(child: _buildKpiAudience()),
+
+                  // ── 3. Efficacité du Matchmaking ─────────────────────────
+                  SliverToBoxAdapter(child: _buildKpiMatchmaking()),
 
                   // ── Annonces en attente ───────────────────────────────────
                   if (_pendingProps.isNotEmpty) ...[
@@ -2033,6 +2041,237 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+
+  // ── Getters KPI 3 : Matchmaking ───────────────────────────────────────────
+
+  /// Filtre les contact_logs sur la période courante (_kpiPeriod).
+  List<Map<String, dynamic>> get _kpi3Filtered {
+    final now = DateTime.now();
+    DateTime from;
+    switch (_kpiPeriod) {
+      case 'jour':    from = DateTime(now.year, now.month, now.day); break;
+      case 'semaine': from = now.subtract(const Duration(days: 7)); break;
+      case 'annee':   from = DateTime(now.year, 1, 1); break;
+      default:        from = DateTime(now.year, now.month, 1);
+    }
+    return _contactLogs.where((log) {
+      final raw = log['created_at_iso'] as String?;
+      if (raw == null) return false;
+      final dt = DateTime.tryParse(raw);
+      return dt != null && dt.isAfter(from);
+    }).toList();
+  }
+
+  int get _kpi3WaClicks =>
+      _kpi3Filtered.where((l) => l['type'] == 'whatsapp').length;
+
+  int get _kpi3CallClicks =>
+      _kpi3Filtered.where((l) => l['type'] == 'call').length;
+
+  int get _kpi3TotalLeads => _kpi3WaClicks + _kpi3CallClicks;
+
+  /// Taux de conversion : leads / annonces actives (≤ 1.0 pour affichage jauge)
+  double get _kpi3ConversionRate {
+    final active = _allProperties
+        .where((p) => p.status == 'Actif' && !p.isExpired)
+        .length;
+    if (active == 0) return 0.0;
+    final ratio = _kpi3TotalLeads / active;
+    return ratio.clamp(0.0, double.infinity); // peut dépasser 1
+  }
+
+  /// Histogramme mensuel : retourne 12 mois avec wa+call counts
+  List<_Kpi3MonthBar> _kpi3BuildMonthlyData() {
+    const months = ['Jan','Fév','Mar','Avr','Mai','Jun',
+                     'Jul','Aoû','Sep','Oct','Nov','Déc'];
+    final now = DateTime.now();
+    return List.generate(12, (i) {
+      final m = i + 1;
+      final wa   = _contactLogs.where((l) {
+        final raw = l['created_at_iso'] as String?;
+        if (raw == null) return false;
+        final dt = DateTime.tryParse(raw);
+        return dt != null && dt.year == now.year && dt.month == m
+            && l['type'] == 'whatsapp';
+      }).length;
+      final call = _contactLogs.where((l) {
+        final raw = l['created_at_iso'] as String?;
+        if (raw == null) return false;
+        final dt = DateTime.tryParse(raw);
+        return dt != null && dt.year == now.year && dt.month == m
+            && l['type'] == 'call';
+      }).length;
+      return _Kpi3MonthBar(label: months[i], wa: wa, call: call);
+    });
+  }
+
+  // ── Bloc KPI 3 ────────────────────────────────────────────────────────────
+  Widget _buildKpiMatchmaking() {
+    final monthData = _kpi3BuildMonthlyData();
+    final maxBar = monthData.isEmpty ? 1
+        : monthData.fold(0, (m, e) => (e.wa + e.call) > m ? (e.wa + e.call) : m);
+    final convRate = _kpi3ConversionRate;
+    final convDisplay = convRate > 1.0
+        ? '${convRate.toStringAsFixed(1)}× '
+        : '${(convRate * 100).toStringAsFixed(1)}%';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+        // ── Titre ────────────────────────────────────────────────────────
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF880E4F),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('3',
+              style: TextStyle(color: Colors.white, fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Efficacité du "Matchmaking"',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary, fontFamily: 'Poppins')),
+          ),
+        ]),
+        const SizedBox(height: 12),
+
+        // ── KPI cards : Volume Leads + Taux Conversion ───────────────────
+        Row(children: [
+          Expanded(child: _kpiCard(
+            label: 'Volume de Leads',
+            value: '$_kpi3TotalLeads',
+            icon: Icons.connect_without_contact_rounded,
+            color: const Color(0xFF880E4F),
+            sub: '${_kpi3WaClicks} WA · ${_kpi3CallClicks} Appels',
+          )),
+          const SizedBox(width: 10),
+          Expanded(child: _kpiCard(
+            label: 'Taux Lead→Contact',
+            value: convDisplay,
+            icon: Icons.trending_up_rounded,
+            color: const Color(0xFF00695C),
+            sub: 'clics / annonces actives',
+          )),
+        ]),
+        const SizedBox(height: 10),
+
+        // ── Jauge taux de conversion ─────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.ads_click_rounded,
+                  color: Color(0xFF880E4F), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Jauge — Engagement (clics / annonces actives)',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary))),
+              Text(convDisplay,
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w800, fontSize: 14,
+                    color: Color(0xFF880E4F))),
+            ]),
+            const SizedBox(height: 10),
+            Stack(children: [
+              Container(height: 12,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFCE4EC),
+                  borderRadius: BorderRadius.circular(6)),
+              ),
+              FractionallySizedBox(
+                widthFactor: (convRate / (convRate > 2.0 ? convRate : 2.0)).clamp(0.0, 1.0),
+                child: Container(height: 12,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        colors: [Color(0xFF880E4F), Color(0xFFE91E63)]),
+                    borderRadius: BorderRadius.circular(6)),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            const Text('Un ratio > 1 indique que chaque annonce génère en moyenne plus d\'1 clic de contact.',
+              style: TextStyle(fontFamily: 'Poppins',
+                  fontSize: 9, color: AppTheme.textHint)),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Histogramme mensuel WA vs Appel ──────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.bar_chart_rounded,
+                  color: Color(0xFF880E4F), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(child: Text('Volume mensuel — WhatsApp vs Appel',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 12, color: AppTheme.textPrimary))),
+            ]),
+            const SizedBox(height: 8),
+            // Légende
+            Row(children: [
+              Container(width: 10, height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF25D366), shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              const Text('WhatsApp',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                    color: AppTheme.textHint)),
+              const SizedBox(width: 14),
+              Container(width: 10, height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1565C0), shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              const Text('Appel',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 9,
+                    color: AppTheme.textHint)),
+            ]),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 130,
+              child: CustomPaint(
+                painter: _Kpi3DualBarPainter(
+                  data: monthData,
+                  maxVal: maxBar.toDouble(),
+                ),
+                child: Container(),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // Labels X
+            SizedBox(
+              height: 16,
+              child: Row(
+                children: monthData.map((m) => Expanded(
+                  child: Center(child: Text(m.label,
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 7, color: AppTheme.textHint))),
+                )).toList(),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
   // Labels axe X
   Widget _kpiXLabels(List<MapEntry<String, double>> entries) =>
     SizedBox(
@@ -2054,6 +2293,68 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 
+
+
+// ── Modèle barre mensuelle KPI 3 ─────────────────────────────────────────────
+
+class _Kpi3MonthBar {
+  final String label;
+  final int wa;
+  final int call;
+  const _Kpi3MonthBar({required this.label, required this.wa, required this.call});
+}
+
+// ── Painter : histogramme double KPI 3 (WA vert + Appel bleu) ────────────────
+
+class _Kpi3DualBarPainter extends CustomPainter {
+  final List<_Kpi3MonthBar> data;
+  final double maxVal;
+  const _Kpi3DualBarPainter({required this.data, required this.maxVal});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+    final n      = data.length;
+    final slotW  = size.width / n;
+    final barW   = slotW * 0.28;
+    final maxH   = size.height - 4;
+    const waColor   = Color(0xFF25D366);
+    const callColor = Color(0xFF1565C0);
+
+    for (int i = 0; i < n; i++) {
+      final d = data[i];
+      final baseX = i * slotW;
+
+      // WA bar (left)
+      final hWa = maxVal > 0 ? (d.wa / maxVal) * maxH : 0.0;
+      if (hWa > 0) {
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTWH(baseX + slotW * 0.05, size.height - hWa, barW, math.max(hWa, 2)),
+            topLeft: const Radius.circular(2), topRight: const Radius.circular(2),
+          ),
+          Paint()..color = waColor.withValues(alpha: 0.85),
+        );
+      }
+
+      // Call bar (right)
+      final hCall = maxVal > 0 ? (d.call / maxVal) * maxH : 0.0;
+      if (hCall > 0) {
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTWH(baseX + slotW * 0.05 + barW + 2, size.height - hCall, barW, math.max(hCall, 2)),
+            topLeft: const Radius.circular(2), topRight: const Radius.circular(2),
+          ),
+          Paint()..color = callColor.withValues(alpha: 0.85),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Kpi3DualBarPainter old) =>
+      old.data != data || old.maxVal != maxVal;
+}
 
 // ── Painter : histogramme simple KPI 2 (visiteurs) ────────────────────────
 

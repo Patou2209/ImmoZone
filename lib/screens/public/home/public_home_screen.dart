@@ -2140,7 +2140,6 @@ class _HomeTabState extends State<_HomeTab>
       // ── Tableau 1 : Disponibilités ──────────────────────────────────────
       _buildStatsCard(
         icon: Icons.store_rounded,
-        titleIcon: Icons.fiber_manual_record_rounded, // petit point orange
         accentIconColor: const Color(0xFFFFA726),     // icône container orange
         title: 'Marché Immobilier — Disponibilités',
         tooltipMsg: 'Cliquez sur une catégorie pour filtrer les annonces',

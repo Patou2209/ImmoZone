@@ -307,7 +307,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 // ── Catégorie ────────────────────────────────────────────
                 Row(children: [
-                  const Text('Je suis :',
+                  const Text('Sélectionnez votre catégorie',
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

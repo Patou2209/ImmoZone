@@ -1130,6 +1130,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   /// Open WhatsApp with pre-filled message
   Future<void> _openWhatsApp(String phone) async {
     final p = widget.property;
+    // ── Log du clic WhatsApp dans Firestore ──────────────────────────
+    final auth = context.read<AuthProvider>();
+    _ds.logContactClick(
+      propertyId:    p.id,
+      propertyTitle: p.title,
+      ownerId:       p.ownerId,
+      type:          'whatsapp',
+      visitorId:     auth.currentUser?.id,
+    );
     String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     final number = cleaned.startsWith('+') ? cleaned.substring(1) : cleaned;
     if (number.isEmpty) {
@@ -1170,6 +1179,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   /// Phone call with clipboard fallback
   Future<void> _callPhone(String phone) async {
+    // ── Log du clic Appel dans Firestore ─────────────────────────────
+    final auth = context.read<AuthProvider>();
+    final p = widget.property;
+    _ds.logContactClick(
+      propertyId:    p.id,
+      propertyTitle: p.title,
+      ownerId:       p.ownerId,
+      type:          'call',
+      visitorId:     auth.currentUser?.id,
+    );
     String cleaned = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (!cleaned.startsWith('+') && !cleaned.startsWith('00')) {
       cleaned = '+$cleaned';
