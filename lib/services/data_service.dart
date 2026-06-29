@@ -785,6 +785,17 @@ class DataService {
     });
   }
 
+  /// Renouvelle une annonce expirée : remet le statut à 'En attente' et
+  /// repousse la date d'expiration de [days] jours à partir d'aujourd'hui.
+  Future<void> renewProperty(String id, {int days = 30}) async {
+    final now = DateTime.now();
+    await _propertiesCol.doc(id).update({
+      'status': 'En attente',
+      'expiresAt': now.add(Duration(days: days)).toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+    });
+  }
+
   /// Incrémente atomiquement le compteur de vues d'une annonce.
   /// Retourne le nouveau total de vues, ou null en cas d'échec.
   Future<int?> incrementPropertyViews(String propertyId) async {

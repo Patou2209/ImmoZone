@@ -306,29 +306,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 24),
 
                 // ── Catégorie ────────────────────────────────────────────
-                Row(children: [
-                  const Text('Sélectionnez votre catégorie',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
-                          fontFamily: 'Poppins')),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.errorColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.4)),
-                    ),
-                    child: const Text('obligatoire',
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                        fontFamily: 'Poppins'),
+                    children: [
+                      TextSpan(text: 'Sélectionnez votre catégorie'),
+                      TextSpan(
+                        text: ' *',
                         style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.errorColor)),
+                            color: AppTheme.errorColor,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
                 const SizedBox(height: 12),
                 Column(
                   children: AppConstants.annonceurCategories

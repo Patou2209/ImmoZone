@@ -283,15 +283,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        Expanded(child: _statCard('Annonces', '${_myProperties.length}', Icons.home_work, AppTheme.primaryColor)),
-                        const SizedBox(width: 12),
                         Expanded(child: _statCard('Actives',
-                            '${_myProperties.where((p) => p.status == 'Actif').length}',
+                            '${_myProperties.where((p) => p.status == 'Actif' && !p.isExpired).length}',
                             Icons.check_circle_outline, AppTheme.successColor)),
                         const SizedBox(width: 12),
                         Expanded(child: _statCard('En attente',
                             '${_myProperties.where((p) => p.status == 'En attente').length}',
                             Icons.pending_outlined, AppTheme.warningColor)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _statCard('Expirées',
+                            '${_myProperties.where((p) => p.isExpired).length}',
+                            Icons.timer_off_outlined, Colors.red)),
                       ],
                     ),
                   ),
@@ -358,52 +360,144 @@ class _ProfileScreenState extends State<ProfileScreen>
             style: TextStyle(color: AppTheme.textSecondary, fontFamily: 'Poppins')),
       );
     }
-    return ListView.builder(
+
+    // Séparer annonces actives/en attente et expirées
+    final activeProps  = _myProperties.where((p) => !p.isExpired).toList();
+    final expiredProps = _myProperties.where((p) => p.isExpired).toList();
+
+    return ListView(
       padding: const EdgeInsets.only(top: 14),
-      itemCount: _myProperties.length,
-      itemBuilder: (ctx, i) {
-        final p = _myProperties[i];
-        final hoursElapsed = DateTime.now().difference(p.createdAt).inHours;
-        final canEdit = hoursElapsed < 24;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              PropertyCard(
-                property: p,
-                showStatus: true,
-                onTap: () => Navigator.push(ctx,
-                    MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+      children: [
+        // ── Annonces actives / en attente ────────────────────────────────
+        if (activeProps.isNotEmpty) ...[
+          ...activeProps.map((p) => _buildPropertyItem(p, expired: false)),
+        ] else
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Center(
+              child: Text('Aucune annonce active',
+                  style: TextStyle(color: AppTheme.textSecondary,
+                      fontFamily: 'Poppins', fontSize: 12)),
+            ),
+          ),
+
+        // ── Section annonces expirées ─────────────────────────────────────
+        if (expiredProps.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.timer_off_outlined, color: Colors.red, size: 15),
+              const SizedBox(width: 7),
+              Text(
+                'Annonces expirées (${expiredProps.length}) — '
+                'non visibles au public',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    fontWeight: FontWeight.w600, color: Colors.red),
               ),
-              // ── Actions : Modifier (24h) + Supprimer ───────────────────
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
-                  ),
-                  boxShadow: [BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4, offset: const Offset(0, 2),
-                  )],
-                ),
-                child: Row(
-                  children: [
-                    // Spacer gauche pour pousser les icônes à droite
+            ]),
+          ),
+          ...expiredProps.map((p) => _buildPropertyItem(p, expired: true)),
+        ],
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  /// Construit la carte d'une annonce avec ses actions selon son état.
+  Widget _buildPropertyItem(PropertyModel p, {required bool expired}) {
+    final hoursElapsed = DateTime.now().difference(p.createdAt).inHours;
+    final canEdit = !expired && hoursElapsed < 24;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Carte de l'annonce (avec opacité réduite si expirée)
+          Opacity(
+            opacity: expired ? 0.7 : 1.0,
+            child: PropertyCard(
+              property: p,
+              showStatus: true,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+            ),
+          ),
+
+          // ── Barre d'actions ──────────────────────────────────────────
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: expired
+                  ? Colors.red.withValues(alpha: 0.04)
+                  : Colors.white,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              border: expired
+                  ? Border.all(color: Colors.red.withValues(alpha: 0.2))
+                  : null,
+              boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4, offset: const Offset(0, 2),
+              )],
+            ),
+            child: expired
+                // ── ANNONCE EXPIRÉE : bouton Renouveler ─────────────────
+                ? Row(children: [
+                    const Icon(Icons.timer_off_outlined,
+                        size: 14, color: Colors.red),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        p.expiresAt != null
+                            ? 'Expirée le ${_formatDate(p.expiresAt!)}'
+                            : 'Annonce expirée',
+                        style: const TextStyle(fontFamily: 'Poppins',
+                            fontSize: 10, color: Colors.red),
+                      ),
+                    ),
+                    // Bouton Renouveler
+                    ElevatedButton.icon(
+                      onPressed: () => _confirmRenew(context, p),
+                      icon: const Icon(Icons.refresh_rounded,
+                          size: 14, color: Colors.white),
+                      label: const Text('Renouveler',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontSize: 11, fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 7),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        elevation: 1,
+                      ),
+                    ),
+                  ])
+                // ── ANNONCE ACTIVE : Modifier (24h) + Supprimer ─────────
+                : Row(children: [
                     const Spacer(),
-                    // Icône Modifier (visible dans les 24h seulement)
                     if (canEdit) ...[
                       IconButton(
                         onPressed: () async {
                           final result = await Navigator.push(
-                            ctx,
+                            context,
                             MaterialPageRoute(
-                              builder: (_) => EditPropertyScreen(property: p),
-                            ),
+                                builder: (_) => EditPropertyScreen(property: p)),
                           );
                           if (result == true && mounted) _load();
                         },
@@ -415,9 +509,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       const SizedBox(width: 4),
                     ],
-                    // Icône Supprimer (toujours disponible)
                     IconButton(
-                      onPressed: () => _confirmDelete(ctx, p),
+                      onPressed: () => _confirmDelete(context, p),
                       icon: const Icon(Icons.delete_outline,
                           size: 20, color: Colors.red),
                       tooltip: 'Supprimer',
@@ -425,15 +518,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                       constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 4),
-                  ],
-                ),
-              ),
-            ],
+                  ]),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
+
+  String _formatDate(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
   Future<void> _confirmDelete(BuildContext ctx, PropertyModel p) async {
     final confirmed = await showDialog<bool>(
@@ -478,6 +571,108 @@ class _ProfileScreenState extends State<ProfileScreen>
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  /// Dialogue de confirmation de renouvellement
+  Future<void> _confirmRenew(BuildContext ctx, PropertyModel p) async {
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.refresh_rounded,
+                color: AppTheme.primaryColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          const Text('Renouveler l\'annonce',
+              style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 15)),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('"${p.title}"',
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'L\'annonce sera remise en attente de validation '
+                'et redeviendra visible au public après approbation.\n\n'
+                'Durée de renouvellement : 30 jours.',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                    color: AppTheme.textSecondary),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx, false),
+            child: const Text('Annuler',
+                style: TextStyle(fontFamily: 'Poppins',
+                    color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(dCtx, true),
+            icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+            label: const Text('Renouveler',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await _ds.renewProperty(p.id, days: 30);
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                '✅ Annonce renouvelée — en attente de validation',
+                style: TextStyle(fontFamily: 'Poppins'),
+              ),
+              backgroundColor: AppTheme.primaryColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur : $e',
+                  style: const TextStyle(fontFamily: 'Poppins')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
