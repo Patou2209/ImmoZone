@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
@@ -13,9 +14,13 @@ import 'services/data_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'screens/public/home/public_home_screen.dart';
+import 'screens/public/property_detail/property_deep_link_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── URL propres sans # pour le deep-linking web (/property/:id) ──────────
+  usePathUrlStrategy();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -72,6 +77,23 @@ class ImmoZoneApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/admin': (context) => const AdminHomeScreen(),
           '/public': (context) => const PublicHomeScreen(),
+        },
+        // ── Deep-link web : /property/:id ──────────────────────────────────
+        onGenerateRoute: (settings) {
+          final uri = Uri.tryParse(settings.name ?? '');
+          if (uri != null &&
+              uri.pathSegments.length == 2 &&
+              uri.pathSegments[0] == 'property') {
+            final id = uri.pathSegments[1];
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => PropertyDeepLinkScreen(propertyId: id),
+            );
+          }
+          // Fallback : accueil public
+          return MaterialPageRoute(
+            builder: (_) => const PublicHomeScreen(),
+          );
         },
       ),
     );
