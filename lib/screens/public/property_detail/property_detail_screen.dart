@@ -221,7 +221,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             tooltip: 'Ajouter aux favoris',
           ),
           IconButton(
-            icon: const Icon(Icons.ios_share_rounded, color: AppTheme.textSecondary),
+            icon: const Icon(Icons.share_rounded, color: AppTheme.textSecondary),
             onPressed: () => _shareProperty(p),
             tooltip: 'Partager',
           ),
@@ -1028,11 +1028,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   // HELPERS
   // -------------------------------------------------------------------------
 
-  /// Native share sheet — partage uniquement le lien deep-link
+  /// Native share sheet — partage le lien web de l'annonce avec titre et référence
   Future<void> _shareProperty(PropertyModel p) async {
-    final link = 'https://immozone.app/property/${p.id}';
+    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
+    final text = '${p.title} — Réf. $ref\n$link';
     await SharePlus.instance.share(
-      ShareParams(text: link),
+      ShareParams(text: text),
     );
   }
 
@@ -1145,9 +1147,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       _showCopyFallback(phone);
       return;
     }
+    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
     final message = Uri.encodeComponent(
-        'Bonjour, je suis int\u00e9ress\u00e9(e) par votre annonce "${p.title}" \u00e0 ${p.city}. '
-        'Est-elle toujours disponible ?');
+        'Bonjour, je suis int\u00e9ress\u00e9(e) par votre annonce r\u00e9f. $ref '
+        '"${p.title}" \u00e0 ${p.city}.\n'
+        'Est-elle toujours disponible ?\n\n'
+        'Voir l\u2019annonce : $link');
     final nativeUri = Uri.parse('whatsapp://send?phone=$number&text=$message');
     try {
       await launchUrl(nativeUri, mode: LaunchMode.externalNonBrowserApplication);

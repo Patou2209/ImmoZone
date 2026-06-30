@@ -219,10 +219,10 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                // Badge Offre Spéciale / Spécial (boost actif)
+                // Badge Offre Spéciale / Spécial (boost actif) — au-dessus du badge IZ
                 if (property.isBoostActive && !property.isSold && !property.isRented)
                   Positioned(
-                    bottom: 8,
+                    bottom: 36,
                     left: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -275,6 +275,28 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                // Badge Référence IZ (toujours affiché, bas-gauche)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
                 // Category badge (Agence / Commissionnaire / Propriétaire)
                 if (property.ownerCategory.isNotEmpty)
                   Positioned(

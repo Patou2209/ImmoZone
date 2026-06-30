@@ -2186,7 +2186,7 @@ class _HomeTabState extends State<_HomeTab>
         title: 'Historique des 3 derniers jours',
         tooltipMsg: 'Biens vendus ou occupés — cliquez pour voir les annonces',
         headerColor: const Color(0xFFE65100), // orange foncé professionnel
-        accentIconColor: Colors.orange.shade300,
+        accentIconColor: AppTheme.primaryColor,
         rows: !_statsLoading ? [
           _statRow('Maisons vendues',          _stats['hist72_maisonVendue'] ?? 0,  Colors.orange.shade300,
               typeFilter: 'Maison',          transactionFilter: 'Vente',    initialHistorique: true),

@@ -2,6 +2,9 @@ class AppConstants {
   // App Info
   static const String appName = 'ImmoZone';
   static const String appVersion = '1.0.0';
+
+  // Web base URL (Firebase Hosting — used for share links & WhatsApp messages)
+  static const String webBaseUrl = 'https://immozone-d9a68.web.app';
   static const String appTagline = 'Achetez, Vendez, Louez ou mettez un bien immobilier en quelques clics';
 
   // Storage Keys
