@@ -136,6 +136,17 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = context.read<AuthProvider>();
     await auth.checkAuth();
     if (!mounted) return;
+
+    // ── Détecter un deep-link initial (ex: /property/abc123) ─────────────────
+    // Si l'URL courante contient un path spécifique, on y navigue directement
+    // au lieu d'écraser avec /public — sinon le deep-link serait perdu.
+    final currentPath = _getInitialPath();
+    if (currentPath != null && currentPath != '/' && currentPath != '/public'
+        && currentPath != '/login' && currentPath != '/admin') {
+      Navigator.of(context).pushReplacementNamed(currentPath);
+      return;
+    }
+
     if (auth.isLoggedIn) {
       // Tous les rôles admin (general, financier, service client) → /admin
       // AdminHomeScreen détecte ensuite le rôle et affiche l'écran approprié
@@ -147,6 +158,20 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       // Unauthenticated users go to the public home to browse freely
       Navigator.of(context).pushReplacementNamed('/public');
+    }
+  }
+
+  /// Retourne le path courant du navigateur web (ex: "/property/abc123").
+  /// Retourne null sur mobile ou si le path est la racine.
+  String? _getInitialPath() {
+    if (!kIsWeb) return null;
+    try {
+      // ignore: avoid_web_libraries_in_flutter
+      final path = Uri.base.path;
+      if (path.isEmpty || path == '/') return null;
+      return path;
+    } catch (_) {
+      return null;
     }
   }
 

@@ -11,6 +11,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
+import '../../../core/utils/web_url_helper.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel property;
@@ -41,6 +42,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     _loadOfficialMessage();
     _loadOwnerSince();
     _incrementAndRefreshViews();
+    // ── Synchroniser l'URL du navigateur web ──────────────────────────────
+    WebUrlHelper.setPropertyUrl(widget.property.id);
   }
 
   /// Incrémente les vues dans Firestore puis relit la valeur réelle
@@ -135,6 +138,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   @override
   void dispose() {
     _pageCtrl.dispose();
+    // ── Remettre l'URL sur /public quand on quitte l'annonce ─────────────
+    WebUrlHelper.setPublicUrl();
     super.dispose();
   }
 
