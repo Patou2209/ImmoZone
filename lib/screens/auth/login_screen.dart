@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -66,9 +67,9 @@ class _LoginScreenState extends State<LoginScreen> {
       // Tous les rôles admin (admin, admin_financier, admin_service_client)
       // sont redirigés vers /admin — AdminHomeScreen affiche l'écran approprié
       if (auth.isAnyAdmin) {
-        Navigator.of(context).pushReplacementNamed('/admin');
+        context.go('/admin');
       } else {
-        Navigator.of(context).pushReplacementNamed('/public');
+        context.go('/public');
       }
     } else {
       _showError(auth.error ?? 'Numéro ou mot de passe incorrect.');

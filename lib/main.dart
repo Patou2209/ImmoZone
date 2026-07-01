@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
@@ -26,35 +27,58 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ── Firebase App Check — debug token (APK sideload / hors Play Store) ────────
-  // Désactivé sur Web : AppCheck Android ne s'applique pas au navigateur.
   if (!kIsWeb) {
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.debug,
     );
   }
 
-  // ── Désactiver reCAPTCHA visible — forcer Play Integrity (Android) ──────────
-  // Sans cette ligne, Firebase Auth 5.x affiche un reCAPTCHA web dans une
-  // WebView chaque fois que Play Integrity n'est pas immédiatement disponible.
-  // forceRecaptchaFlow: false  → Firebase utilise toujours SafetyNet/Play Integrity
-  // en priorité, jamais le reCAPTCHA visible. Si Play Integrity échoue,
-  // l'OTP est quand même envoyé via silent push notification.
   if (!kIsWeb) {
     try {
       await FirebaseAuth.instance.setSettings(
         forceRecaptchaFlow: false,
         appVerificationDisabledForTesting: false,
       );
-    } catch (_) {
-      // Non-bloquant — l'app fonctionne même si setSettings échoue
-    }
+    } catch (_) {}
   }
 
   await DataService().init();
 
   runApp(const ImmoZoneApp());
 }
+
+// ── GoRouter — gère le deep-linking web de façon fiable ───────────────────
+final _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => const AdminHomeScreen(),
+    ),
+    GoRoute(
+      path: '/public',
+      builder: (context, state) => const PublicHomeScreen(),
+    ),
+    // ── Deep-link annonce : /property/:id ──────────────────────────────────
+    GoRoute(
+      path: '/property/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return PropertyDeepLinkScreen(propertyId: id);
+      },
+    ),
+  ],
+  // Toute route inconnue → accueil public
+  errorBuilder: (context, state) => const PublicHomeScreen(),
+);
 
 class ImmoZoneApp extends StatelessWidget {
   const ImmoZoneApp({super.key});
@@ -67,34 +91,11 @@ class ImmoZoneApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PropertyProvider()),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
       ],
-      child: MaterialApp(
+      child: MaterialApp.router(
         title: 'ImmoZone',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const SplashScreen(),
-          '/login': (context) => const LoginScreen(),
-          '/admin': (context) => const AdminHomeScreen(),
-          '/public': (context) => const PublicHomeScreen(),
-        },
-        // ── Deep-link web : /property/:id ──────────────────────────────────
-        onGenerateRoute: (settings) {
-          final uri = Uri.tryParse(settings.name ?? '');
-          if (uri != null &&
-              uri.pathSegments.length == 2 &&
-              uri.pathSegments[0] == 'property') {
-            final id = uri.pathSegments[1];
-            return MaterialPageRoute(
-              settings: settings,
-              builder: (_) => PropertyDeepLinkScreen(propertyId: id),
-            );
-          }
-          // Fallback : accueil public
-          return MaterialPageRoute(
-            builder: (_) => const PublicHomeScreen(),
-          );
-        },
+        routerConfig: _router,
       ),
     );
   }
@@ -136,42 +137,14 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = context.read<AuthProvider>();
     await auth.checkAuth();
     if (!mounted) return;
-
-    // ── Détecter un deep-link initial (ex: /property/abc123) ─────────────────
-    // Si l'URL courante contient un path spécifique, on y navigue directement
-    // au lieu d'écraser avec /public — sinon le deep-link serait perdu.
-    final currentPath = _getInitialPath();
-    if (currentPath != null && currentPath != '/' && currentPath != '/public'
-        && currentPath != '/login' && currentPath != '/admin') {
-      Navigator.of(context).pushReplacementNamed(currentPath);
-      return;
-    }
-
     if (auth.isLoggedIn) {
-      // Tous les rôles admin (general, financier, service client) → /admin
-      // AdminHomeScreen détecte ensuite le rôle et affiche l'écran approprié
       if (auth.isAnyAdmin) {
-        Navigator.of(context).pushReplacementNamed('/admin');
+        context.go('/admin');
       } else {
-        Navigator.of(context).pushReplacementNamed('/public');
+        context.go('/public');
       }
     } else {
-      // Unauthenticated users go to the public home to browse freely
-      Navigator.of(context).pushReplacementNamed('/public');
-    }
-  }
-
-  /// Retourne le path courant du navigateur web (ex: "/property/abc123").
-  /// Retourne null sur mobile ou si le path est la racine.
-  String? _getInitialPath() {
-    if (!kIsWeb) return null;
-    try {
-      // ignore: avoid_web_libraries_in_flutter
-      final path = Uri.base.path;
-      if (path.isEmpty || path == '/') return null;
-      return path;
-    } catch (_) {
-      return null;
+      context.go('/public');
     }
   }
 
@@ -193,7 +166,6 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ── Logo officiel ImmoZone sur fond blanc ───────────
                 Image.asset(
                   'assets/images/immozone_logo.png',
                   width: 260,
@@ -220,8 +192,6 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 64),
-
-                // ── Spinner sur fond blanc ──────────────────────────
                 SizedBox(
                   width: 28,
                   height: 28,

@@ -1,24 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+
+  <!-- ── Meta Open Graph (preview WhatsApp / Facebook / Twitter) ─────────── -->
+  <meta property="og:site_name" content="ImmoZone">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ImmoZone — Immobilier en RDC & Congo-Brazzaville">
+  <meta property="og:description" content="Achetez, vendez ou louez un bien immobilier en quelques clics sur ImmoZone.">
+  <meta property="og:image" content="https://www.immozone.pro/icons/Icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:url" content="https://www.immozone.pro">
+
+  <!-- ── Twitter Card ──────────────────────────────────────────────────────── -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ImmoZone — Immobilier en RDC & Congo-Brazzaville">
+  <meta name="twitter:description" content="Achetez, vendez ou louez un bien immobilier en quelques clics sur ImmoZone.">
+  <meta name="twitter:image" content="https://www.immozone.pro/icons/Icon-512.png">
+
+  <!-- ── Description générale ─────────────────────────────────────────────── -->
+  <meta name="description" content="ImmoZone — La plateforme immobilière de référence en RDC et Congo-Brazzaville.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,8 +34,47 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>ImmoZone</title>
+  <title>ImmoZone — Immobilier RDC & Congo</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // ── Injection dynamique des meta OG pour les deep-links /property/:id ──
+    // WhatsApp scrape le HTML statique AVANT que Flutter s'exécute.
+    // Ce script lit le path et met à jour les meta og: immédiatement,
+    // sans attendre le rendu Flutter.
+    (function () {
+      var path = window.location.pathname;
+      var match = path.match(/^\/property\/([^/]+)$/);
+      if (match) {
+        var id = match[1];
+        // Référence courte IZ + 4 derniers chars
+        var ref = 'IZ' + id.slice(-4).toUpperCase();
+        var url = 'https://www.immozone.pro/property/' + id;
+        var title = 'Annonce ' + ref + ' — ImmoZone';
+        var desc = 'Découvrez cette annonce immobilière sur ImmoZone. Cliquez pour voir tous les détails, photos et contacter l\'annonceur.';
+        var img = 'https://www.immozone.pro/icons/Icon-512.png';
+
+        function setMeta(attr, key, val) {
+          var el = document.querySelector('meta[' + attr + '="' + key + '"]');
+          if (el) el.setAttribute('content', val);
+        }
+
+        // og:
+        setMeta('property', 'og:title', title);
+        setMeta('property', 'og:description', desc);
+        setMeta('property', 'og:url', url);
+        setMeta('property', 'og:image', img);
+        // twitter:
+        setMeta('name', 'twitter:title', title);
+        setMeta('name', 'twitter:description', desc);
+        setMeta('name', 'twitter:image', img);
+        // title
+        document.title = title;
+        // description
+        setMeta('name', 'description', desc);
+      }
+    })();
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

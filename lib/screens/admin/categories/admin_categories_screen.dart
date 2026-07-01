@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
@@ -344,7 +345,7 @@ class AdminCategoriesScreen extends StatelessWidget {
               Navigator.pop(context);
               await ds.logout();
               if (context.mounted) {
-                Navigator.of(context).pushReplacementNamed('/');
+                context.go('/');
               }
             },
             style: ElevatedButton.styleFrom(

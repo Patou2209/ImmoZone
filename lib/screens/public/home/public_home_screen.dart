@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -2531,7 +2532,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
             onPressed: () async {
               await auth.logout();
-              if (mounted) Navigator.of(context).pushReplacementNamed('/');
+              if (mounted) context.go('/');
             },
             tooltip: 'Deconnexion',
           ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -186,9 +187,9 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
 
     if (user != null) {
       if (auth.isAdmin) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/admin',  (_) => false);
+        context.go('/admin');
       } else {
-        Navigator.of(context).pushNamedAndRemoveUntil('/public', (_) => false);
+        context.go('/public');
       }
     } else {
       setState(() { _isVerifying = false; _showSuccess = false; });

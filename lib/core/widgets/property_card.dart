@@ -286,7 +286,7 @@ class PropertyCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
+                      'REF: IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 9,

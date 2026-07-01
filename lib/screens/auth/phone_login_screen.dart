@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -101,9 +102,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     }
     if (user != null) {
       if (auth.isAdmin) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/admin',   (_) => false);
+        context.go('/admin');
       } else {
-        Navigator.of(context).pushNamedAndRemoveUntil('/public',  (_) => false);
+        context.go('/public');
       }
     } else {
       _showError(

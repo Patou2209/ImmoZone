@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -138,7 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         if (!mounted) return;
         if (ok) {
-          Navigator.of(context).pushReplacementNamed('/public');
+          context.go('/public');
         } else {
           _showError(auth.error ?? 'Erreur lors de l\'inscription.');
         }

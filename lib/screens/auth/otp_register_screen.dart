@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -160,7 +161,7 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
         await _successAnimCtrl.forward();
         await Future.delayed(const Duration(milliseconds: 900));
         if (!mounted) return;
-        Navigator.of(context).pushNamedAndRemoveUntil('/public', (_) => false);
+        context.go('/public');
       } else {
         setState(() => _isVerifying = false);
         _clearOtp();
