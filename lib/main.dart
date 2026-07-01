@@ -47,10 +47,39 @@ void main() async {
   runApp(const ImmoZoneApp());
 }
 
+// ── Détection du deep-link au démarrage (avant GoRouter) ─────────────────
+// Vrai si l'URL initiale est un deep-link /property/:id
+// Utilisé par GoRouter redirect ET SplashScreen pour éviter tout conflit.
+bool _isDeepLink = false;
+
+String _getInitialLocation() {
+  if (kIsWeb) {
+    final path = Uri.base.path;
+    if (path.startsWith('/property/')) {
+      _isDeepLink = true;
+      return path;
+    }
+  }
+  return '/';
+}
+
 // ── GoRouter — gère le deep-linking web de façon fiable ───────────────────
 final _router = GoRouter(
-  // initialLocation est ignoré quand le path de l'URL est déjà défini (deep-link)
-  initialLocation: '/',
+  // initialLocation calculé AVANT construction du router : si deep-link, on
+  // démarre directement sur /property/:id — SplashScreen n'est JAMAIS créé.
+  initialLocation: _getInitialLocation(),
+  redirect: (context, state) {
+    // Garde supplémentaire : si GoRouter tente quand même d'aller sur '/'
+    // alors que l'URL réelle est un /property/:id, on redirige immédiatement.
+    if (kIsWeb && state.matchedLocation == '/') {
+      final path = Uri.base.path;
+      if (path.startsWith('/property/')) {
+        _isDeepLink = true;
+        return path;
+      }
+    }
+    return null; // pas de redirection — GoRouter gère normalement
+  },
   routes: [
     GoRoute(
       path: '/',
@@ -80,9 +109,6 @@ final _router = GoRouter(
   // Toute route inconnue → accueil public
   errorBuilder: (context, state) => const PublicHomeScreen(),
 );
-
-// ── Flag global : deep-link actif — SplashScreen ne doit pas rediriger ────
-bool _deepLinkActive = false;
 
 class ImmoZoneApp extends StatelessWidget {
   const ImmoZoneApp({super.key});
@@ -136,26 +162,25 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
-    // ── Détecter un deep-link web actif (/property/:id) ──────────────────────
-    // Si l'URL initiale est un deep-link, on ne redirige PAS vers /public
-    // pour ne pas écraser l'annonce qui se charge en parallèle.
+    // ── Protection deep-link : GoRouter ne devrait JAMAIS instancier
+    // SplashScreen si l'URL est /property/:id (grâce à initialLocation +
+    // redirect). Ce check est une sécurité supplémentaire.
+    if (_isDeepLink) return;
     if (kIsWeb) {
       final path = Uri.base.path;
       if (path.startsWith('/property/')) {
-        _deepLinkActive = true;
-        // Laisser GoRouter gérer la route /property/:id — ne rien faire
+        _isDeepLink = true;
         return;
       }
     }
 
     await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
-    // Vérifier une dernière fois — si un deep-link a été activé entre-temps
-    if (_deepLinkActive) return;
+    if (_isDeepLink) return;
 
     final auth = context.read<AuthProvider>();
     await auth.checkAuth();
-    if (!mounted || _deepLinkActive) return;
+    if (!mounted || _isDeepLink) return;
 
     if (auth.isLoggedIn) {
       if (auth.isAnyAdmin) {
