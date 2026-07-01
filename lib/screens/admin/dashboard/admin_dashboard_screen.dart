@@ -2243,27 +2243,81 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: AppTheme.textHint)),
             ]),
             const SizedBox(height: 10),
+            // ── Graphique avec axe Y à gauche ────────────────────────────
             SizedBox(
               height: 130,
-              child: CustomPaint(
-                painter: _Kpi3DualBarPainter(
-                  data: monthData,
-                  maxVal: maxBar.toDouble(),
-                ),
-                child: Container(),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Axe Y : étiquettes numériques ────────────────────
+                  SizedBox(
+                    width: 28,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // max
+                        Text(
+                          '${maxBar}',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 8,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                        // mid
+                        Text(
+                          '${(maxBar / 2).round()}',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 8,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                        // 0
+                        const Text(
+                          '0',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 8,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // ── Zone de barres ────────────────────────────────────
+                  Expanded(
+                    child: CustomPaint(
+                      painter: _Kpi3DualBarPainter(
+                        data: monthData,
+                        maxVal: maxBar.toDouble(),
+                      ),
+                      child: Container(),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 4),
-            // Labels X
-            SizedBox(
-              height: 16,
-              child: Row(
-                children: monthData.map((m) => Expanded(
-                  child: Center(child: Text(m.label,
-                    style: const TextStyle(fontFamily: 'Poppins',
-                        fontSize: 7, color: AppTheme.textHint))),
-                )).toList(),
-              ),
+            // Labels X (indentés du même décalage que l'axe Y)
+            Row(
+              children: [
+                const SizedBox(width: 32), // même largeur que axe Y (28 + gap 4)
+                Expanded(
+                  child: SizedBox(
+                    height: 16,
+                    child: Row(
+                      children: monthData.map((m) => Expanded(
+                        child: Center(child: Text(m.label,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 7, color: AppTheme.textHint))),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ]),
         ),
@@ -2314,6 +2368,17 @@ class _Kpi3DualBarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (data.isEmpty) return;
+
+    final gridPaint = Paint()
+      ..color = const Color(0xFFEEEEEE)
+      ..strokeWidth = 0.8;
+
+    // ── Lignes horizontales de grille : 100% / 50% / 0% ─────────────────
+    for (final fraction in [0.0, 0.5, 1.0]) {
+      final y = size.height - 2 - fraction * (size.height - 4);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
     final n      = data.length;
     final slotW  = size.width / n;
     final barW   = slotW * 0.28;

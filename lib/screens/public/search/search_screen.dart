@@ -10,6 +10,7 @@ import '../../../services/data_service.dart';
 import '../../../models/property_model.dart';
 import '../../../models/ad_model.dart';
 import '../property_detail/property_detail_screen.dart';
+import '../../../core/widgets/property_image.dart';
 
 class SearchScreen extends StatefulWidget {
   final String? initialType;
@@ -203,7 +204,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     controller: _searchCtrl,
                     onSubmitted: (_) => _applyFilters(),
                     decoration: InputDecoration(
-                      hintText: 'Titre, ville, commune...',
+                      hintText: 'Titre, ville, REF:IZ0000...',
                       hintStyle: const TextStyle(fontSize: 14, fontFamily: 'Poppins', color: AppTheme.textHint),
                       prefixIcon: const Icon(Icons.search, color: AppTheme.accentColor),
                       filled: true,
@@ -360,8 +361,42 @@ class _SearchScreenState extends State<SearchScreen> {
             duration: const Duration(milliseconds: 250),
           ),
 
-          // ── Barre de résultats ──────────────────────────────────────────────
-          if (_hasSearched)
+          // ── Bandeau REF : mode recherche par référence ─────────────────────
+          if (_hasSearched && provider.isRefSearch)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              color: const Color(0xFF1A237E),
+              child: Row(children: [
+                const Icon(Icons.tag_rounded, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Colors.white70),
+                      children: [
+                        const TextSpan(text: 'Recherche par référence '),
+                        TextSpan(
+                          text: _searchCtrl.text.trim().toUpperCase(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' — ${properties.length} résultat${properties.length > 1 ? 's' : ''}',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+
+          // ── Barre de résultats (mode normal) ─────────────────────────────────
+          if (_hasSearched && !provider.isRefSearch)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               color: Colors.white,
@@ -408,7 +443,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Utilisez la barre de recherche ou\nles filtres pour trouver votre bien.',
+                              'Utilisez la barre de recherche, les filtres\nou entrez une référence (ex: REF:IZ7326).',
                               style: TextStyle(fontSize: 13, fontFamily: 'Poppins',
                                   color: AppTheme.textHint),
                               textAlign: TextAlign.center,
@@ -427,11 +462,220 @@ class _SearchScreenState extends State<SearchScreen> {
                           ],
                         ),
                       )
-                    : _buildSearchResults(context, provider, properties),
+                    : provider.isRefSearch
+                        ? _buildRefResults(context, properties)
+                        : _buildSearchResults(context, provider, properties),
           ),
         ],
         ),
       ),
+    );
+  }
+
+  // ── Vue résultats pour une recherche REF:IZ ────────────────────────────────
+  Widget _buildRefResults(BuildContext context, List<PropertyModel> properties) {
+    if (properties.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A237E).withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.tag_rounded, size: 48, color: Color(0xFF1A237E)),
+            ),
+            const SizedBox(height: 16),
+            const Text('Référence introuvable',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins', color: AppTheme.textPrimary)),
+            const SizedBox(height: 8),
+            Text(
+              'Aucune annonce ne correspond à la\nréférence "${_searchCtrl.text.trim().toUpperCase()}"',
+              style: const TextStyle(fontSize: 13, fontFamily: 'Poppins',
+                  color: AppTheme.textHint),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: _clearFilters,
+              child: const Text('Effacer et chercher autrement',
+                  style: TextStyle(fontFamily: 'Poppins', color: AppTheme.accentColor)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Résultats REF : on affiche chaque annonce trouvée avec un badge REF mis en avant
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      itemCount: properties.length,
+      itemBuilder: (ctx, i) {
+        final p = properties[i];
+        // Calcul du badge REF (4 derniers chars de l'id)
+        final refBadge =
+            'REF: IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+        return GestureDetector(
+          onTap: () => Navigator.push(ctx,
+              MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1A237E).withValues(alpha: 0.25), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1A237E).withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // ── Photo ──────────────────────────────────────────────────
+                ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
+                  child: Stack(
+                    children: [
+                      PropertyImage(
+                        src: p.mainImage,
+                        width: 100,
+                        height: 110,
+                        fit: BoxFit.cover,
+                      ),
+                      // Badge REF sur la photo
+                      Positioned(
+                        bottom: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A237E),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            refBadge,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // ── Infos ────────────────────────────────────────────────
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Badge REF en haut de la carte
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A237E).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            refBadge,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1A237E),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          p.title,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppTheme.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          p.formattedPrice,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppTheme.accentColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          const Icon(Icons.location_on_outlined,
+                              size: 12, color: AppTheme.textHint),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              '${p.commune}, ${p.city}',
+                              style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(p.type,
+                                style: const TextStyle(fontFamily: 'Poppins',
+                                    fontSize: 10, color: AppTheme.accentColor)),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(p.transactionType,
+                                style: const TextStyle(fontFamily: 'Poppins',
+                                    fontSize: 10, color: AppTheme.primaryColor)),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ),
+                // ── Flèche ─────────────────────────────────────────────────
+                const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Icon(Icons.chevron_right_rounded,
+                      color: AppTheme.textHint, size: 22),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

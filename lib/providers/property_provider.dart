@@ -204,11 +204,44 @@ class PropertyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Helpers REF:IZ ─────────────────────────────────────────────────────────
+  /// Extrait le suffixe alphanumérique après "IZ" depuis la query.
+  /// Ex : "REF:IZ7326" → "7326", "IZ7326" → "7326", "iz 7326" → "7326"
+  /// Retourne null si la query ne ressemble pas à une référence IZ.
+  static String? _extractRefSuffix(String query) {
+    final q = query.trim().toUpperCase().replaceAll(RegExp(r'[\s:\-_]'), '');
+    final match = RegExp(r'IZ([A-Z0-9]{1,10})$').firstMatch(q);
+    return match?.group(1);
+  }
+
+  /// Vérifie si une annonce correspond au suffixe REF extrait.
+  static bool _matchesRef(PropertyModel p, String refSuffix) {
+    final id = p.id.toUpperCase();
+    if (id.length >= refSuffix.length && id.endsWith(refSuffix)) return true;
+    if (id.contains(refSuffix)) return true;
+    return false;
+  }
+
+  /// True si la query courante est une recherche par référence IZ.
+  bool get isRefSearch => _extractRefSuffix(_searchQuery) != null;
+
   void _applyFilters() {
-    // Les annonces boostées sont exclues de la liste normale — elles s’affichent
+    final refSuffix = _extractRefSuffix(_searchQuery);
+
+    // ── Mode REF : recherche par référence IZ (ex : REF:IZ7326) ─────────────
+    // Tous les filtres géo/type sont ignorés — seule la référence compte.
+    // Les boostées sont incluses (override de l'exclusion normale).
+    if (refSuffix != null) {
+      _filteredProperties = _properties
+          .where((p) => _matchesRef(p, refSuffix))
+          .toList();
+      return;
+    }
+
+    // ── Mode normal : filtre classique ───────────────────────────────────────
+    // Les annonces boostées sont exclues de la liste normale — elles s'affichent
     // dans la section "Offres Spéciales" via getBoostedProperties().
     _filteredProperties = _properties.where((p) {
-      // Ne pas inclure les boostés actifs dans la liste principale
       if (p.isBoostActive) return false;
       final matchesSearch = _searchQuery.isEmpty ||
           p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
@@ -232,6 +265,7 @@ class PropertyProvider extends ChangeNotifier {
           matchesProvince && matchesMinPrice && matchesMaxPrice;
     }).toList();
   }
+
 
   Future<void> addProperty(PropertyModel property) async {
     await _dataService.addProperty(property);

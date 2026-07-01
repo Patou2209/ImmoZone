@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../models/property_model.dart';
 import '../../../providers/property_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/property_image.dart';
 import '../../../services/data_service.dart';
 
 class AdminPropertyDetailScreen extends StatefulWidget {
@@ -83,17 +84,22 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image ──────────────────────────────────────────────────────
-            ClipRRect(
+            // ── Image principale (base64 / URL / local) ────────────────
+            PropertyImage(
+              src: _property.mainImage,
+              height: 220,
+              width: double.infinity,
+              fit: BoxFit.cover,
               borderRadius: BorderRadius.circular(14),
-              child: Image.network(
-                _property.mainImage,
-                height: 220, width: double.infinity, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 220,
+              placeholder: Container(
+                height: 220,
+                width: double.infinity,
+                decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                  child: const Icon(Icons.home, size: 80, color: AppTheme.accentColor),
+                  borderRadius: BorderRadius.circular(14),
                 ),
+                child: const Icon(Icons.home_work_outlined,
+                    size: 80, color: AppTheme.accentColor),
               ),
             ),
             const SizedBox(height: 16),
