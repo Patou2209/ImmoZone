@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -16,7 +16,7 @@ const DEFAULT_DESC = 'La plateforme immobilière de référence en RDC & Congo-B
  * avec les vraies meta OG (titre, description, photo) pour WhatsApp/Facebook.
  * Flutter démarre ensuite normalement via le script flutter_bootstrap.js intégré.
  */
-exports.propertyPreview = functions.https.onRequest(async (req, res) => {
+exports.propertyPreview = onRequest(async (req, res) => {
   try {
     // Extraire l'ID de l'annonce depuis le path /property/:id
     const match = req.path.match(/^\/property\/([^/]+)$/);
