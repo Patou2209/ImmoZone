@@ -1,7 +1,11 @@
 {
-  "functions": {
-    "source": "functions"
-  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs18"
+    }
+  ],
   "hosting": {
     "public": "build/web",
     "ignore": [
@@ -12,7 +16,8 @@
     "rewrites": [
       {
         "source": "/property/**",
-        "function": "propertyPreview"
+        "function": "propertyPreview",
+        "region": "us-central1"
       },
       {
         "source": "**",
