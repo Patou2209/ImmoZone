@@ -49,6 +49,7 @@ void main() async {
 
 // ── GoRouter — gère le deep-linking web de façon fiable ───────────────────
 final _router = GoRouter(
+  // initialLocation est ignoré quand le path de l'URL est déjà défini (deep-link)
   initialLocation: '/',
   routes: [
     GoRoute(
@@ -79,6 +80,9 @@ final _router = GoRouter(
   // Toute route inconnue → accueil public
   errorBuilder: (context, state) => const PublicHomeScreen(),
 );
+
+// ── Flag global : deep-link actif — SplashScreen ne doit pas rediriger ────
+bool _deepLinkActive = false;
 
 class ImmoZoneApp extends StatelessWidget {
   const ImmoZoneApp({super.key});
@@ -132,11 +136,27 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
+    // ── Détecter un deep-link web actif (/property/:id) ──────────────────────
+    // Si l'URL initiale est un deep-link, on ne redirige PAS vers /public
+    // pour ne pas écraser l'annonce qui se charge en parallèle.
+    if (kIsWeb) {
+      final path = Uri.base.path;
+      if (path.startsWith('/property/')) {
+        _deepLinkActive = true;
+        // Laisser GoRouter gérer la route /property/:id — ne rien faire
+        return;
+      }
+    }
+
     await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
+    // Vérifier une dernière fois — si un deep-link a été activé entre-temps
+    if (_deepLinkActive) return;
+
     final auth = context.read<AuthProvider>();
     await auth.checkAuth();
-    if (!mounted) return;
+    if (!mounted || _deepLinkActive) return;
+
     if (auth.isLoggedIn) {
       if (auth.isAnyAdmin) {
         context.go('/admin');
