@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -194,21 +195,31 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: Image.asset(
-          'assets/images/immozone_logo.png',
-          height: 44,
-          fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => RichText(
-            text: const TextSpan(
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 17),
-              children: [
-                TextSpan(text: 'Immo',
-                    style: TextStyle(fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary)),
-                TextSpan(text: 'Zone',
-                    style: TextStyle(fontWeight: FontWeight.w800,
-                        color: AppTheme.primaryColor)),
-              ],
+        title: GestureDetector(
+          onTap: () {
+            // Logo cliquable → retour à l'accueil
+            if (context.canPop()) {
+              context.go('/public');
+            } else {
+              context.go('/public');
+            }
+          },
+          child: Image.asset(
+            'assets/images/immozone_logo.png',
+            height: 44,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => RichText(
+              text: const TextSpan(
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 17),
+                children: [
+                  TextSpan(text: 'Immo',
+                      style: TextStyle(fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary)),
+                  TextSpan(text: 'Zone',
+                      style: TextStyle(fontWeight: FontWeight.w800,
+                          color: AppTheme.primaryColor)),
+                ],
+              ),
             ),
           ),
         ),
@@ -241,9 +252,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
             // ----------------------------------------------------------------
-            // PHOTO GALLERY  (height 280 — starts immediately below the AppBar)
+            // PHOTO GALLERY — responsive:
+            //   mobile (<768px)  : slideshow pleine largeur h=280
+            //   desktop (≥768px) : grille centrée max 900px (1 grande + 2 petites)
             // ----------------------------------------------------------------
-            SizedBox(
+            LayoutBuilder(builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 768;
+              if (isWide) {
+                // ── WIDE SCREEN: grille centrée ─────────────────────────────
+                return _buildWidePhotoGrid(p);
+              }
+              // ── MOBILE: slideshow classique ─────────────────────────────
+              return SizedBox(
               height: 280,
               child: Stack(
                 children: [
@@ -416,7 +436,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ),
                 ],
               ),
-            ),
+            ); // end mobile slideshow
+            }), // end LayoutBuilder
 
             // ----------------------------------------------------------------
             // SCROLLABLE CONTENT  (all cards, margin: symmetric(horizontal:16))
@@ -1246,6 +1267,243 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   }
 
   /// Render a property image from base64, local file, or network URL
+  // ── Wide screen photo grid (≥768px) ────────────────────────────────────────
+  // Grille centrée max 900px : 1 grande photo à gauche + 2 petites à droite
+  // Fond blanc + marges latérales — image complète sans distorsion
+  Widget _buildWidePhotoGrid(PropertyModel p) {
+    final images = p.images.isNotEmpty ? p.images : <String>[];
+    final hasImages = images.isNotEmpty;
+    final total = images.length;
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: total == 0
+                  // ── Aucune image ───────────────────────────────────────────
+                  ? Container(
+                      height: 340,
+                      color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                      child: const Center(
+                        child: Icon(Icons.home_work_outlined,
+                            size: 80, color: AppTheme.accentColor),
+                      ),
+                    )
+                  : total == 1
+                      // ── Une seule image: centrée, ratio préservé ───────────
+                      ? GestureDetector(
+                          onTap: () => _openImageFullscreen(context, images, 0),
+                          child: SizedBox(
+                            height: 340,
+                            width: double.infinity,
+                            child: _buildPropertyImageContained(images[0]),
+                          ),
+                        )
+                      // ── 2+ images: grande à gauche + 1 ou 2 petites à droite
+                      : SizedBox(
+                          height: 340,
+                          child: Stack(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Grande image gauche (60% de la largeur)
+                                  Expanded(
+                                    flex: 60,
+                                    child: GestureDetector(
+                                      onTap: () => _openImageFullscreen(context, images, 0),
+                                      child: _buildPropertyImageCover(images[0]),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // Colonne droite (40% de la largeur)
+                                  Expanded(
+                                    flex: 40,
+                                    child: Column(
+                                      children: [
+                                        // Petite image haute
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () => _openImageFullscreen(context, images, 1),
+                                            child: _buildPropertyImageCover(images[1]),
+                                          ),
+                                        ),
+                                        if (total >= 3) ...[
+                                          const SizedBox(height: 4),
+                                          // Petite image basse
+                                          Expanded(
+                                            child: GestureDetector(
+                                              onTap: () => _openImageFullscreen(context, images, 2),
+                                              child: _buildPropertyImageCover(images[2]),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Badge transaction (Vente / Location)
+                              Positioned(
+                                top: 12, left: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: p.transactionType == 'Vente'
+                                        ? AppTheme.primaryColor
+                                        : AppTheme.successColor,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.25),
+                                        blurRadius: 6,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(p.transactionType,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          fontFamily: 'Poppins')),
+                                ),
+                              ),
+                              // Badge "Voir toutes les photos"
+                              if (total > 3)
+                                Positioned(
+                                  bottom: 12, right: 12,
+                                  child: GestureDetector(
+                                    onTap: () => _openImageFullscreen(context, images, 0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(alpha: 0.72),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        const Icon(Icons.photo_library_outlined,
+                                            size: 14, color: Colors.white),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Voir les $total photos',
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w600),
+                                        ),
+                                      ]),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Image avec BoxFit.cover (pour remplir une cellule de la grille)
+  Widget _buildPropertyImageCover(String src) {
+    final placeholder = Container(
+      color: AppTheme.primaryColor.withValues(alpha: 0.08),
+      child: const Center(
+        child: Icon(Icons.home_work_outlined, size: 48, color: AppTheme.accentColor),
+      ),
+    );
+    if (src.startsWith('data:image/')) {
+      try {
+        final ci = src.indexOf(',');
+        if (ci == -1) return placeholder;
+        final bytes = base64Decode(src.substring(ci + 1));
+        return Image.memory(bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      } catch (_) { return placeholder; }
+    }
+    if (!kIsWeb && !src.startsWith('http')) {
+      final file = File(src);
+      if (file.existsSync()) {
+        return Image.file(file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      }
+      return placeholder;
+    }
+    return Image.network(src,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => placeholder,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: AppTheme.primaryColor.withValues(alpha: 0.08),
+            child: const Center(child: CircularProgressIndicator(
+                color: AppTheme.accentColor, strokeWidth: 2)),
+          );
+        });
+  }
+
+  /// Image avec BoxFit.contain (pour image unique, ratio préservé, fond blanc)
+  Widget _buildPropertyImageContained(String src) {
+    final placeholder = Container(
+      color: AppTheme.primaryColor.withValues(alpha: 0.08),
+      child: const Center(
+        child: Icon(Icons.home_work_outlined, size: 80, color: AppTheme.accentColor),
+      ),
+    );
+    if (src.startsWith('data:image/')) {
+      try {
+        final ci = src.indexOf(',');
+        if (ci == -1) return placeholder;
+        final bytes = base64Decode(src.substring(ci + 1));
+        return Image.memory(bytes,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      } catch (_) { return placeholder; }
+    }
+    if (!kIsWeb && !src.startsWith('http')) {
+      final file = File(src);
+      if (file.existsSync()) {
+        return Image.file(file,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => placeholder);
+      }
+      return placeholder;
+    }
+    return Image.network(src,
+        fit: BoxFit.contain,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => placeholder,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: AppTheme.primaryColor.withValues(alpha: 0.08),
+            child: const Center(child: CircularProgressIndicator(
+                color: AppTheme.accentColor, strokeWidth: 2)),
+          );
+        });
+  }
+
   Widget _buildPropertyImage(String src) {
     final placeholder = Container(
       color: AppTheme.primaryColor,

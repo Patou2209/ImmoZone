@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/data_service.dart';
 import '../../auth/login_screen.dart';
@@ -150,20 +151,23 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Image.asset(
-                          'assets/images/immozone_logo.png',
-                          height: 36,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => RichText(
-                            text: const TextSpan(
-                              style: TextStyle(fontFamily: 'Poppins',
-                                  fontSize: 18, fontWeight: FontWeight.w800),
-                              children: [
-                                TextSpan(text: 'Immo',
-                                    style: TextStyle(color: AppTheme.primaryColor)),
-                                TextSpan(text: 'Zone',
-                                    style: TextStyle(color: AppTheme.accentColor)),
-                              ],
+                        child: GestureDetector(
+                          onTap: () => context.go('/public'),
+                          child: Image.asset(
+                            'assets/images/immozone_logo.png',
+                            height: 36,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => RichText(
+                              text: const TextSpan(
+                                style: TextStyle(fontFamily: 'Poppins',
+                                    fontSize: 18, fontWeight: FontWeight.w800),
+                                children: [
+                                  TextSpan(text: 'Immo',
+                                      style: TextStyle(color: AppTheme.primaryColor)),
+                                  TextSpan(text: 'Zone',
+                                      style: TextStyle(color: AppTheme.accentColor)),
+                                ],
+                              ),
                             ),
                           ),
                         ),
