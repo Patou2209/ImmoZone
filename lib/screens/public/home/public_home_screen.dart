@@ -1300,7 +1300,7 @@ class _HomeTabState extends State<_HomeTab>
               style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                   color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                hintText: 'Maison Lemba, Location, REF:IZ000...',
+                hintText: 'Recherche par mot clé ex: Maison Lemba, REF:IZ000...',
                 hintStyle: TextStyle(fontFamily: 'Poppins',
                     fontSize: 12, color: AppTheme.textHint),
                 prefixIcon: Icon(Icons.search_rounded,
@@ -1427,11 +1427,20 @@ class _HomeTabState extends State<_HomeTab>
                 label: 'Pays',
                 value: _country,
                 items: AppConstants.filterCountries,
-                onChanged: (v) => setState(() {
-                  _country = v ?? AppConstants.defaultCountry;
-                  _province = null;
-                  _city = null;
-                }),
+                onChanged: (v) {
+                  final selected = v ?? AppConstants.defaultCountry;
+                  setState(() {
+                    _country = selected;
+                    _city = null;
+                    // Province par défaut selon le pays
+                    if (selected == 'Congo (Brazzaville)') {
+                      _province = 'Brazzaville';
+                    } else {
+                      // RDC → reset (hint affiche Kinshasa)
+                      _province = null;
+                    }
+                  });
+                },
               ),
             ),
             const SizedBox(width: 8),
@@ -1442,7 +1451,8 @@ class _HomeTabState extends State<_HomeTab>
                 label: 'Province',
                 value: _province,
                 items: provinces,
-                hint: 'Kinshasa',
+                // hint dynamique selon le pays
+                hint: _country == 'Congo (Brazzaville)' ? 'Brazzaville' : 'Kinshasa',
                 onChanged: (v) => setState(() {
                   _province = v;
                   _city = null;

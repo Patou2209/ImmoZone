@@ -220,6 +220,23 @@ class AppTheme {
         thickness: 1,
       ),
 
+      // Scrollbar — toujours visible, jamais transparent
+      scrollbarTheme: ScrollbarThemeData(
+        thumbVisibility: WidgetStateProperty.all(true),
+        trackVisibility: WidgetStateProperty.all(true),
+        thickness: WidgetStateProperty.all(8),
+        radius: const Radius.circular(8),
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return const Color(0xFF0d2a6e);
+          }
+          return const Color(0xFF1a3a8f);
+        }),
+        trackColor: WidgetStateProperty.all(const Color(0xFFEEF2FA)),
+        trackBorderColor: WidgetStateProperty.all(Colors.transparent),
+        interactive: true,
+      ),
+
       // FloatingActionButton
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
