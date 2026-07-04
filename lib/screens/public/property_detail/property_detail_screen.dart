@@ -197,12 +197,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         centerTitle: true,
         title: GestureDetector(
           onTap: () {
-            // Logo cliquable → retour à l'accueil
-            if (context.canPop()) {
-              context.go('/public');
-            } else {
-              context.go('/public');
-            }
+            // Logo → accueil : pop toute la pile puis go /public
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            context.go('/public');
           },
           child: Image.asset(
             'assets/images/immozone_logo.png',
@@ -1064,41 +1061,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     );
   }
 
-  /// Fullscreen zoom viewer on image tap
+  /// Fullscreen zoom viewer — image centrée, nav prev/next, zoom pinch, compteur
   void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
     if (images.isEmpty) return;
-    final pageCtrl = PageController(initialPage: initialIndex);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(children: [
-            PageView.builder(
-              controller: pageCtrl,
-              itemCount: images.length,
-              itemBuilder: (_, i) => InteractiveViewer(
-                minScale: 1.0,
-                maxScale: 5.0,
-                child: Center(child: _buildPropertyImage(images[i])),
-              ),
-            ),
-            Positioned(
-              top: 40, right: 16,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close_rounded,
-                      color: Colors.white, size: 22),
-                ),
-              ),
-            ),
-          ]),
+        builder: (_) => _FullscreenGallery(
+          images: images,
+          initialIndex: initialIndex,
+          buildImage: _buildPropertyImage,
         ),
       ),
     );
@@ -1558,4 +1530,192 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   String _formatDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FULLSCREEN GALLERY — image centrée sur fond noir, nav prev/next, zoom
+// ═══════════════════════════════════════════════════════════════════════════
+class _FullscreenGallery extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+  final Widget Function(String) buildImage;
+
+  const _FullscreenGallery({
+    required this.images,
+    required this.initialIndex,
+    required this.buildImage,
+  });
+
+  @override
+  State<_FullscreenGallery> createState() => _FullscreenGalleryState();
+}
+
+class _FullscreenGalleryState extends State<_FullscreenGallery> {
+  late int _current;
+  late PageController _ctrl;
+  // Zoom state per page — TransformationController
+  final List<TransformationController> _transforms = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialIndex;
+    _ctrl = PageController(initialPage: widget.initialIndex);
+    for (int i = 0; i < widget.images.length; i++) {
+      _transforms.add(TransformationController());
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    for (final t in _transforms) t.dispose();
+    super.dispose();
+  }
+
+  void _resetZoom(int index) {
+    _transforms[index].value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.images.length;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(children: [
+        // ── PageView with InteractiveViewer per image ──────────────────────
+        PageView.builder(
+          controller: _ctrl,
+          itemCount: total,
+          onPageChanged: (i) {
+            _resetZoom(_current); // reset zoom when swiping away
+            setState(() => _current = i);
+          },
+          itemBuilder: (_, i) => InteractiveViewer(
+            transformationController: _transforms[i],
+            minScale: 0.8,
+            maxScale: 6.0,
+            clipBehavior: Clip.none,
+            child: Center(
+              child: widget.buildImage(widget.images[i]),
+            ),
+          ),
+        ),
+
+        // ── Close button (top-right) ───────────────────────────────────────
+        Positioned(
+          top: 44, right: 16,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+            ),
+          ),
+        ),
+
+        // ── Page counter (bottom-right) ────────────────────────────────────
+        if (total > 1)
+          Positioned(
+            bottom: 28, right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: Text(
+                '${_current + 1} / $total',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+
+        // ── Prev arrow (left) ──────────────────────────────────────────────
+        if (total > 1 && _current > 0)
+          Positioned(
+            left: 8, top: 0, bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  _ctrl.previousPage(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: Container(
+                  width: 40, height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.chevron_left_rounded,
+                      color: Colors.white, size: 32),
+                ),
+              ),
+            ),
+          ),
+
+        // ── Next arrow (right) ─────────────────────────────────────────────
+        if (total > 1 && _current < total - 1)
+          Positioned(
+            right: 8, top: 0, bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  _ctrl.nextPage(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: Container(
+                  width: 40, height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.chevron_right_rounded,
+                      color: Colors.white, size: 32),
+                ),
+              ),
+            ),
+          ),
+
+        // ── Zoom reset button (bottom-left) ───────────────────────────────
+        Positioned(
+          bottom: 28, left: 16,
+          child: GestureDetector(
+            onTap: () => setState(() => _resetZoom(_current)),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 16),
+                SizedBox(width: 4),
+                Text('Reset zoom', style: TextStyle(
+                  color: Colors.white, fontSize: 11,
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
+              ]),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
 }

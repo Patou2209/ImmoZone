@@ -839,11 +839,14 @@ class _HomeTabState extends State<_HomeTab>
     final bool isTextSearch = _searchQuery.isNotEmpty;
 
     return all.where((p) {
-      // Mode (Location vs Achat) — toujours applique
-      final modeMatch = _activeMode == 'Location'
-          ? p.transactionType == 'Location'
-          : p.transactionType == 'Vente';
-      if (!modeMatch) return false;
+      // Mode (Location vs Achat) — suspendu si recherche texte active
+      // (l'utilisateur peut taper "Location maison" sans changer le tab)
+      if (!isTextSearch) {
+        final modeMatch = _activeMode == 'Location'
+            ? p.transactionType == 'Location'
+            : p.transactionType == 'Vente';
+        if (!modeMatch) return false;
+      }
 
       // Categorie (court-circuitee quand recherche texte active)
       if (!isTextSearch) {
@@ -869,15 +872,18 @@ class _HomeTabState extends State<_HomeTab>
       if (_commune != null && _commune!.isNotEmpty &&
           !_normalize(p.commune).contains(_normalize(_commune!))) return false;
 
-      // Recherche texte — meme logique que admin/user posts :
-      // titre, ville, province, type de propriété, description
+      // Recherche texte multi-mots : chaque mot doit trouver une correspondance
+      // dans au moins un champ — "Location maison Lemba" → 3 mots indépendants
       if (isTextSearch) {
-        final q = _searchQuery.toLowerCase();
-        if (!p.title.toLowerCase().contains(q) &&
-            !p.city.toLowerCase().contains(q) &&
-            !p.province.toLowerCase().contains(q) &&
-            !p.type.toLowerCase().contains(q) &&
-            !p.description.toLowerCase().contains(q)) return false;
+        final keywords = _searchQuery.toLowerCase().trim().split(RegExp(r'\s+'));
+        final searchable = [
+          p.title, p.city, p.province, p.type,
+          p.description, p.commune, p.country ?? '',
+          p.transactionType, p.id,
+        ].map((s) => s.toLowerCase()).join(' ');
+        // Au moins un mot-clé doit matcher (OR logique)
+        final anyMatch = keywords.any((kw) => kw.isNotEmpty && searchable.contains(kw));
+        if (!anyMatch) return false;
       }
 
       // Filtres prix
@@ -1216,8 +1222,11 @@ class _HomeTabState extends State<_HomeTab>
     ]);
   }
 
-  // ── HEADER SCROLLABLE (hero + tabs + chips + search) ──────────────────────
+  // ── HEADER SCROLLABLE (hero + search + tabs + chips + pays/province + filtres)
   Widget _buildScrollableHeader(BuildContext context, {int filteredCount = 0}) {
+    // Listes dynamiques selon le pays sélectionné (utilisées ici pour les dropdowns inline)
+    final provinces = AppConstants.getProvincesForCountry(_country);
+
     return Column(children: [
       // ══ PARTIE 2 : Hero gradient ══════════════════════════════════════════
       Container(
@@ -1225,24 +1234,21 @@ class _HomeTabState extends State<_HomeTab>
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFB8D0F5), // bleu vif en haut
-              Color(0xFFCADCF8), // bleu moyen
-              Color(0xFFE8F1FD), // bleu très clair
-              Color(0xFFFFFFFF), // blanc pur — fondu parfait vers les tabs
+              Color(0xFFB8D0F5),
+              Color(0xFFCADCF8),
+              Color(0xFFE8F1FD),
+              Color(0xFFFFFFFF),
             ],
             stops: [0.0, 0.35, 0.70, 1.0],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 30, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
         child: Column(children: [
           ShaderMask(
             shaderCallback: (bounds) => const LinearGradient(
-              colors: [
-                Color(0xFFFFA726), // orange vif
-                Color(0xFF0A3A8F), // bleu navy
-              ],
+              colors: [Color(0xFFFFA726), Color(0xFF0A3A8F)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ).createShader(bounds),
@@ -1253,7 +1259,7 @@ class _HomeTabState extends State<_HomeTab>
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w800,
                 fontSize: 24,
-                color: Colors.white, // requis pour ShaderMask
+                color: Colors.white,
                 height: 1.2,
               ),
             ),
@@ -1269,48 +1275,97 @@ class _HomeTabState extends State<_HomeTab>
               color: AppTheme.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
-        ]),
-      ),
+          const SizedBox(height: 16),
 
-      // ══ PARTIE 3 : Tabs Location / Achat pill ════════════════════════════
-      Container(
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Container(
-          height: 46,
-          decoration: BoxDecoration(
-            color: const Color(0xFFEEF2FA),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          padding: const EdgeInsets.all(3),
-          child: TabBar(
-            controller: _modeCtrl,
-            indicator: BoxDecoration(
-              color: AppTheme.primaryColor,
-              borderRadius: BorderRadius.circular(26),
+          // ══ BARRE DE RECHERCHE GLOBALE (dans le hero, avant les filtres) ══
+          Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.30),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            dividerColor: Colors.transparent,
-            labelColor: Colors.white,
-            unselectedLabelColor: AppTheme.textSecondary,
-            labelStyle: const TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w600, fontSize: 13),
-            unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w500, fontSize: 13),
-            tabs: const [
-              Tab(text: 'Location'),
-              Tab(text: 'Achat'),
-            ],
+            child: TextField(
+              onChanged: (v) => setState(() {
+                _searchQuery = v;
+                _displayCount = 4;
+                _hasSearched = v.isNotEmpty;
+              }),
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                  color: AppTheme.textPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Maison Lemba, Location, REF:IZ000...',
+                hintStyle: TextStyle(fontFamily: 'Poppins',
+                    fontSize: 12, color: AppTheme.textHint),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: AppTheme.primaryColor, size: 22),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
           ),
-        ),
+          const SizedBox(height: 4),
+        ]),
+      ),
+
+      // ══ PARTIE 3 : Label + Tabs Location / Achat ════════════════════════
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text(
+            'Recherche par filtre :',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FA),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            padding: const EdgeInsets.all(3),
+            child: TabBar(
+              controller: _modeCtrl,
+              indicator: BoxDecoration(
+                color: AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.30),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppTheme.textSecondary,
+              labelStyle: const TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w500, fontSize: 13),
+              tabs: const [
+                Tab(text: 'Location'),
+                Tab(text: 'Achat'),
+              ],
+            ),
+          ),
+        ]),
       ),
 
       // ══ PARTIE 4 : Chips categories ══════════════════════════════════════
@@ -1358,60 +1413,88 @@ class _HomeTabState extends State<_HomeTab>
         ),
       ),
 
-      // ══ PARTIE 5 : Barre recherche + filtres ═════════════════════════════
+      // ══ PARTIE 5 : Pays + Province + Plus de filtres ═════════════════════
       Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-        child: Row(children: [
-          Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF2FA),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TextField(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Ligne Pays + Province (inline)
+          Row(children: [
+            // Dropdown Pays
+            Expanded(
+              child: _inlineDropdown(
+                icon: Icons.public_rounded,
+                label: 'Pays',
+                value: _country,
+                items: AppConstants.filterCountries,
                 onChanged: (v) => setState(() {
-                  _searchQuery = v;
-                  _displayCount = 4;
-                  _hasSearched = v.isNotEmpty;
+                  _country = v ?? AppConstants.defaultCountry;
+                  _province = null;
+                  _city = null;
                 }),
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
-                    color: AppTheme.textPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Rechercher (maison, quartier...)',
-                  hintStyle: TextStyle(fontFamily: 'Poppins',
-                      fontSize: 12, color: AppTheme.textHint),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      color: AppTheme.textHint, size: 20),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 8),
+            // Dropdown Province
+            Expanded(
+              child: _inlineDropdown(
+                icon: Icons.location_city_rounded,
+                label: 'Province',
+                value: _province,
+                items: provinces,
+                hint: 'Kinshasa',
+                onChanged: (v) => setState(() {
+                  _province = v;
+                  _city = null;
+                }),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          // Bouton "Plus de filtres" (pleine largeur)
           GestureDetector(
             onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
             child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              width: double.infinity,
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: _filtersExpanded ? AppTheme.primaryColor : const Color(0xFFEEF2FA),
+                color: _filtersExpanded
+                    ? AppTheme.primaryColor
+                    : const Color(0xFFEEF2FA),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _filtersExpanded
+                      ? AppTheme.primaryColor
+                      : const Color(0xFFDDE3F0),
+                ),
               ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.tune_rounded,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.tune_rounded,
+                      color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
+                      size: 17),
+                  const SizedBox(width: 6),
+                  Text(
+                    _filtersExpanded ? 'Masquer les filtres' : 'Plus de filtres',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    _filtersExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
                     color: _filtersExpanded ? Colors.white : AppTheme.textSecondary,
-                    size: 17),
-                const SizedBox(width: 4),
-                Text('Filtres',
-                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color: _filtersExpanded ? Colors.white : AppTheme.textSecondary)),
-              ]),
+                    size: 18,
+                  ),
+                ],
+              ),
             ),
           ),
         ]),
@@ -1420,6 +1503,75 @@ class _HomeTabState extends State<_HomeTab>
       // Ligne séparatrice
       const Divider(height: 1, color: Color(0xFFE4E8F0)),
     ]);
+  }
+
+  // ── Dropdown compact inline (Pays / Province) ─────────────────────────────
+  Widget _inlineDropdown({
+    required IconData icon,
+    required String label,
+    required String? value,
+    required List<String> items,
+    String? hint,
+    required void Function(String?) onChanged,
+  }) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDDE3F0)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: (value != null && items.contains(value)) ? value : null,
+          hint: Row(children: [
+            Icon(icon, size: 14, color: AppTheme.textHint),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                hint ?? label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppTheme.textHint,
+                ),
+              ),
+            ),
+          ]),
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              size: 16, color: AppTheme.textHint),
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 11,
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          items: items.map((item) => DropdownMenuItem(
+            value: item,
+            child: Text(item, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+          )).toList(),
+          onChanged: onChanged,
+          selectedItemBuilder: (ctx) => items.map((item) => Row(children: [
+            Icon(icon, size: 14, color: AppTheme.primaryColor),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(item,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'Poppins', fontSize: 11,
+                  color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ])).toList(),
+        ),
+      ),
+    );
   }
 
   // ── ANCIENNE METHODE _buildHeader (supprimee — remplacee par _buildTopBar + _buildScrollableHeader)
@@ -1438,43 +1590,19 @@ class _HomeTabState extends State<_HomeTab>
       color: Colors.white,
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Localisation — Pays + Province + Ville en cascade
+        // Localisation — Ville + Commune en cascade (Pays+Province déjà au-dessus)
         const Text('Localisation', style: TextStyle(fontFamily: 'Poppins',
             fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary)),
         const SizedBox(height: 8),
-        // Ligne 1 : Pays (pleine largeur)
-        _filterDropdown(
-          'Pays',
-          AppConstants.filterCountries,
-          _country,
-          (v) => setState(() {
-            _country = v ?? AppConstants.defaultCountry;
-            _province = null; // reset cascade
-            _city = null;
-            _displayCount = 4;
-          }),
-          allowNull: false,
-          currentValue: _country,
-        ),
-        const SizedBox(height: 8),
-        // Ligne 2 : Province + Ville
-        Row(children: [
-          Expanded(child: _filterDropdown('Province', provinces, _province,
-              (v) => setState(() {
-                _province = v;
-                _city = null; // reset ville quand province change
-                _displayCount = 4;
-              }))),
-          const SizedBox(width: 8),
-          Expanded(child: _filterDropdown('Ville', cities, _city,
-              (v) => setState(() {
-                _city = v;
-                _commune = null; // reset commune when ville changes
-                _displayCount = 4;
-              }))),
-        ]),
-        // Ligne 3 : Commune (cascade depuis Ville)
-        if (_city != null && _city!.isNotEmpty) ...[  
+        // Ville (selon province sélectionnée)
+        _filterDropdown('Ville', cities, _city,
+            (v) => setState(() {
+              _city = v;
+              _commune = null;
+              _displayCount = 4;
+            })),
+        // Commune (cascade depuis Ville)
+        if (_city != null && _city!.isNotEmpty) ...[
           const SizedBox(height: 8),
           _filterDropdown(
             'Commune',
