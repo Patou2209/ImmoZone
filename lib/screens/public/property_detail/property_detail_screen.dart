@@ -1588,7 +1588,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
     final scale = level.clamp(_zoomMin, _zoomMax);
     setState(() => _zoomLevel = scale);
     // Centre le zoom sur l'écran
-    final matrix = Matrix4.identity()..scaleByDouble(scale);
+    final matrix = Matrix4.diagonal3Values(scale, scale, 1.0);
     _transforms[_current].value = matrix;
   }
 
