@@ -56,16 +56,6 @@
       opacity: 0;
       pointer-events: none;
     }
-    #imz-loading .imz-logo-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 4px;
-    }
-    #imz-loading .imz-logo-icon {
-      width: 52px;
-      height: 52px;
-    }
     #imz-loading .imz-brand {
       font-size: 38px;
       font-weight: 800;
@@ -184,14 +174,15 @@
   <!-- Visible immédiatement, avant que Flutter JS démarre.                    -->
   <!-- Disparaît automatiquement au premier frame Flutter rendu.               -->
   <div id="imz-loading">
-    <div class="imz-logo-row">
-      <!-- Icône maison SVG inline (pas de dépendance externe) -->
-      <svg class="imz-logo-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="52" height="52" rx="12" fill="#1a3a8f"/>
-        <path d="M26 10 L44 26 L38 26 L38 44 L30 44 L30 33 L22 33 L22 44 L14 44 L14 26 L8 26 Z"
-              fill="white"/>
-        <circle cx="26" cy="23" r="4" fill="#f7941d"/>
-      </svg>
+    <!-- Logo officiel ImmoZone (PNG 500×500, servi comme asset web) -->
+    <img
+      src="immozone_logo.png"
+      alt="ImmoZone"
+      style="width:160px;height:160px;object-fit:contain;margin-bottom:12px;"
+      onerror="this.style.display='none';document.getElementById('imz-fallback-brand').style.display='flex';"
+    />
+    <!-- Fallback texte si le PNG ne charge pas -->
+    <div id="imz-fallback-brand" style="display:none;align-items:center;gap:6px;margin-bottom:12px;">
       <div class="imz-brand">
         <span class="immo">Immo</span><span class="zone">Zone</span>
       </div>

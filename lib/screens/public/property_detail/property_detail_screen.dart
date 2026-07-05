@@ -1564,6 +1564,9 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
   static const double _zoomMax = 4.0;
   static const double _zoomStep = 0.5;
 
+  // Taille du viewport capturée via LayoutBuilder — nécessaire pour centrer le zoom
+  Size _viewportSize = Size.zero;
+
   // TransformationController par page pour appliquer le zoom programmatiquement
   final List<TransformationController> _transforms = [];
 
@@ -1584,16 +1587,31 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
     super.dispose();
   }
 
+  /// Applique le zoom centré sur le milieu du viewport.
+  /// Technique : T(center) × Scale(s) × T(-center)
+  /// Cela étire/rétracte l'image également dans toutes les directions.
   void _applyZoom(double level) {
     final scale = level.clamp(_zoomMin, _zoomMax);
     setState(() => _zoomLevel = scale);
-    // Centre le zoom sur l'écran
-    final matrix = Matrix4.diagonal3Values(scale, scale, 1.0);
+
+    // Centre du viewport en coordonnées scene (au niveau de zoom 1.0)
+    final cx = _viewportSize.width / 2.0;
+    final cy = _viewportSize.height / 2.0;
+
+    // Matrice : T(center) × Scale × T(-center) — zoom centré sur le milieu de l'écran
+    // Chaque coin s'éloigne de façon équitable vers l'extérieur.
+    // On compose les 3 matrices sans utiliser les méthodes dépréciées (.translate/.scale).
+    final tPlus  = Matrix4.translationValues(cx, cy, 0);
+    final tMinus = Matrix4.translationValues(-cx, -cy, 0);
+    final scaleM = Matrix4.diagonal3Values(scale, scale, 1.0);
+    final matrix = tPlus * scaleM * tMinus;
+
     _transforms[_current].value = matrix;
   }
 
   void _resetZoom() {
-    _applyZoom(1.0);
+    setState(() => _zoomLevel = 1.0);
+    _transforms[_current].value = Matrix4.identity();
   }
 
   void _zoomIn() => _applyZoom(_zoomLevel + _zoomStep);
@@ -1608,7 +1626,17 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(children: [
+      body: LayoutBuilder(builder: (context, constraints) {
+        // Capturer la taille du viewport pour centrer le zoom correctement
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final newSize = Size(constraints.maxWidth, constraints.maxHeight);
+          if (newSize != _viewportSize) {
+            _viewportSize = newSize;
+          }
+        });
+        _viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+        return Stack(children: [
 
         // ── PageView — image centrée, BoxFit.contain via _buildContainImage ──
         PageView.builder(
@@ -1620,6 +1648,8 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             _resetZoom();
             setState(() => _current = i);
           },
+          // pageSnapping + scroll custom pour une transition smooth
+          pageSnapping: true,
           itemBuilder: (_, i) => InteractiveViewer(
             transformationController: _transforms[i],
             minScale: _zoomMin,
@@ -1682,9 +1712,10 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             child: Center(
               child: GestureDetector(
                 onTap: () {
-                  _ctrl.previousPage(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeInOut,
+                  _ctrl.animateToPage(
+                    _current - 1,
+                    duration: const Duration(milliseconds: 380),
+                    curve: Curves.easeInOutCubic,
                   );
                 },
                 child: Container(
@@ -1707,9 +1738,10 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             child: Center(
               child: GestureDetector(
                 onTap: () {
-                  _ctrl.nextPage(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeInOut,
+                  _ctrl.animateToPage(
+                    _current + 1,
+                    duration: const Duration(milliseconds: 380),
+                    curve: Curves.easeInOutCubic,
                   );
                 },
                 child: Container(
@@ -1816,7 +1848,8 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             ),
           ),
         ),
-      ]),
+      ]);   // fin Stack
+      }), // fin LayoutBuilder
     );
   }
 
