@@ -1300,7 +1300,7 @@ class _HomeTabState extends State<_HomeTab>
               style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                   color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                hintText: 'Recherche par mot clé ex: Maison Lemba, REF:IZ000...',
+                hintText: 'Recherche par mots-clés (ex: maison Lemba, Ref: Iz2209, 2 chambres...)',
                 hintStyle: TextStyle(fontFamily: 'Poppins',
                     fontSize: 12, color: AppTheme.textHint),
                 prefixIcon: Icon(Icons.search_rounded,

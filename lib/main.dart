@@ -174,12 +174,15 @@ class _SplashScreenState extends State<SplashScreen>
       }
     }
 
-    await Future.delayed(const Duration(milliseconds: 2000));
-    if (!mounted) return;
-    if (_isDeepLink) return;
-
+    // ── Vérification auth avec timeout 3 s maximum ────────────────────────
+    // On lance checkAuth() ET un timer de 3 s en parallèle.
+    // On navigue dès que l'un des deux se termine en premier.
+    // Plus aucun délai artificiel — l'écran splash s'affiche max 3 secondes.
     final auth = context.read<AuthProvider>();
-    await auth.checkAuth();
+    await Future.any([
+      auth.checkAuth(),
+      Future.delayed(const Duration(seconds: 3)),
+    ]);
     if (!mounted || _isDeepLink) return;
 
     if (auth.isLoggedIn) {

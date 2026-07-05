@@ -1244,7 +1244,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   // Fond blanc + marges latérales — image complète sans distorsion
   Widget _buildWidePhotoGrid(PropertyModel p) {
     final images = p.images.isNotEmpty ? p.images : <String>[];
-    final hasImages = images.isNotEmpty;
     final total = images.length;
 
     return Container(
@@ -1535,6 +1534,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 // ═══════════════════════════════════════════════════════════════════════════
 // FULLSCREEN GALLERY — image centrée sur fond noir, nav prev/next, zoom
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// FULLSCREEN GALLERY
+//  • BoxFit.contain → image JAMAIS coupée, fond noir remplit les vides
+//  • Barre zoom +/- avec pourcentage (100% → 400%) en bas au centre
+//  • Prev / Next arrows, compteur N/Total, bouton X fermer
+// ═══════════════════════════════════════════════════════════════════════════
 class _FullscreenGallery extends StatefulWidget {
   final List<String> images;
   final int initialIndex;
@@ -1553,7 +1558,13 @@ class _FullscreenGallery extends StatefulWidget {
 class _FullscreenGalleryState extends State<_FullscreenGallery> {
   late int _current;
   late PageController _ctrl;
-  // Zoom state per page — TransformationController
+  // Niveau de zoom courant (1.0 = 100%)
+  double _zoomLevel = 1.0;
+  static const double _zoomMin = 1.0;
+  static const double _zoomMax = 4.0;
+  static const double _zoomStep = 0.5;
+
+  // TransformationController par page pour appliquer le zoom programmatiquement
   final List<TransformationController> _transforms = [];
 
   @override
@@ -1573,57 +1584,80 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
     super.dispose();
   }
 
-  void _resetZoom(int index) {
-    _transforms[index].value = Matrix4.identity();
+  void _applyZoom(double level) {
+    final scale = level.clamp(_zoomMin, _zoomMax);
+    setState(() => _zoomLevel = scale);
+    // Centre le zoom sur l'écran
+    final matrix = Matrix4.identity()..scaleByDouble(scale);
+    _transforms[_current].value = matrix;
   }
+
+  void _resetZoom() {
+    _applyZoom(1.0);
+  }
+
+  void _zoomIn() => _applyZoom(_zoomLevel + _zoomStep);
+  void _zoomOut() => _applyZoom(_zoomLevel - _zoomStep);
 
   @override
   Widget build(BuildContext context) {
     final total = widget.images.length;
+    final zoomPct = (_zoomLevel * 100).round();
+    final atMin = _zoomLevel <= _zoomMin;
+    final atMax = _zoomLevel >= _zoomMax;
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(children: [
-        // ── PageView with InteractiveViewer per image ──────────────────────
+
+        // ── PageView — image centrée, BoxFit.contain via _buildContainImage ──
         PageView.builder(
           controller: _ctrl,
           itemCount: total,
+          // Désactiver le scroll lateral quand on est zoomé (évite conflit)
+          physics: _zoomLevel > 1.0 ? const NeverScrollableScrollPhysics() : const PageScrollPhysics(),
           onPageChanged: (i) {
-            _resetZoom(_current); // reset zoom when swiping away
+            _resetZoom();
             setState(() => _current = i);
           },
           itemBuilder: (_, i) => InteractiveViewer(
             transformationController: _transforms[i],
-            minScale: 0.8,
-            maxScale: 6.0,
+            minScale: _zoomMin,
+            maxScale: _zoomMax,
+            // Désactiver le zoom pinch — géré par les boutons +/-
+            panEnabled: _zoomLevel > 1.0,
+            scaleEnabled: false,
             clipBehavior: Clip.none,
-            child: Center(
-              child: widget.buildImage(widget.images[i]),
+            child: SizedBox.expand(
+              child: Center(
+                // ── BoxFit.contain : image complète, jamais coupée ──────────
+                child: _buildContainImage(widget.images[i]),
+              ),
             ),
           ),
         ),
 
-        // ── Close button (top-right) ───────────────────────────────────────
+        // ── Close button (top-right) ──────────────────────────────────────
         Positioned(
           top: 44, right: 16,
           child: GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              width: 36, height: 36,
+              width: 38, height: 38,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.65),
+                color: Colors.black.withValues(alpha: 0.70),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white24, width: 1),
+                border: Border.all(color: Colors.white30, width: 1),
               ),
               child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
             ),
           ),
         ),
 
-        // ── Page counter (bottom-right) ────────────────────────────────────
+        // ── Page counter (top-left) ────────────────────────────────────────
         if (total > 1)
           Positioned(
-            bottom: 28, right: 16,
+            top: 48, left: 16,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -1634,19 +1668,17 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
               child: Text(
                 '${_current + 1} / $total',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.white, fontFamily: 'Poppins',
+                  fontSize: 13, fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
 
-        // ── Prev arrow (left) ──────────────────────────────────────────────
+        // ── Prev arrow ────────────────────────────────────────────────────
         if (total > 1 && _current > 0)
           Positioned(
-            left: 8, top: 0, bottom: 0,
+            left: 8, top: 0, bottom: 80,
             child: Center(
               child: GestureDetector(
                 onTap: () {
@@ -1668,10 +1700,10 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             ),
           ),
 
-        // ── Next arrow (right) ─────────────────────────────────────────────
+        // ── Next arrow ────────────────────────────────────────────────────
         if (total > 1 && _current < total - 1)
           Positioned(
-            right: 8, top: 0, bottom: 0,
+            right: 8, top: 0, bottom: 80,
             child: Center(
               child: GestureDetector(
                 onTap: () {
@@ -1693,29 +1725,145 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
             ),
           ),
 
-        // ── Zoom reset button (bottom-left) ───────────────────────────────
+        // ── Barre zoom +/- avec pourcentage (bas, centrée) ───────────────
         Positioned(
-          bottom: 28, left: 16,
-          child: GestureDetector(
-            onTap: () => setState(() => _resetZoom(_current)),
+          bottom: 20, left: 0, right: 0,
+          child: Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.black.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(28),
                 border: Border.all(color: Colors.white24, width: 1),
               ),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 16),
-                SizedBox(width: 4),
-                Text('Reset zoom', style: TextStyle(
-                  color: Colors.white, fontSize: 11,
-                  fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                // Bouton —
+                GestureDetector(
+                  onTap: atMin ? null : _zoomOut,
+                  child: AnimatedOpacity(
+                    opacity: atMin ? 0.35 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: atMin
+                            ? Colors.white10
+                            : AppTheme.primaryColor.withValues(alpha: 0.85),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.remove_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Label pourcentage
+                SizedBox(
+                  width: 56,
+                  child: Text(
+                    '$zoomPct%',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Bouton +
+                GestureDetector(
+                  onTap: atMax ? null : _zoomIn,
+                  child: AnimatedOpacity(
+                    opacity: atMax ? 0.35 : 1.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: atMax
+                            ? Colors.white10
+                            : AppTheme.primaryColor.withValues(alpha: 0.85),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add_rounded,
+                          color: Colors.white, size: 20),
+                    ),
+                  ),
+                ),
+                // Bouton reset (visible seulement si zoomé)
+                if (_zoomLevel > 1.0) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _resetZoom,
+                    child: Container(
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Center(
+                        child: Text('Reset', style: TextStyle(
+                          color: Colors.white, fontFamily: 'Poppins',
+                          fontSize: 11, fontWeight: FontWeight.w500)),
+                      ),
+                    ),
+                  ),
+                ],
               ]),
             ),
           ),
         ),
       ]),
     );
+  }
+
+  /// Construit l'image avec BoxFit.contain — jamais coupée, fond noir
+  Widget _buildContainImage(String src) {
+    final placeholder = Container(
+      color: Colors.black,
+      child: const Center(
+        child: Icon(Icons.broken_image_outlined, size: 64, color: Colors.white24),
+      ),
+    );
+
+    if (src.startsWith('data:image/')) {
+      try {
+        final ci = src.indexOf(',');
+        if (ci == -1) return placeholder;
+        final bytes = base64Decode(src.substring(ci + 1));
+        return Image.memory(bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => placeholder);
+      } catch (_) {
+        return placeholder;
+      }
+    }
+
+    if (!kIsWeb && !src.startsWith('http')) {
+      final file = File(src);
+      if (file.existsSync()) {
+        return Image.file(file,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => placeholder);
+      }
+      return placeholder;
+    }
+
+    return Image.network(src,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => placeholder,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: Colors.black,
+            child: const Center(
+              child: CircularProgressIndicator(
+                  color: Colors.white38, strokeWidth: 2),
+            ),
+          );
+        });
   }
 }

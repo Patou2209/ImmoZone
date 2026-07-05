@@ -205,20 +205,34 @@ class PropertyProvider extends ChangeNotifier {
   }
 
   // ── Helpers REF:IZ ─────────────────────────────────────────────────────────
-  /// Extrait le suffixe alphanumérique après "IZ" depuis la query.
-  /// Ex : "REF:IZ7326" → "7326", "IZ7326" → "7326", "iz 7326" → "7326"
+  /// Extrait la référence complète IZ depuis la query (IZ inclus).
+  /// Ex : "REF:IZ7326" → "IZ7326", "IZ7326" → "IZ7326", "iz 7326" → "IZ7326"
   /// Retourne null si la query ne ressemble pas à une référence IZ.
   static String? _extractRefSuffix(String query) {
     final q = query.trim().toUpperCase().replaceAll(RegExp(r'[\s:\-_]'), '');
-    final match = RegExp(r'IZ([A-Z0-9]{1,10})$').firstMatch(q);
-    return match?.group(1);
+    // Cas 1 : contient explicitement le préfixe IZ → extraire IZ + ce qui suit
+    final matchIZ = RegExp(r'(IZ[A-Z0-9]{1,10})$').firstMatch(q);
+    if (matchIZ != null) return matchIZ.group(1); // ex: "IZ7326"
+    // Cas 2 : query = uniquement des chiffres (4 à 10) → les utilisateurs tapent
+    // juste "2209" en pensant à la ref IZ2209 — traiter comme ref
+    final matchDigits = RegExp(r'^[0-9]{4,10}$').firstMatch(q);
+    if (matchDigits != null) return 'IZ${matchDigits.group(0)}'; // → "IZ2209"
+    return null;
   }
 
-  /// Vérifie si une annonce correspond au suffixe REF extrait.
-  static bool _matchesRef(PropertyModel p, String refSuffix) {
+  /// Vérifie si une annonce correspond à la référence IZ extraite.
+  /// La référence affichée d'une annonce est : "IZ" + 4 derniers chars de p.id
+  static bool _matchesRef(PropertyModel p, String izRef) {
     final id = p.id.toUpperCase();
-    if (id.length >= refSuffix.length && id.endsWith(refSuffix)) return true;
-    if (id.contains(refSuffix)) return true;
+    // Référence d'affichage : IZ + 4 derniers chars de l'ID
+    final displayRef = 'IZ${id.length >= 4 ? id.substring(id.length - 4) : id}';
+    // Suffixe seul (chiffres après IZ) pour match partiel sur l'ID complet
+    final suffix = izRef.startsWith('IZ') ? izRef.substring(2) : izRef;
+
+    if (displayRef == izRef) return true;          // match exact ref affichée
+    if (displayRef.contains(izRef)) return true;   // ref affichée contient la query
+    if (id.endsWith(suffix)) return true;          // l'ID complet se termine par les chiffres
+    if (id.contains(suffix)) return true;          // l'ID contient les chiffres
     return false;
   }
 

@@ -38,6 +38,62 @@
   <link rel="manifest" href="manifest.json">
 
   <style>
+    /* ── Écran de chargement ImmoZone (avant Flutter) ────────────────────── */
+    #imz-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: opacity 0.35s ease;
+    }
+    #imz-loading.hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #imz-loading .imz-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    #imz-loading .imz-logo-icon {
+      width: 52px;
+      height: 52px;
+    }
+    #imz-loading .imz-brand {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    #imz-loading .imz-brand span.immo { color: #1a3a8f; }
+    #imz-loading .imz-brand span.zone { color: #f7941d; }
+    #imz-loading .imz-tagline {
+      font-size: 12px;
+      color: #8a99b8;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      font-weight: 400;
+    }
+    /* Spinner circulaire */
+    #imz-loading .imz-spinner {
+      width: 28px;
+      height: 28px;
+      border: 2.5px solid rgba(26,58,143,0.15);
+      border-top-color: #1a3a8f;
+      border-radius: 50%;
+      animation: imz-spin 0.8s linear infinite;
+    }
+    @keyframes imz-spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* ── Scrollbar toujours visible (Chrome / Edge / Safari) ─────────────── */
     ::-webkit-scrollbar {
       width: 10px;
@@ -123,6 +179,45 @@
   </script>
 </head>
 <body>
+
+  <!-- ── Écran de chargement ImmoZone ─────────────────────────────────────── -->
+  <!-- Visible immédiatement, avant que Flutter JS démarre.                    -->
+  <!-- Disparaît automatiquement au premier frame Flutter rendu.               -->
+  <div id="imz-loading">
+    <div class="imz-logo-row">
+      <!-- Icône maison SVG inline (pas de dépendance externe) -->
+      <svg class="imz-logo-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="52" height="52" rx="12" fill="#1a3a8f"/>
+        <path d="M26 10 L44 26 L38 26 L38 44 L30 44 L30 33 L22 33 L22 44 L14 44 L14 26 L8 26 Z"
+              fill="white"/>
+        <circle cx="26" cy="23" r="4" fill="#f7941d"/>
+      </svg>
+      <div class="imz-brand">
+        <span class="immo">Immo</span><span class="zone">Zone</span>
+      </div>
+    </div>
+    <div class="imz-tagline">Votre immobilier en RDC &amp; Congo</div>
+    <div class="imz-spinner"></div>
+  </div>
+
+  <script>
+    // Masque l'overlay dès que Flutter rend son premier frame.
+    // Timeout de sécurité : retire l'overlay après 4 s même si l'event ne vient pas.
+    (function () {
+      function hideOverlay() {
+        var el = document.getElementById('imz-loading');
+        if (!el) return;
+        el.classList.add('hide');
+        // Retirer du DOM après la transition CSS (350 ms)
+        setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
+      }
+      // Événement natif Flutter Web
+      window.addEventListener('flutter-first-frame', hideOverlay, { once: true });
+      // Sécurité : retire après 4 secondes maximum
+      setTimeout(hideOverlay, 4000);
+    })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
