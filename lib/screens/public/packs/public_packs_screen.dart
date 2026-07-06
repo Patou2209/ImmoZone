@@ -153,23 +153,27 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                         ),
                         child: GestureDetector(
                           onTap: () => context.go('/public'),
-                          child: Image.asset(
-                            'assets/images/immozone_logo.png',
-                            height: 36,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => RichText(
-                              text: const TextSpan(
-                                style: TextStyle(fontFamily: 'Poppins',
-                                    fontSize: 18, fontWeight: FontWeight.w800),
-                                children: [
-                                  TextSpan(text: 'Immo',
-                                      style: TextStyle(color: AppTheme.primaryColor)),
-                                  TextSpan(text: 'Zone',
-                                      style: TextStyle(color: AppTheme.accentColor)),
-                                ],
+                          child: Builder(builder: (ctx) {
+                            final w = MediaQuery.of(ctx).size.width;
+                            final h = w < 480 ? 28.0 : w < 768 ? 32.0 : w < 1024 ? 38.0 : 44.0;
+                            return Image.asset(
+                              'assets/images/immozone_logo_text.png',
+                              height: h,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontFamily: 'Poppins',
+                                      fontSize: h * 0.5, fontWeight: FontWeight.w800),
+                                  children: const [
+                                    TextSpan(text: 'Immo',
+                                        style: TextStyle(color: Color(0xFF2B5BE8))),
+                                    TextSpan(text: 'Zone',
+                                        style: TextStyle(color: Color(0xFFED5C1F))),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          }),
                         ),
                       ),
                       const SizedBox(height: 8),

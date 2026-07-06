@@ -1119,6 +1119,47 @@ class _HomeTabState extends State<_HomeTab>
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
   // ── TOP BAR (fixe — ne scrolle pas) ─────────────────────────────────────
+
+  /// Logo texte ImmoZone — taille responsive selon la largeur de l'écran.
+  /// Ratio du PNG : 1024×223 ≈ 4.59:1 (horizontal).
+  /// Principe : plus le viewport est large, plus le logo est grand.
+  Widget _buildResponsiveLogo(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final screenW = MediaQuery.of(context).size.width;
+      // Hauteur de base 32px (mobile <480), monte progressivement
+      double h;
+      if (screenW < 480) {
+        h = 30;
+      } else if (screenW < 768) {
+        h = 34;
+      } else if (screenW < 1024) {
+        h = 40;
+      } else if (screenW < 1440) {
+        h = 46;
+      } else {
+        h = 52;
+      }
+      return Image.asset(
+        'assets/images/immozone_logo_text.png',
+        height: h,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => RichText(
+          text: TextSpan(
+            style: TextStyle(fontFamily: 'Poppins', fontSize: h * 0.55),
+            children: const [
+              TextSpan(text: 'Immo',
+                  style: TextStyle(fontWeight: FontWeight.w800,
+                      color: Color(0xFF2B5BE8))),
+              TextSpan(text: 'Zone',
+                  style: TextStyle(fontWeight: FontWeight.w800,
+                      color: Color(0xFFED5C1F))),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
   Widget _buildTopBar(BuildContext context) {
     return Column(children: [
       // Barre blanche : logo + cloche + avatar/connexion
@@ -1126,25 +1167,8 @@ class _HomeTabState extends State<_HomeTab>
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(children: [
-          // Logo officiel ImmoZone
-          Image.asset(
-            'assets/images/immozone_logo.png',
-            height: 52,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => RichText(
-              text: const TextSpan(
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 20),
-                children: [
-                  TextSpan(text: 'Immo',
-                      style: TextStyle(fontWeight: FontWeight.w800,
-                          color: AppTheme.textPrimary)),
-                  TextSpan(text: 'Zone',
-                      style: TextStyle(fontWeight: FontWeight.w800,
-                          color: AppTheme.primaryColor)),
-                ],
-              ),
-            ),
-          ),
+          // Logo texte ImmoZone responsive
+          _buildResponsiveLogo(context),
           const Spacer(),
           // Avatar / bouton Connexion
           Builder(builder: (ctx) {

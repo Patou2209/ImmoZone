@@ -249,15 +249,20 @@ class _SplashScreenState extends State<SplashScreen>
                     backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
                   ),
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  'Chargement...',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textHint,
-                    fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.5,
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    'La 1ère plateforme de l\'immobilier\nen RD Congo et au Congo Brazzaville',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textHint,
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w400,
+                      height: 1.5,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ],

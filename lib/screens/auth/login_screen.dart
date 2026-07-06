@@ -817,29 +817,29 @@ class _LoginScreenState extends State<LoginScreen> {
             // ── Logo (cliquable → accueil) ─────────────────────────────
             GestureDetector(
               onTap: () => context.go('/public'),
-              child: Image.asset(
-                'assets/images/immozone_logo.png',
-                width: 210,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => RichText(
-                  text: const TextSpan(
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800),
-                    children: [
-                      TextSpan(
-                          text: 'Immo',
-                          style: TextStyle(
-                              color: AppTheme.primaryColor)),
-                      TextSpan(
-                          text: 'Zone',
-                          style: TextStyle(
-                              color: AppTheme.accentColor)),
-                    ],
+              child: LayoutBuilder(builder: (ctx, _) {
+                final w = MediaQuery.of(ctx).size.width;
+                final logoW = w < 480 ? 180.0 : w < 768 ? 210.0 : w < 1024 ? 240.0 : 280.0;
+                return Image.asset(
+                  'assets/images/immozone_logo_text.png',
+                  width: logoW,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: logoW * 0.14,
+                          fontWeight: FontWeight.w800),
+                      children: const [
+                        TextSpan(text: 'Immo',
+                            style: TextStyle(color: Color(0xFF2B5BE8))),
+                        TextSpan(text: 'Zone',
+                            style: TextStyle(color: Color(0xFFED5C1F))),
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              }),
             ),
             const SizedBox(height: 28),
 

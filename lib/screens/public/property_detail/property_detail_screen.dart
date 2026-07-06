@@ -201,24 +201,28 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             Navigator.of(context).popUntil((route) => route.isFirst);
             context.go('/public');
           },
-          child: Image.asset(
-            'assets/images/immozone_logo.png',
-            height: 44,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => RichText(
-              text: const TextSpan(
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 17),
-                children: [
-                  TextSpan(text: 'Immo',
-                      style: TextStyle(fontWeight: FontWeight.w800,
-                          color: AppTheme.textPrimary)),
-                  TextSpan(text: 'Zone',
-                      style: TextStyle(fontWeight: FontWeight.w800,
-                          color: AppTheme.primaryColor)),
-                ],
+          child: LayoutBuilder(builder: (ctx, _) {
+            final w = MediaQuery.of(ctx).size.width;
+            final h = w < 480 ? 26.0 : w < 768 ? 30.0 : w < 1024 ? 36.0 : 42.0;
+            return Image.asset(
+              'assets/images/immozone_logo_text.png',
+              height: h,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => RichText(
+                text: TextSpan(
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: h * 0.55),
+                  children: const [
+                    TextSpan(text: 'Immo',
+                        style: TextStyle(fontWeight: FontWeight.w800,
+                            color: Color(0xFF2B5BE8))),
+                    TextSpan(text: 'Zone',
+                        style: TextStyle(fontWeight: FontWeight.w800,
+                            color: Color(0xFFED5C1F))),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          }),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
