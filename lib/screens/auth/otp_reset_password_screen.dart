@@ -589,7 +589,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
                 ? const SizedBox(
                     width: 22, height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2.5))
-                : GestureDetector(
+                : MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: _resendOtp,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -615,11 +615,11 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
                         ],
                       ),
                     ),
-                  ),
+                  )),
         ] else ...[
           const SizedBox(height: 12),
           // Lien pour modifier le code si erreur
-          GestureDetector(
+          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: _clearOtp,
             child: Text('Modifier le code',
                 style: TextStyle(
@@ -627,7 +627,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
                     fontSize: 12,
                     color: AppTheme.textSecondary,
                     decoration: TextDecoration.underline)),
-          ),
+          )),
         ],
       ]),
     );

@@ -513,7 +513,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                       ),
                                     ]),
                                   ),
-                                  GestureDetector(
+                                  MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(builder: (_) => const AdminPaymentsScreen()),
@@ -529,7 +529,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                               fontSize: 11, fontWeight: FontWeight.w700,
                                               color: Colors.white)),
                                     ),
-                                  ),
+                                  )),
                                 ]),
                               ),
                               // Cartes des paiements en attente
@@ -1172,7 +1172,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: Row(children: [
             Expanded(
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => _validatePaymentFromDashboard(pay, false),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1188,12 +1188,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.errorColor)),
                   ]),
                 ),
-              ),
+              )),
             ),
             const SizedBox(width: 10),
             Expanded(
               flex: 2,
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => _validatePaymentFromDashboard(pay, true),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 9),
@@ -1209,7 +1209,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
                   ]),
                 ),
-              ),
+              )),
             ),
           ]),
         ),
@@ -1346,7 +1346,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         // ── Filtre période ────────────────────────────────────────────────
         Row(
           children: periods.map((p) => Expanded(
-            child: GestureDetector(
+            child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => setState(() => _kpiPeriod = p['v']!),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
@@ -1365,7 +1365,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: _kpiPeriod == p['v'] ? Colors.white : AppTheme.textSecondary,
                   ))),
               ),
-            ),
+            )),
           )).toList(),
         ),
         const SizedBox(height: 12),
@@ -2621,7 +2621,7 @@ class _PendingPropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
@@ -2652,7 +2652,7 @@ class _PendingPropertyCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontFamily: 'Poppins')),
                 const SizedBox(height: 6),
                 Row(children: [
-                  Expanded(child: GestureDetector(
+                  Expanded(child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: onApprove,
                     child: Container(padding: const EdgeInsets.symmetric(vertical: 6),
                         decoration: BoxDecoration(color: AppTheme.successColor, borderRadius: BorderRadius.circular(8)),
@@ -2662,9 +2662,9 @@ class _PendingPropertyCard extends StatelessWidget {
                           Text('Approuver', style: TextStyle(color: Colors.white, fontSize: 10,
                               fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                         ])),
-                  )),
+                  ))),
                   const SizedBox(width: 6),
-                  Expanded(child: GestureDetector(
+                  Expanded(child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: onReject,
                     child: Container(padding: const EdgeInsets.symmetric(vertical: 6),
                         decoration: BoxDecoration(color: AppTheme.errorColor, borderRadius: BorderRadius.circular(8)),
@@ -2674,7 +2674,7 @@ class _PendingPropertyCard extends StatelessWidget {
                           Text('Rejeter', style: TextStyle(color: Colors.white, fontSize: 10,
                               fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                         ])),
-                  )),
+       )           ))),
                 ]),
               ]),
             ),

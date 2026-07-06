@@ -815,7 +815,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 32),
 
             // ── Logo (cliquable → accueil) ─────────────────────────────
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => context.go('/public'),
               child: LayoutBuilder(builder: (ctx, _) {
                 final w = MediaQuery.of(ctx).size.width;
@@ -840,7 +840,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 );
               }),
-            ),
+            )),
             const SizedBox(height: 28),
 
             // ── Carte formulaire ────────────────────────────────────────
@@ -899,12 +899,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Row(children: [
                       // Bouton indicatif
-                      GestureDetector(
+                      MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                         onTap: _showCountryPicker,
                         child: _codeButton(
                             _countryCode, null,
                             flag: selected['flag']),
-                      ),
+                      )),
                       // Numéro sans indicatif
                       Expanded(
                         child: TextFormField(
@@ -1068,7 +1068,7 @@ class _LoginScreenState extends State<LoginScreen> {
       (c) => c['code'] == code,
       orElse: () => AppConstants.countryCodes.first,
     );
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -1093,7 +1093,7 @@ class _LoginScreenState extends State<LoginScreen> {
               color: AppTheme.accentColor, size: 18),
         ]),
       ),
-    );
+    ));
   }
 
 

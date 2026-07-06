@@ -250,7 +250,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  GestureDetector(
+                  MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: _sendMessage,
                     child: Container(
                       width: 46,
@@ -261,7 +261,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ),
                       child: const Icon(Icons.send, color: Colors.white, size: 20),
                     ),
-                  ),
+                  )),
                 ],
               ),
             ),

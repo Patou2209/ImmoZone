@@ -380,7 +380,7 @@ class _AdTile extends StatelessWidget {
             ],
             const Spacer(),
             // Bouton éditer
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: onEdit,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -396,10 +396,10 @@ class _AdTile extends StatelessWidget {
                       color: AppTheme.accentColor)),
                 ]),
               ),
-            ),
+            )),
             const SizedBox(width: 8),
             // Bouton supprimer
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: onDelete,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -415,7 +415,7 @@ class _AdTile extends StatelessWidget {
                       color: AppTheme.errorColor)),
                 ]),
               ),
-            ),
+            )),
           ]),
         ),
       ]),
@@ -771,7 +771,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
   /// Widget sélecteur d'image depuis la galerie
   Widget _buildImagePicker() {
     final hasImage = _imageBase64.isNotEmpty;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: hasImage ? null : _pickImageFromGallery,
       child: Container(
         width: double.infinity,
@@ -796,7 +796,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                 // Bouton supprimer (coin haut-droit)
                 Positioned(
                   top: 6, right: 6,
-                  child: GestureDetector(
+                  child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: _removeImage,
                     child: Container(
                       padding: const EdgeInsets.all(5),
@@ -807,12 +807,12 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                       child: const Icon(Icons.close_rounded,
                           size: 14, color: Colors.white),
                     ),
-                  ),
+                  )),
                 ),
                 // Bouton changer (coin bas-gauche)
                 Positioned(
                   bottom: 6, left: 6,
-                  child: GestureDetector(
+                  child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: _pickImageFromGallery,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -834,7 +834,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                                 color: Colors.white)),
                       ]),
                     ),
-                  ),
+                  )),
                 ),
               ])
             : Column(
@@ -856,7 +856,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                       style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 10,
-                          color: AppTheme.textHint)),
+                          color: AppTheme.)textHint)),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -908,7 +908,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
   Widget _linkTypeBtn(String type, IconData icon, String label) {
     final selected = _linkType == type;
     return Expanded(
-      child: GestureDetector(
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
         onTap: () => setState(() => _linkType = type),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -930,12 +930,12 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                     color: selected ? Colors.white : AppTheme.textSecondary)),
           ]),
         ),
-      ),
+      )),
     );
   }
 
   Widget _dateTile(String label, DateTime date, VoidCallback onTap) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -960,7 +960,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
           ]),
         ]),
       ),
-    );
+    ));
   }
 
   Widget _label(String text) => Padding(

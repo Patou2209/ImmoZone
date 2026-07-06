@@ -151,7 +151,7 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: GestureDetector(
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () => context.go('/public'),
                           child: Builder(builder: (ctx) {
                             final w = MediaQuery.of(ctx).size.width;
@@ -174,7 +174,7 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                               ),
                             );
                           }),
-                        ),
+                        )),
                       ),
                       const SizedBox(height: 8),
                       const Text('Plateforme immobiliere N°1 en RDC',

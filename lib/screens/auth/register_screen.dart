@@ -779,7 +779,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           border: Border.all(color: AppTheme.dividerColor),
         ),
         child: Row(children: [
-          GestureDetector(
+          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: _showPhoneCountryPicker,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
@@ -798,7 +798,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const Icon(Icons.arrow_drop_down, color: AppTheme.accentColor, size: 18),
               ]),
             ),
-          ),
+          )),
           Expanded(
             child: TextFormField(
               controller: _phoneNumberCtrl,
@@ -940,7 +940,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         color = const Color(0xFF2E7D32);
         subtitle = 'Je publie mon propre bien';
     }
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => setState(() => _selectedCategory = category),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -995,6 +995,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
         ]),
       ),
-    );
+    ));
   }
 }

@@ -518,7 +518,7 @@ class _SearchScreenState extends State<SearchScreen> {
         // Calcul du badge REF (4 derniers chars de l'id)
         final refBadge =
             'REF: IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-        return GestureDetector(
+        return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
           onTap: () => Navigator.push(ctx,
               MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
           child: Container(
@@ -674,7 +674,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-        );
+        ));
       },
     );
   }

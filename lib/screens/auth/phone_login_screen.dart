@@ -342,7 +342,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                         ),
                         child: Row(children: [
                           // Indicatif pays
-                          GestureDetector(
+                          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                             onTap: _showCountryPicker,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -370,7 +370,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                                 ],
                               ),
                             ),
-                          ),
+                          )),
                           // Champ numéro
                           Expanded(
                             child: TextFormField(

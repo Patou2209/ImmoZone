@@ -145,7 +145,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
   @override
   Widget build(BuildContext context) {
     final isGrid = widget.gridMode;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: _handleTap,
       child: Container(
         // gridMode : pas de margin (la grille gère l'espacement via mainAxisSpacing/crossAxisSpacing)
@@ -238,7 +238,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
                     const Spacer(),
 
                     // Bouton "→ Visiter"
-                    GestureDetector(
+                    MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                       onTap: _handleTap,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -262,7 +262,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
                           ],
                         ),
                       ),
-                    ),
+                    )),
                   ],
                 ),
               ),
@@ -305,7 +305,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
             ],
             ), // Stack
           ), // SizedBox
-        ),   // ClipRRect
+   )     ),   // ClipRRect
       ),     // Container
     );       // GestureDetector
   }

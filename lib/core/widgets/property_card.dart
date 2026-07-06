@@ -63,7 +63,9 @@ class PropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
       onTap: onTap,
       child: SizedBox(
         width: _cardWidth,
@@ -546,8 +548,9 @@ class PropertyCard extends StatelessWidget {
             ), // Column
           ), // Container
         ), // ClipRRect
-      ), // AspectRatio
-    );
+        ), // AspectRatio
+      ), // GestureDetector
+    ); // MouseRegion
   }
 
   /// Returns a human-readable time-ago string based on [dt].

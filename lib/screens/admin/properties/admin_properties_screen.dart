@@ -599,13 +599,13 @@ class _AdminPropertyTile extends StatelessWidget {
   }
 
   Widget _iconBtn(IconData icon, Color color, VoidCallback onPressed) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onPressed,
       child: Padding(
         padding: const EdgeInsets.only(left: 6),
         child: Icon(icon, color: color, size: 22),
       ),
-    );
+    ));
   }
 
   /// Affiche la vraie image de la propriété (locale, base64 ou réseau)

@@ -302,7 +302,7 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
       child: Row(
         children: [
           ...periods.map((p) => Expanded(
-                child: GestureDetector(
+                child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                   onTap: () => setState(() => _selectedPeriod = p['value']!),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -328,7 +328,7 @@ class _AdminFinancierHomeScreenState extends State<AdminFinancierHomeScreen>
                       ),
                     ),
                   ),
-                ),
+                )),
               )),
         ],
       ),

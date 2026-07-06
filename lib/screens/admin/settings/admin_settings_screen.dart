@@ -891,7 +891,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   Widget _promoScopeBtn(StateSetter setPromo, int index, IconData icon, String label) {
     final selected = _promoScopeIndex == index;
     return Expanded(
-      child: GestureDetector(
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
         onTap: () => setPromo(() {
           _promoScopeIndex = index;
           if (index == 0) {
@@ -916,7 +916,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             )),
           ]),
         ),
-      ),
+      )),
     );
   }
 

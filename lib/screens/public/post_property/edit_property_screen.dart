@@ -305,7 +305,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       // Photo principale
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Main photo slot
-        GestureDetector(
+        MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
           onTap: _pickMainPhoto,
           child: Stack(children: [
             Container(
@@ -354,7 +354,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               ),
             ),
           ]),
-        ),
+        )),
         const SizedBox(width: 10),
 
         // Secondary photos grid
@@ -381,7 +381,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                               Icons.broken_image_rounded, size: 18,
                               color: AppTheme.textHint));
                     }
-                    return GestureDetector(
+                    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                       onTap: _pickSecondaryPhoto,
                       child: Container(
                         width: 70, height: 70,
@@ -392,7 +392,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                         clipBehavior: Clip.antiAlias,
                         child: img,
                       ),
-                    );
+                    ));
                   },
                 ),
 
@@ -417,7 +417,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                   ),
                   Positioned(
                     top: 2, right: 2,
-                    child: GestureDetector(
+                    child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                       onTap: () => _removeSecondaryPhoto(i),
                       child: Container(
                         padding: const EdgeInsets.all(2),
@@ -428,7 +428,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                         child: const Icon(Icons.close_rounded,
                             size: 10, color: Colors.white),
                       ),
-                    ),
+                    )),
                   ),
                 ]);
               }),
@@ -436,7 +436,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               // Add button (if < 3 secondary)
               if (_newSecondaryPhotos.length < 3 ||
                   (_newSecondaryPhotos.isEmpty && existingImages.length < 4))
-                GestureDetector(
+                MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                   onTap: _pickSecondaryPhoto,
                   child: Container(
                     width: 70, height: 70,
@@ -458,7 +458,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       ],
                     ),
                   ),
-                ),
+                )),
             ]),
           ]),
         ),

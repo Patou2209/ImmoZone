@@ -431,7 +431,7 @@ class _RoleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = role['color'] as Color;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -488,6 +488,6 @@ class _RoleTile extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }

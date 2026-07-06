@@ -150,7 +150,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 12),
           Row(
             children: _operators.map((op) => Expanded(
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(() => _selectedOperator = op['id'] as String),
                 child: Container(
                   margin: const EdgeInsets.only(right: 8),
@@ -182,7 +182,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ],
                   ),
                 ),
-              ),
+              )),
             )).toList(),
           ),
           const SizedBox(height: 20),
@@ -359,7 +359,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Widget _modeChip(String label, bool selected, VoidCallback onTap) => GestureDetector(
+  Widget _modeChip(String label, bool selected, VoidCallback onTap) => MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
     onTap: onTap,
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -372,7 +372,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           fontWeight: FontWeight.w600,
           color: selected ? Colors.white : AppTheme.textSecondary)),
     ),
-  );
+  ));
 
   Widget _label(String text) => Text(text,
       style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,

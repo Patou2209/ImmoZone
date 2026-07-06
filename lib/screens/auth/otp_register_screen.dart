@@ -404,7 +404,7 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
                     ),
                     if (_resendSeconds == 0) ...[
                       const SizedBox(width: 6),
-                      GestureDetector(
+                      MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                         onTap: _isResending ? null : _resendOtp,
                         child: _isResending
                             ? const SizedBox(
@@ -417,7 +417,7 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.primaryColor,
                                     decoration: TextDecoration.underline)),
-                      ),
+                      )),
                     ],
                   ]),
                 ]),

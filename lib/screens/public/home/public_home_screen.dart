@@ -178,7 +178,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
@@ -211,7 +211,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
           Icon(Icons.arrow_forward_ios_rounded, size: 14, color: color.withValues(alpha: 0.6)),
         ]),
       ),
-    );
+    ));
   }
 
   Future<void> _launchWhatsApp() async {
@@ -319,7 +319,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                         // Alertes
                         _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
                         // Contact
-                        GestureDetector(
+                        MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: _openContactSheet,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -339,7 +339,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                               ],
                             ),
                           ),
-                        ),
+                        )),
                       ],
                     ),
                   ),
@@ -350,7 +350,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                   left: 0,
                   right: 0,
                   child: Center(
-                    child: GestureDetector(
+                    child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                       onTap: () => _openPublish(context, auth),
                       child: Container(
                         width: 58,
@@ -368,7 +368,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                         ),
                         child: const Icon(Icons.add, color: Colors.white, size: 30),
                       ),
-                    ),
+                    )),
                   ),
                 ),
               ],
@@ -385,7 +385,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
 
   Widget _navItemWithBadge(int index, IconData icon, IconData activeIcon, String label, int badge) {
     final isSelected = _currentIndex == index;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () {
         setState(() => _currentIndex = index);
         if (index == 2) _loadUnreadCount();
@@ -429,7 +429,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   void _openPublish(BuildContext context, AuthProvider auth) {
@@ -1174,7 +1174,7 @@ class _HomeTabState extends State<_HomeTab>
           Builder(builder: (ctx) {
             final auth = ctx.watch<AuthProvider>();
             if (auth.isLoggedIn) {
-              return GestureDetector(
+              return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () {
                   if (auth.isAdmin) {
                     Navigator.pushAndRemoveUntil(
@@ -1215,9 +1215,9 @@ class _HomeTabState extends State<_HomeTab>
                           ),
                   ),
                 ),
-              );
+              ));
             }
-            return GestureDetector(
+            return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const LoginScreen())),
               child: Container(
@@ -1237,7 +1237,7 @@ class _HomeTabState extends State<_HomeTab>
                     style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                         fontSize: 13, color: Colors.white)),
               ),
-            );
+            ));
           }),
         ]),
       ),
@@ -1406,7 +1406,7 @@ class _HomeTabState extends State<_HomeTab>
             itemBuilder: (_, i) {
               final cat = _currentCategories[i];
               final selected = cat == _selectedCategory;
-              return GestureDetector(
+              return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(() {
                   _selectedCategory = cat;
                   _resetFilters(clearSearch: false);
@@ -1431,7 +1431,7 @@ class _HomeTabState extends State<_HomeTab>
                         color: selected ? Colors.white : AppTheme.textSecondary,
                       )),
                 ),
-              );
+              ));
             },
           ),
         ),
@@ -1486,7 +1486,7 @@ class _HomeTabState extends State<_HomeTab>
           ]),
           const SizedBox(height: 8),
           // Bouton "Plus de filtres" (pleine largeur)
-          GestureDetector(
+          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
             child: Container(
               width: double.infinity,
@@ -1530,7 +1530,7 @@ class _HomeTabState extends State<_HomeTab>
                 ],
               ),
             ),
-          ),
+          )),
         ]),
       ),
 
@@ -2019,7 +2019,7 @@ class _HomeTabState extends State<_HomeTab>
     required void Function(bool?) onChanged,
   }) {
     final active = value == true;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => onChanged(active ? null : true),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -2052,7 +2052,7 @@ class _HomeTabState extends State<_HomeTab>
           ),
         ]),
       ),
-    );
+    ));
   }
 
   // ── GRILLE RESPONSIVE : colonnes de 400px, 1 col min si écran < 400px ──
@@ -3133,7 +3133,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
     required IconData icon, required String label,
     required Color color, required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -3150,11 +3150,11 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                   fontSize: 11, color: color)),
         ]),
       ),
-    );
+    ));
   }
 
   Widget _iconAction(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -3165,7 +3165,7 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
         ),
         child: Icon(icon, color: color, size: 18),
       ),
-    );
+    ));
   }
 
   Widget _imgPlaceholder() => Container(

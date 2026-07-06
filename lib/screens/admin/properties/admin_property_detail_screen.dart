@@ -551,7 +551,7 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
         _property.boostType == (days <= 7 ? 'semaine' : days <= 15 ? '15jours' : 'mois');
 
     return Expanded(
-      child: GestureDetector(
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
         onTap: _boostLoading ? null : () => _applyBoost(level: level, days: days),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -581,7 +581,7 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
                       )),
                 ]),
         ),
-      ),
+      )),
     );
   }
 

@@ -903,7 +903,7 @@ class _PeriodFilter extends StatelessWidget {
             ? '${customRange!.start.day}/${customRange!.start.month}→${customRange!.end.day}/${customRange!.end.month}'
             : p['label']!;
         return Expanded(
-          child: GestureDetector(
+          child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: () => onChanged(p['value']!),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
@@ -924,7 +924,7 @@ class _PeriodFilter extends StatelessWidget {
                         color: isActive ? Colors.white : Colors.white70)),
               ),
             ),
-          ),
+          )),
         );
       }).toList(),
     );
@@ -986,7 +986,7 @@ class _GeoFilter extends StatelessWidget {
                   color: AppTheme.textPrimary)),
           const Spacer(),
           if (hasFilter)
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: onClear,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1000,7 +1000,7 @@ class _GeoFilter extends StatelessWidget {
                         color: AppTheme.errorColor,
                         fontWeight: FontWeight.w600)),
               ),
-            ),
+            )),
         ]),
         const SizedBox(height: 8),
         // Ligne 1 : Pays + Province

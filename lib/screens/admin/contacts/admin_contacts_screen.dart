@@ -153,7 +153,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
     final color = typeColors[type] ?? AppTheme.textSecondary;
     final icon  = typeIcons[type]  ?? Icons.contact_page_rounded;
 
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => _showContactDialog(index: index),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -180,7 +180,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
               color: isHidden ? AppTheme.textHint : AppTheme.textPrimary,
             )),
             const SizedBox(height: 2),
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () {
                 Clipboard.setData(ClipboardData(text: c['value'] ?? ''));
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -197,7 +197,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
                 ))),
                 Icon(Icons.copy_rounded, size: 12, color: isHidden ? AppTheme.textHint : color),
               ]),
-            ),
+            )),
           ])),
           if (isHidden)
             Container(
@@ -234,7 +234,7 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
               if (val == 'toggle') setState(() { _contacts[index]['hidden'] = !isHidden; });
               if (val == 'edit')   _showContactDialog(index: index);
               if (val == 'delete') _confirmDelete(index, c['label'] ?? 'ce contact');
-            },
+)            },
           ),
         ]),
       ),

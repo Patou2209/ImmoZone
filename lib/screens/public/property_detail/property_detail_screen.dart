@@ -195,7 +195,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        title: GestureDetector(
+        title: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
           onTap: () {
             // Logo → accueil : pop toute la pile puis go /public
             Navigator.of(context).popUntil((route) => route.isFirst);
@@ -223,7 +223,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               ),
             );
           }),
-        ),
+        )),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: const Color(0xFFE9EBF0)),
@@ -277,10 +277,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       final img = p.images.isNotEmpty
                           ? p.images[i]
                           : AppConstants.placeholderProperty;
-                      return GestureDetector(
+                      return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                         onTap: () => _openImageFullscreen(context, p.images, i),
                         child: _buildPropertyImage(img),
-                      );
+                      ));
                     },
                   ),
 
@@ -307,7 +307,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     Positioned(
                       left: 8, top: 0, bottom: 0,
                       child: Center(
-                        child: GestureDetector(
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () {
                             if (_currentImageIndex > 0) {
                               _pageCtrl.previousPage(
@@ -328,13 +328,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   color: Colors.white, size: 24),
                             ),
                           ),
-                        ),
+                        )),
                       ),
                     ),
                     Positioned(
                       right: 8, top: 0, bottom: 0,
                       child: Center(
-                        child: GestureDetector(
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () {
                             if (_currentImageIndex < p.images.length - 1) {
                               _pageCtrl.nextPage(
@@ -355,7 +355,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   color: Colors.white, size: 24),
                             ),
                           ),
-                        ),
+                        )),
                       ),
                     ),
                   ],
@@ -447,7 +447,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             // Message officiel ImmoZone
             if (_officialMessage.isNotEmpty) ...[  
               const SizedBox(height: 16),
-              GestureDetector(
+              MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(() => _messageExpanded = !_messageExpanded),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -524,7 +524,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ],
                   ]),
                 ),
-              ),
+              )),
 
             ],
 
@@ -939,7 +939,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
                       if (p.ownerPhone.isNotEmpty)
-                        GestureDetector(
+                        MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () => _copyToClipboard(p.ownerPhone, 'Numero'),
                           child: Row(children: [
                             const Icon(Icons.phone_rounded,
@@ -952,7 +952,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                     fontFamily: 'Poppins',
                                     fontWeight: FontWeight.w600)),
                           ]),
-                        ),
+                        )),
                     ]),
                   ),
 
@@ -1272,14 +1272,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     )
                   : total == 1
                       // ── Une seule image: centrée, ratio préservé ───────────
-                      ? GestureDetector(
+                      ? MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () => _openImageFullscreen(context, images, 0),
                           child: SizedBox(
                             height: 340,
                             width: double.infinity,
                             child: _buildPropertyImageContained(images[0]),
                           ),
-                        )
+                        ))
                       // ── 2+ images: grande à gauche + 1 ou 2 petites à droite
                       : SizedBox(
                           height: 340,
@@ -1291,10 +1291,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                   // Grande image gauche (60% de la largeur)
                                   Expanded(
                                     flex: 60,
-                                    child: GestureDetector(
+                                    child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                       onTap: () => _openImageFullscreen(context, images, 0),
                                       child: _buildPropertyImageCover(images[0]),
-                                    ),
+                                    )),
                                   ),
                                   const SizedBox(width: 4),
                                   // Colonne droite (40% de la largeur)
@@ -1304,19 +1304,19 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                       children: [
                                         // Petite image haute
                                         Expanded(
-                                          child: GestureDetector(
+                                          child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                             onTap: () => _openImageFullscreen(context, images, 1),
                                             child: _buildPropertyImageCover(images[1]),
-                                          ),
+                                          )),
                                         ),
                                         if (total >= 3) ...[
                                           const SizedBox(height: 4),
                                           // Petite image basse
                                           Expanded(
-                                            child: GestureDetector(
+                                            child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                               onTap: () => _openImageFullscreen(context, images, 2),
                                               child: _buildPropertyImageCover(images[2]),
-                                            ),
+                                            )),
                                           ),
                                         ],
                                       ],
@@ -1353,7 +1353,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               if (total > 3)
                                 Positioned(
                                   bottom: 12, right: 12,
-                                  child: GestureDetector(
+                                  child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                     onTap: () => _openImageFullscreen(context, images, 0),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -1375,7 +1375,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                         ),
                                       ]),
                                     ),
-                                  ),
+                                  )),
                                 ),
                             ],
                           ),
@@ -1674,7 +1674,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
         // ── Close button (top-right) ──────────────────────────────────────
         Positioned(
           top: 44, right: 16,
-          child: GestureDetector(
+          child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
               width: 38, height: 38,
@@ -1685,7 +1685,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
               ),
               child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
             ),
-          ),
+          )),
         ),
 
         // ── Page counter (top-left) ────────────────────────────────────────
@@ -1714,7 +1714,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
           Positioned(
             left: 8, top: 0, bottom: 80,
             child: Center(
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () {
                   _ctrl.animateToPage(
                     _current - 1,
@@ -1731,7 +1731,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                   child: const Icon(Icons.chevron_left_rounded,
                       color: Colors.white, size: 32),
                 ),
-              ),
+              )),
             ),
           ),
 
@@ -1740,7 +1740,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
           Positioned(
             right: 8, top: 0, bottom: 80,
             child: Center(
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () {
                   _ctrl.animateToPage(
                     _current + 1,
@@ -1757,7 +1757,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                   child: const Icon(Icons.chevron_right_rounded,
                       color: Colors.white, size: 32),
                 ),
-              ),
+              )),
             ),
           ),
 
@@ -1774,7 +1774,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
               ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 // Bouton —
-                GestureDetector(
+                MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                   onTap: atMin ? null : _zoomOut,
                   child: AnimatedOpacity(
                     opacity: atMin ? 0.35 : 1.0,
@@ -1791,7 +1791,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                           color: Colors.white, size: 20),
                     ),
                   ),
-                ),
+                )),
                 const SizedBox(width: 10),
                 // Label pourcentage
                 SizedBox(
@@ -1810,7 +1810,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                 ),
                 const SizedBox(width: 10),
                 // Bouton +
-                GestureDetector(
+                MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                   onTap: atMax ? null : _zoomIn,
                   child: AnimatedOpacity(
                     opacity: atMax ? 0.35 : 1.0,
@@ -1827,11 +1827,11 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                           color: Colors.white, size: 20),
                     ),
                   ),
-                ),
+                )),
                 // Bouton reset (visible seulement si zoomé)
                 if (_zoomLevel > 1.0) ...[
                   const SizedBox(width: 8),
-                  GestureDetector(
+                  MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: _resetZoom,
                     child: Container(
                       height: 36,
@@ -1846,7 +1846,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
                           fontSize: 11, fontWeight: FontWeight.w500)),
                       ),
                     ),
-                  ),
+                  )),
                 ],
               ]),
             ),

@@ -1296,7 +1296,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   Widget _durationCostChip(String label, int cost, Color color, bool selected, int days) {
     return Expanded(
-      child: GestureDetector(
+      child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
         onTap: () => setState(() {
           _selectedDuration = days;
           _creditChecked = false;
@@ -1333,7 +1333,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             ),
           ]),
         ),
-      ),
+      )),
     );
   }
 
@@ -1366,7 +1366,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                       fontSize: 13,
                       color: AppTheme.textPrimary)),
             ),
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => onChanged(false),
               child: Container(
                 padding:
@@ -1389,8 +1389,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         fontWeight: FontWeight.w700,
                         color: !value ? Colors.white : AppTheme.textHint)),
               ),
-            ),
-            GestureDetector(
+            )),
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => onChanged(true),
               child: Container(
                 padding:
@@ -1413,7 +1413,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         fontWeight: FontWeight.w700,
                         color: value ? Colors.white : AppTheme.textHint)),
               ),
-            ),
+            )),
           ]),
         ),
       );
@@ -1736,7 +1736,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ),
           child: Row(children: [
             // Selecteur d'indicatif
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => _showCountryCodePicker(),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -1755,7 +1755,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   const Icon(Icons.arrow_drop_down, color: AppTheme.accentColor, size: 18),
                 ]),
               ),
-            ),
+            )),
             // Saisie des 9 chiffres
             Expanded(
               child: TextField(
@@ -1915,7 +1915,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
                       color: AppTheme.textPrimary)),
             ),
-            GestureDetector(
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => setState(() => _hasCommission = false),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1929,8 +1929,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         fontWeight: FontWeight.w700,
                         color: !_hasCommission ? Colors.white : AppTheme.textHint)),
               ),
-            ),
-            GestureDetector(
+            )),
+            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => setState(() => _hasCommission = true),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -1944,7 +1944,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         fontWeight: FontWeight.w700,
                         color: _hasCommission ? Colors.white : AppTheme.textHint)),
               ),
-            ),
+            )),
           ]),
         ),
         // Champ % — visible & actif si Oui, grisé si Non
@@ -2107,7 +2107,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         // Zone principale photo
         AspectRatio(
           aspectRatio: 16 / 9,
-          child: GestureDetector(
+          child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: () async { await _pickMainPhoto(fromCamera: false); },
             child: Container(
               decoration: BoxDecoration(
@@ -2149,7 +2149,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         ),
                       ),
                       Positioned(top: 6, right: 6,
-                        child: GestureDetector(
+                        child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: () => setState(() => _mainPhoto = null),
                           child: Container(
                             padding: const EdgeInsets.all(4),
@@ -2157,7 +2157,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                 color: AppTheme.errorColor, shape: BoxShape.circle),
                             child: const Icon(Icons.close, color: Colors.white, size: 10),
                           ),
-                        ),
+                        )),
                       ),
                     ])
                   : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -2172,7 +2172,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                       Text('Cette photo sera la couverture de votre annonce',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                              color: AppTheme.textHint)),
+                              color: AppTheme.textHint))),
                     ]),
             ),
           ),
@@ -2253,7 +2253,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           return Expanded(
             child: Padding(
               padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: isEmpty && isNextToFill
                     ? () async { await _pickSecondaryPhoto(); }
                     : null,
@@ -2314,7 +2314,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                 ),
                               ),
                               Positioned(top: 3, right: 3,
-                                child: GestureDetector(
+                                child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                   onTap: () => setState(() => _secondaryPhotos.removeAt(i)),
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
@@ -2322,7 +2322,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                         color: AppTheme.errorColor, shape: BoxShape.circle),
                                     child: const Icon(Icons.close, color: Colors.white, size: 9),
                                   ),
-                                ),
+                                )),
                               ),
                             ])
                           : Center(
@@ -2349,7 +2349,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                 ),
                               ]),
                             ),
-                  ),
+ )                 ),
                 ),
               ),
             ),
@@ -2438,7 +2438,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 width: (MediaQuery.of(context).size.width - 40 - 12) / 3,
                 child: AspectRatio(
                   aspectRatio: 1,
-                  child: GestureDetector(
+                  child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: isNextToFill && _secondaryPhotos.length < (_maxSecondaryRequired + _maxOptionalPhotos)
                         ? () async { await _pickSecondaryPhoto(); }
                         : null,
@@ -2476,7 +2476,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                 ),
                               ),
                               Positioned(top: 3, right: 3,
-                                child: GestureDetector(
+                                child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                                   onTap: () => setState(() => _secondaryPhotos.removeAt(idx)),
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
@@ -2484,7 +2484,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                         color: AppTheme.errorColor, shape: BoxShape.circle),
                                     child: const Icon(Icons.close, color: Colors.white, size: 9),
                                   ),
-                                ),
+                                )),
                               ),
                             ])
                           : Center(
@@ -2508,7 +2508,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                                   ),
                                 ),
                               ]),
-                            ),
+                   )         ),
                     ),
                   ),
                 ),
@@ -3307,7 +3307,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final credits = (qty > 0) ? qty : (price * DataService.creditsPerDollar).round();
     final isCredits = pack['type'] == 'credits';
     final desc = pack['description'] as String?;
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => setState(() => _selectedPack = pack),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -3366,12 +3366,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ),
         ]),
       ),
-    );
+    ));
   }
 
   Widget _paymentMethodTile(Map<String, dynamic> m) {
     final isSelected = _selectedPaymentMethod?['id'] == m['id'];
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => setState(() => _selectedPaymentMethod = m),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -3403,7 +3403,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ),
         ]),
       ),
-    );
+    ));
   }
 
   Widget _operatorLogoWidget(String type, {double size = 44}) {

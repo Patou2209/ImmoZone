@@ -59,7 +59,7 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
               child: Row(
                 children: _filters.map((f) {
                   final selected = _filter == f['id'];
-                  return GestureDetector(
+                  return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: () => setState(() => _filter = f['id']!),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
@@ -76,7 +76,7 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
                               fontWeight: FontWeight.w600,
                               color: selected ? Colors.white : AppTheme.textSecondary)),
                     ),
-                  );
+                  ));
                 }).toList(),
               ),
             ),

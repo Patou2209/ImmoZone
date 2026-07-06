@@ -108,6 +108,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 1,
+          mouseCursor: SystemMouseCursors.click,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -125,6 +126,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
           side: const BorderSide(color: primaryColor, width: 1.5),
+          mouseCursor: SystemMouseCursors.click,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -141,11 +143,34 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryColor,
-          textStyle: TextStyle(
+          mouseCursor: SystemMouseCursors.click,
+          textStyle: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+
+      // IconButton — curseur pointeur sur web
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          mouseCursor: SystemMouseCursors.click,
+        ),
+      ),
+
+      // Chip — curseur pointeur sur web
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFFEEF2FA),
+        selectedColor: primaryColor,
+        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+        labelStyle: const TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
       ),
 
@@ -197,20 +222,6 @@ class AppTheme {
         unselectedLabelStyle: TextStyle(
           fontFamily: 'Poppins',
           fontSize: 11,
-        ),
-      ),
-
-      // Chip
-      chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFEEF2FA),
-        selectedColor: primaryColor,
-        labelStyle: const TextStyle(
-          fontFamily: 'Poppins',
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
         ),
       ),
 

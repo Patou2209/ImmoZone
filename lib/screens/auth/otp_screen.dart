@@ -436,7 +436,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                       ),
                       if (_resendSeconds == 0) ...[
                         const SizedBox(width: 6),
-                        GestureDetector(
+                        MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                           onTap: _isResending ? null : _resendOtp,
                           child: _isResending
                               ? const SizedBox(
@@ -451,7 +451,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
                                       color: AppTheme.primaryColor,
                                       decoration:
                                           TextDecoration.underline)),
-                        ),
+                        )),
                       ],
                     ],
                   ),

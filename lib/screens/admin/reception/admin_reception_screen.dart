@@ -338,7 +338,7 @@ class _ReceptionCard extends StatelessWidget {
             ? AppTheme.successColor
             : AppTheme.errorColor;
 
-    return GestureDetector(
+    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: onView,
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -471,7 +471,7 @@ class _ReceptionCard extends StatelessWidget {
           ),
         ]),
       ),
-    );
+    ));
   }
 
   Widget _imgPlaceholder() => Container(
@@ -776,7 +776,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
       SizedBox(width: 120, child: Text('$label :', style: const TextStyle(
           fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
           color: AppTheme.textSecondary))),
-      Expanded(child: GestureDetector(
+      Expanded(child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
         onTap: () {
           Clipboard.setData(ClipboardData(text: value));
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -793,7 +793,7 @@ class _ReceptionDetailScreenState extends State<_ReceptionDetailScreen> {
           const SizedBox(width: 4),
           const Icon(Icons.copy_rounded, size: 14, color: AppTheme.accentColor),
         ]),
-      )),
+      ))),
     ]),
   );
 

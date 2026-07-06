@@ -686,7 +686,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                   spacing: 5,
                   children: [1, 2, 3, 5, 8, 10, 15, 20].map((v) {
                     final isSel = units == v;
-                    return GestureDetector(
+                    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                       onTap: () => setState(() {
                         _zoneDurations[zoneName] = Map.from(dur)..[days] = v;
                       }),
@@ -702,7 +702,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                             fontWeight: FontWeight.w700,
                             color: isSel ? Colors.white : color)),
                       ),
-                    );
+                    ));
                   }).toList(),
                 ),
               ]),
@@ -796,7 +796,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
             final v   = _coeffValues[i];
             final sel = coeff == v;
             final label = v % 1 == 0 ? '×${v.toInt()}' : '×$v';
-            return GestureDetector(
+            return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => setState(() => _venteCoeff[zoneName] = v),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
@@ -832,7 +832,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                   ]),
                 ),
               ),
-            );
+            ));
           },
         ),
       ),
@@ -950,7 +950,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
           ..._countries.map((c) {
             final selected = _selectedCountry == c['code'];
             return Expanded(
-              child: GestureDetector(
+              child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(() {
                   _selectedCountry = c['code']!;
                   _selectedCity = null;
@@ -1009,11 +1009,11 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                         ],
                       ]),
                 ),
-              ),
+              )),
             );
           }),
           const SizedBox(width: 8),
-          GestureDetector(
+          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: _showAddCountryDialog,
             child: Container(
               padding: const EdgeInsets.all(10),
@@ -1025,7 +1025,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
               child: const Icon(Icons.add_rounded,
                   color: AppTheme.accentColor, size: 18),
             ),
-          ),
+          )),
         ]),
       ]),
     );
@@ -1064,7 +1064,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
               final assignedCount = AppConstants.getCommunesForCity(city)
                   .where((c) => _communeAssignments.containsKey(c))
                   .length;
-              return GestureDetector(
+              return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(
                     () => _selectedCity = isSelected ? null : city),
                 child: Container(
@@ -1113,7 +1113,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                     ],
                   ]),
                 ),
-              );
+              ));
             },
           ),
         ),
@@ -1394,7 +1394,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                       : usdDialVal.toStringAsFixed(3);
                   final isSelected = selectedZone == z;
 
-                  return GestureDetector(
+                  return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: () => setD(() => selectedZone = z),
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -1445,7 +1445,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                               color: c, size: 20),
                       ]),
                     ),
-                  );
+                  ));
                 }),
               ]),
           actions: [
@@ -1523,7 +1523,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                   final units = (_zoneDurations[z]?[30] ?? 1);
                   final isSelected = bulkZone == z;
 
-                  return GestureDetector(
+                  return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                     onTap: () => setD(() => bulkZone = z),
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -1562,7 +1562,7 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
                               color: c, size: 18),
                       ]),
                     ),
-                  );
+                  ));
                 }),
               ]),
           actions: [
