@@ -65,14 +65,21 @@
     #imz-loading .imz-brand span.immo { color: #1a3a8f; }
     #imz-loading .imz-brand span.zone { color: #f7941d; }
     #imz-loading .imz-tagline {
-      font-size: 12px;
+      font-size: 13px;
       color: #8a99b8;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
       margin-bottom: 32px;
-      font-weight: 400;
+      font-weight: 700;
       text-align: center;
-      max-width: 320px;
-      line-height: 1.5;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+    @media (max-width: 480px) {
+      #imz-loading .imz-tagline {
+        font-size: 11px;
+        white-space: normal;
+        max-width: 280px;
+      }
     }
     /* Spinner circulaire */
     #imz-loading .imz-spinner {
@@ -181,7 +188,8 @@
     <img
       src="immozone_logo.png"
       alt="ImmoZone"
-      style="width:160px;height:160px;object-fit:contain;margin-bottom:12px;"
+      id="imz-logo"
+      style="width:clamp(140px, 22vw, 240px);height:auto;object-fit:contain;margin-bottom:12px;"
       onerror="this.style.display='none';document.getElementById('imz-fallback-brand').style.display='flex';"
     />
     <!-- Fallback texte si le PNG ne charge pas -->

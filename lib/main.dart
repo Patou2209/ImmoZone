@@ -138,27 +138,12 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<double> _scaleAnim;
-  bool _navigating = false; // évite double-navigation
+class _SplashScreenState extends State<SplashScreen> {
+  bool _navigating = false;
 
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.easeIn),
-    );
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1).animate(
-      CurvedAnimation(parent: _animCtrl, curve: Curves.elasticOut),
-    );
-    _animCtrl.forward();
     _checkAuth();
   }
 
@@ -176,24 +161,31 @@ class _SplashScreenState extends State<SplashScreen>
     final auth = context.read<AuthProvider>();
     final propProvider = context.read<PropertyProvider>();
 
-    // ── Lancer auth + prefetch propriétés + timer 4 s en parallèle ───────
-    // Le timer 4 s garantit le splash minimum; on attend aussi que
-    // le prefetch soit lancé pour éviter une page blanche après navigation.
-    await Future.any([
-      Future.wait([
-        auth.checkAuth(),
-        propProvider.loadAllProperties(), // prefetch pour éviter page blanche
-      ]),
-      Future.delayed(const Duration(seconds: 4)),
-    ]);
+    if (kIsWeb) {
+      // ── WEB : l'HTML overlay gère tout le visuel du splash.
+      // On lance auth + prefetch en parallèle avec un timer 4 s.
+      // SplashScreen reste blanc/transparent — aucun Flutter widget visible.
+      await Future.any([
+        Future.wait([
+          auth.checkAuth(),
+          propProvider.loadAllProperties(),
+        ]),
+        Future.delayed(const Duration(seconds: 4)),
+      ]);
+    } else {
+      // ── MOBILE : on affiche notre propre splash Flutter.
+      // Timer 4 s minimum, auth en parallèle.
+      await Future.any([
+        Future.wait([
+          auth.checkAuth(),
+          propProvider.loadAllProperties(),
+        ]),
+        Future.delayed(const Duration(seconds: 4)),
+      ]);
+    }
 
     if (!mounted || _isDeepLink || _navigating) return;
     _navigating = true;
-
-    // Petite pause pour s'assurer que le premier frame est rendu avant
-    // de naviguer — élimine l'écran blanc intermédiaire.
-    await Future.delayed(const Duration(milliseconds: 80));
-    if (!mounted) return;
 
     if (auth.isLoggedIn) {
       if (auth.isAnyAdmin) {
@@ -206,94 +198,87 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
-  }
-
-  /// Taille du logo responsive selon la largeur de l'écran.
+  /// Taille du logo responsive selon la largeur de l'écran (mobile).
   double _logoWidth(double screenW) {
     if (screenW < 360) return screenW * 0.72;
     if (screenW < 480) return screenW * 0.68;
     if (screenW < 768) return screenW * 0.60;
-    if (screenW < 1024) return screenW * 0.45;
-    if (screenW < 1440) return screenW * 0.35;
-    return screenW * 0.28;
+    return screenW * 0.55;
   }
 
   @override
   Widget build(BuildContext context) {
+    // ── WEB : fond blanc pur, aucun widget Flutter visible.
+    // L'HTML overlay imz-loading recouvre tout jusqu'au premier frame.
+    // Dès que Flutter rend ce Scaffold blanc, l'overlay se fond en lui
+    // puis disparaît — transition imperceptible, zéro double-splash.
+    if (kIsWeb) {
+      return const Scaffold(backgroundColor: Colors.white);
+    }
+
+    // ── MOBILE : splash Flutter classique, propre, sans animation.
     final screenW = MediaQuery.of(context).size.width;
     final logoW = _logoWidth(screenW);
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/immozone_logo.png',
-                  width: logoW,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.home_work_rounded,
-                          size: logoW * 0.35, color: AppTheme.primaryColor),
-                      const SizedBox(height: 12),
-                      RichText(
-                        text: TextSpan(
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: logoW * 0.13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          children: const [
-                            TextSpan(text: 'Immo',
-                                style: TextStyle(color: AppTheme.primaryColor)),
-                            TextSpan(text: 'Zone',
-                                style: TextStyle(color: AppTheme.accentColor)),
-                          ],
-                        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/images/immozone_logo.png',
+              width: logoW,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.home_work_rounded,
+                      size: logoW * 0.35, color: AppTheme.primaryColor),
+                  const SizedBox(height: 10),
+                  RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: logoW * 0.13,
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 56),
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(
-                    color: AppTheme.primaryColor,
-                    strokeWidth: 3,
-                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Text(
-                    'La 1ère plateforme de l\'immobilier\nen RD Congo et au Congo Brazzaville',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textHint,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      height: 1.5,
-                      letterSpacing: 0.2,
+                      children: const [
+                        TextSpan(text: 'Immo',
+                            style: TextStyle(color: AppTheme.primaryColor)),
+                        TextSpan(text: 'Zone',
+                            style: TextStyle(color: AppTheme.accentColor)),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 48),
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(
+                color: AppTheme.primaryColor,
+                strokeWidth: 2.5,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'La 1ère plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textHint,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
         ),
       ),
     );
