@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
@@ -86,6 +87,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
   final List<XFile> _secondaryPhotos = []; // 3 obligatoires + 6 optionnelles (max 9)
   final ImagePicker _picker = ImagePicker();
+  // ── Bytes pour le web (XFile.path = blob URL, inutilisable sur web) ─────
+  Uint8List? _webMainPhotoBytes;
+  final List<Uint8List> _webSecondaryBytes = [];
   // Compatibilité avec l'ancien système URL (conserver pour _addSampleImages)
   final List<String> _imageUrls = [];
   final _imageUrlCtrl = TextEditingController();
@@ -577,6 +581,23 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     ));
   }
 
+  /// Applique les valeurs par défaut pour la garantie et la commission
+  /// selon le type de bien et le type de transaction.
+  /// Maison / Villa / Appartement : garantie 3 mois
+  /// Autres catégories location   : garantie 6 mois
+  /// Commission : toujours Oui / 100% pour la location
+  /// ⚠️ Doit être appelé DANS un bloc setState() existant.
+  void _applyGarantieDefaults() {
+    if (_selectedTransaction == 'Location') {
+      final isResidentiel = _selectedType == 'Maison' ||
+          _selectedType == 'Villa' ||
+          _selectedType == 'Appartement / flat';
+      _garantieMois = isResidentiel ? 3 : 6;
+      _hasCommission = true;
+      _commissionPctCtrl.text = '100';
+    }
+  }
+
   Future<void> _submitAnnonce() async {
     setState(() => _submitting = true);
     try {
@@ -597,10 +618,26 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       // Limite Firestore : 1 Mo par document. imageQuality:40 ≈ 80–150 KB/photo → 5×150=750KB OK.
       // ── Encoder les photos : principale en [0], secondaires en [1..3] ────────
       final images = <String>[];
-      if (!kIsWeb) {
-        int totalBytes = 0;
-        const int maxDocBytes = 900000; // 900 KB marge de sécurité sous 1 MB
-        // Photo principale en premier (position [0])
+      const int maxDocBytes = 900000; // 900 KB marge de sécurité sous 1 MB
+      int totalBytes = 0;
+
+      if (kIsWeb) {
+        // ── Web : utiliser les bytes lus lors de la sélection ─────────────────
+        final allWebBytes = <Uint8List>[
+          if (_webMainPhotoBytes != null) _webMainPhotoBytes!,
+          ..._webSecondaryBytes,
+        ];
+        for (int i = 0; i < allWebBytes.length; i++) {
+          if (totalBytes >= maxDocBytes) break;
+          final bytes = allWebBytes[i];
+          if (totalBytes + bytes.length > maxDocBytes) break;
+          final xfile = i == 0 ? _mainPhoto : _secondaryPhotos[i - 1];
+          final ext = (xfile?.name.toLowerCase().endsWith('.png') ?? false) ? 'png' : 'jpeg';
+          images.add('data:image/$ext;base64,${base64Encode(bytes)}');
+          totalBytes += bytes.length;
+        }
+      } else {
+        // ── Mobile/Desktop : lire depuis le chemin fichier ──────────────────
         final allPhotos = [
           if (_mainPhoto != null) _mainPhoto!,
           ..._secondaryPhotos,
@@ -962,7 +999,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         ],
 
         // ── Type de propriété & transaction ──────────────────────────────────────
-        _sectionLabel('Type de propriété'),
+        _sectionLabel('Type de propriété et conditions financières'),
         const SizedBox(height: 10),
         _dropdown('Type de propriété *', _selectedType, AppConstants.propertyTypes,
             Icons.home_outlined, (v) {
@@ -976,6 +1013,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             if (_selectedType == 'Chambre d\'hôtel') {
               _selectedTransaction = 'Location';
             }
+            // Mettre à jour les defaults garantie/commission selon le type
+            _applyGarantieDefaults();
             // Le type de bien peut changer la transaction → recalculer le coût
             _creditChecked = false;
           });
@@ -994,6 +1033,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               availableTx, Icons.swap_horiz,
               (v) => setState(() {
                 _selectedTransaction = v!;
+                // Mettre à jour les defaults garantie/commission
+                _applyGarantieDefaults();
                 // Recalculer le coût (Location vs Vente → coefficient différent)
                 _creditChecked = false;
               }));
@@ -1018,9 +1059,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                     Icons.monetization_on_outlined, '0',
                     type: TextInputType.number, suffix: _currencyDropdown()),
 
-        // ── Description ────────────────────────────────────────────────────
-        _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
-            'Décrivez votre bien...', maxLines: 4),
+        // ── Garantie & Commission (Location uniquement, catégories applicables) ────
+        if (_selectedTransaction == 'Location' &&
+            AppConstants.categoriesLocation.contains(_selectedType) &&
+            _selectedType != 'Chambre d\'hôtel') ...[  
+          _garantieDropdown(),
+          _commissionField(),
+        ],
 
         // ── Adresse du bien ────────────────────────────────────────────────
         _sectionLabel('Adresse complète du bien'),
@@ -1123,6 +1168,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         // ── Champs conditionnels selon la catégorie ─────────────────────────
         _buildCategoryFields(),
         const SizedBox(height: 20),
+
+        // ── Description (en dernier, avant les photos) ──────────────────────
+        _field(_descCtrl, 'Description (optionnel)', Icons.description_outlined,
+            'Décrivez votre bien...', maxLines: 4),
 
         _navButtons(
           onNext: () { if (_validateStep1()) _goTo(1); },
@@ -1446,10 +1495,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         if (isLocationTx)
           yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
               (v) => setState(() => _hasWater = v)),
-        if (isLocationTx) ...[
-          _garantieDropdown(),
-          _commissionField(),
-        ],
       ]);
     }
 
@@ -1471,10 +1516,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         if (isLocationTx)
           yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
               (v) => setState(() => _hasWater = v)),
-        if (isLocationTx) ...[
-          _garantieDropdown(),
-          _commissionField(),
-        ],
       ]);
     }
 
@@ -1491,10 +1532,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         if (isLocationTx)
           yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
               (v) => setState(() => _hasWater = v)),
-        if (isLocationTx) ...[
-          _garantieDropdown(),
-          _commissionField(),
-        ],
       ]);
     }
 
@@ -2132,11 +2169,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                             ? Image.network(_imageUrls[0], fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     const Icon(Icons.broken_image, color: AppTheme.accentColor))
-                            : kIsWeb
-                                ? Container(
-                                    color: AppTheme.accentColor.withValues(alpha: 0.1),
-                                    child: const Icon(Icons.image, color: AppTheme.accentColor, size: 48))
-                                : Image.file(File(_mainPhoto!.path), fit: BoxFit.cover),
+                            : kIsWeb && _webMainPhotoBytes != null
+                                ? Image.memory(_webMainPhotoBytes!, fit: BoxFit.cover)
+                                : kIsWeb
+                                    ? Container(
+                                        color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                        child: const Icon(Icons.image, color: AppTheme.accentColor, size: 48))
+                                    : Image.file(File(_mainPhoto!.path), fit: BoxFit.cover),
                       ),
                       Positioned(bottom: 8, left: 8,
                         child: Container(
@@ -2152,7 +2191,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                       ),
                       Positioned(top: 6, right: 6,
                         child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                          onTap: () => setState(() => _mainPhoto = null),
+                          onTap: () => setState(() { _mainPhoto = null; _webMainPhotoBytes = null; }),
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: const BoxDecoration(
@@ -2300,11 +2339,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                           ? Stack(fit: StackFit.expand, children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(9),
-                                child: kIsWeb
-                                    ? Container(
-                                        color: AppTheme.accentColor.withValues(alpha: 0.1),
-                                        child: const Icon(Icons.image, color: AppTheme.accentColor))
-                                    : Image.file(File(_secondaryPhotos[i].path), fit: BoxFit.cover),
+                                child: kIsWeb && i < _webSecondaryBytes.length
+                                    ? Image.memory(_webSecondaryBytes[i], fit: BoxFit.cover)
+                                    : kIsWeb
+                                        ? Container(
+                                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                            child: const Icon(Icons.image, color: AppTheme.accentColor))
+                                        : Image.file(File(_secondaryPhotos[i].path), fit: BoxFit.cover),
                               ),
                               Positioned(bottom: 3, left: 3,
                                 child: Container(
@@ -2318,7 +2359,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                               ),
                               Positioned(top: 3, right: 3,
                                 child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                                  onTap: () => setState(() => _secondaryPhotos.removeAt(i)),
+                                  onTap: () => setState(() {
+                                    _secondaryPhotos.removeAt(i);
+                                    if (kIsWeb && i < _webSecondaryBytes.length) _webSecondaryBytes.removeAt(i);
+                                  }),
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: const BoxDecoration(
@@ -2462,11 +2506,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                           ? Stack(fit: StackFit.expand, children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(9),
-                                child: kIsWeb
-                                    ? Container(
-                                        color: AppTheme.accentColor.withValues(alpha: 0.1),
-                                        child: const Icon(Icons.image, color: AppTheme.accentColor))
-                                    : Image.file(File(_secondaryPhotos[idx].path), fit: BoxFit.cover),
+                                child: kIsWeb && idx < _webSecondaryBytes.length
+                                    ? Image.memory(_webSecondaryBytes[idx], fit: BoxFit.cover)
+                                    : kIsWeb
+                                        ? Container(
+                                            color: AppTheme.accentColor.withValues(alpha: 0.1),
+                                            child: const Icon(Icons.image, color: AppTheme.accentColor))
+                                        : Image.file(File(_secondaryPhotos[idx].path), fit: BoxFit.cover),
                               ),
                               Positioned(bottom: 3, left: 3,
                                 child: Container(
@@ -2480,7 +2526,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                               ),
                               Positioned(top: 3, right: 3,
                                 child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                                  onTap: () => setState(() => _secondaryPhotos.removeAt(idx)),
+                                  onTap: () => setState(() {
+                                    _secondaryPhotos.removeAt(idx);
+                                    if (kIsWeb && idx < _webSecondaryBytes.length) _webSecondaryBytes.removeAt(idx);
+                                  }),
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: const BoxDecoration(
@@ -2611,9 +2660,18 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         maxHeight: 1024,
       );
       if (photo == null) return; // annulation silencieuse
-      // Ignorer silencieusement si la même photo est déjà sélectionnée
-      if (_mainPhoto != null && _mainPhoto!.path == photo.path) return;
-      setState(() => _mainPhoto = photo);
+      if (kIsWeb) {
+        // Sur web : lire les bytes immédiatement (blob URL invalide en dehors du picker)
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _mainPhoto = photo;
+          _webMainPhotoBytes = bytes;
+        });
+      } else {
+        // Ignorer silencieusement si la même photo est déjà sélectionnée
+        if (_mainPhoto != null && _mainPhoto!.path == photo.path) return;
+        setState(() => _mainPhoto = photo);
+      }
     } on PlatformException {
       // Picker déjà ouvert ou permission refusée : ignorer silencieusement
     } catch (_) {
@@ -2632,11 +2690,20 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         maxHeight: 1024,
       );
       if (photo == null) return; // annulation silencieuse
-      // Ignorer silencieusement les doublons (même chemin de fichier)
-      final isDuplicate = _secondaryPhotos.any((f) => f.path == photo.path) ||
-          (_mainPhoto != null && _mainPhoto!.path == photo.path);
-      if (isDuplicate) return;
-      setState(() => _secondaryPhotos.add(photo));
+      if (kIsWeb) {
+        // Sur web : lire les bytes immédiatement
+        final bytes = await photo.readAsBytes();
+        setState(() {
+          _secondaryPhotos.add(photo);
+          _webSecondaryBytes.add(bytes);
+        });
+      } else {
+        // Ignorer silencieusement les doublons (même chemin de fichier)
+        final isDuplicate = _secondaryPhotos.any((f) => f.path == photo.path) ||
+            (_mainPhoto != null && _mainPhoto!.path == photo.path);
+        if (isDuplicate) return;
+        setState(() => _secondaryPhotos.add(photo));
+      }
     } on PlatformException {
       // Picker déjà ouvert ou permission refusée : ignorer silencieusement
     } catch (_) {
@@ -2648,7 +2715,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     setState(() {
       // Réinitialiser les photos locales
       _mainPhoto = null;
+      _webMainPhotoBytes = null;
       _secondaryPhotos.clear();
+      _webSecondaryBytes.clear();
       // Charger exactement 4 URLs exemple
       _imageUrls.clear();
       _imageUrls.addAll([

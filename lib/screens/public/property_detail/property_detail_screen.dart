@@ -927,7 +927,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   ),
                   const SizedBox(width: 14),
 
-                  // ── Nom + Téléphone (Expanded) ───────────────────────────
+                  // ── Nom + Téléphone + Badge catégorie (Expanded) ──────────
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(p.ownerName,
@@ -953,6 +953,49 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                     fontWeight: FontWeight.w600)),
                           ]),
                         )),
+                      // ── Badge catégorie annonceur ──────────────────────────
+                      if (p.ownerCategory.isNotEmpty) ...[
+                        const SizedBox(height: 5),
+                        Builder(builder: (ctx) {
+                          Color badgeColor;
+                          IconData badgeIcon;
+                          switch (p.ownerCategory) {
+                            case 'Agence Immobilière':
+                              badgeColor = const Color(0xFF1565C0);
+                              badgeIcon = Icons.business_rounded;
+                            case 'Commissionnaire':
+                              badgeColor = const Color(0xFF6A1B9A);
+                              badgeIcon = Icons.handshake_rounded;
+                            default: // Propriétaire
+                              badgeColor = const Color(0xFF2E7D32);
+                              badgeIcon = Icons.person_rounded;
+                          }
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: badgeColor.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: badgeColor.withValues(alpha: 0.35)),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(badgeIcon, size: 11, color: badgeColor),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  p.ownerCategory,
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: badgeColor,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ]),
+                          );
+                        }),
+                      ],
                     ]),
                   ),
 

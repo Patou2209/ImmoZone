@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:io';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -26,6 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _loading = true;
   int _availableCredits = 0;
   final DataService _ds = DataService();
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -157,16 +163,52 @@ class _ProfileScreenState extends State<ProfileScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 40),
-                      CircleAvatar(
-                        radius: 38,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: Text(
-                          user?.initials ?? '?',
-                          style: const TextStyle(
-                            fontSize: 28, fontWeight: FontWeight.w700,
-                            color: Colors.white, fontFamily: 'Poppins',
+                      // ── Photo de profil (cliquable) ────────────────────────
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: user?.avatar != null && user!.avatar!.isNotEmpty
+                                  ? () => _showFullscreenPhoto(context, user)
+                                  : null,
+                              child: CircleAvatar(
+                                radius: 42,
+                                backgroundColor: Colors.white.withValues(alpha: 0.25),
+                                child: _buildAvatarContent(user),
+                              ),
+                            ),
                           ),
-                        ),
+                          // Bouton modifier photo
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: _uploadingPhoto ? null : () => _pickAndUploadPhoto(context, auth),
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.accentColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: _uploadingPhoto
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(5),
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Icon(Icons.camera_alt_rounded,
+                                          color: Colors.white, size: 14),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Text(
@@ -348,6 +390,153 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
       ),
     );
+  }
+
+  // ── Contenu de l'avatar (photo ou initiales) ─────────────────────────────
+  Widget _buildAvatarContent(UserModel? user) {
+    final avatarData = user?.avatar;
+    if (avatarData != null && avatarData.isNotEmpty) {
+      try {
+        // L'avatar est stocké en base64 (data:image/jpeg;base64,...)
+        final base64Str = avatarData.contains(',')
+            ? avatarData.split(',').last
+            : avatarData;
+        final bytes = base64Decode(base64Str);
+        return ClipOval(
+          child: Image.memory(bytes,
+              width: 84, height: 84, fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _initialsWidget(user)),
+        );
+      } catch (_) {
+        return _initialsWidget(user);
+      }
+    }
+    return _initialsWidget(user);
+  }
+
+  Widget _initialsWidget(UserModel? user) {
+    return Text(
+      user?.initials ?? '?',
+      style: const TextStyle(
+        fontSize: 28, fontWeight: FontWeight.w700,
+        color: Colors.white, fontFamily: 'Poppins',
+      ),
+    );
+  }
+
+  // ── Affichage plein écran de la photo ─────────────────────────────────────
+  void _showFullscreenPhoto(BuildContext context, UserModel user) {
+    final avatarData = user.avatar;
+    if (avatarData == null || avatarData.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(children: [
+          InteractiveViewer(
+            child: Center(
+              child: Builder(builder: (ctx) {
+                try {
+                  final base64Str = avatarData.contains(',')
+                      ? avatarData.split(',').last
+                      : avatarData;
+                  final bytes = base64Decode(base64Str);
+                  return Image.memory(bytes,
+                      fit: BoxFit.contain,
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height);
+                } catch (_) {
+                  return const Icon(Icons.broken_image, color: Colors.white, size: 64);
+                }
+              }),
+            ),
+          ),
+          Positioned(
+            top: 40, right: 16,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white30),
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ── Sélectionner et enregistrer la photo de profil ────────────────────────
+  Future<void> _pickAndUploadPhoto(BuildContext context, AuthProvider auth) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    final picker = ImagePicker();
+    try {
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+      if (picked == null) return;
+
+      setState(() => _uploadingPhoto = true);
+
+      // Lire les bytes selon la plateforme
+      final Uint8List bytes;
+      if (kIsWeb) {
+        bytes = await picked.readAsBytes();
+      } else {
+        bytes = await File(picked.path).readAsBytes();
+      }
+
+      // Encoder en base64 (data URL)
+      final ext = picked.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+      final dataUrl = 'data:image/$ext;base64,${base64Encode(bytes)}';
+
+      // Sauvegarder dans Firestore via updateUser
+      final updatedUser = user.copyWith(avatar: dataUrl);
+      await _ds.updateUser(updatedUser);
+
+      // Mettre à jour la session locale dans AuthProvider
+      auth.updateCurrentUserLocally(updatedUser);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Photo de profil mise à jour !',
+                style: TextStyle(fontFamily: 'Poppins')),
+            backgroundColor: AppTheme.successColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : $e',
+                style: const TextStyle(fontFamily: 'Poppins')),
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   Widget _myPropertiesTab() {

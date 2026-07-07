@@ -23,6 +23,13 @@ class AuthProvider extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  /// Met à jour l'utilisateur courant en mémoire et notifie les listeners.
+  /// Utile après modification du profil (photo, nom, etc.) sans rechargement complet.
+  void updateCurrentUserLocally(UserModel updated) {
+    _currentUser = updated;
+    notifyListeners();
+  }
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == 'admin';
   bool get isAdminFinancier => _currentUser?.role == 'admin_financier';
