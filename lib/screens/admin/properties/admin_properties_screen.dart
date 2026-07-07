@@ -6,8 +6,6 @@ import 'package:provider/provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/property_model.dart';
-import '../../../services/data_service.dart';
-import '../../../models/app_notification_model.dart';
 import 'admin_property_detail_screen.dart';
 
 class AdminPropertiesScreen extends StatefulWidget {
@@ -27,7 +25,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
@@ -42,12 +40,28 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
 
   List<PropertyModel> _filtered(String status) {
     return _allProperties.where((p) {
-      final matchStatus = status == 'Tous' || p.status == status;
+      // L'onglet 'Tous' n'affiche PAS les supprimés (ils ont leur propre onglet)
+      if (status == 'Tous') {
+        if (p.status == 'Supprimé') return false;
+      } else {
+        if (p.status != status) return false;
+      }
       final matchSearch = _searchQuery.isEmpty ||
           p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           p.ownerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           p.city.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchStatus && matchSearch;
+      return matchSearch;
+    }).toList();
+  }
+
+  List<PropertyModel> _filteredDeleted() {
+    return _allProperties.where((p) {
+      if (p.status != 'Supprimé') return false;
+      final matchSearch = _searchQuery.isEmpty ||
+          p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          p.ownerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          p.city.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchSearch;
     }).toList();
   }
 
@@ -104,6 +118,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                   Tab(text: 'En attente (${_filtered('En attente').length})'),
                   Tab(text: 'Actifs (${_filtered('Actif').length})'),
                   Tab(text: 'Rejetés (${_filtered('Rejeté').length})'),
+                  Tab(text: 'Supprimés (${_filteredDeleted().length})'),
                 ],
               ),
             ],
@@ -119,6 +134,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 _buildList('En attente'),
                 _buildList('Actif'),
                 _buildList('Rejeté'),
+                _buildDeletedList(),
               ],
             ),
     );
@@ -168,31 +184,20 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
             },
             onDelete: () async {
               final provider = context.read<PropertyProvider>();
-              final ds = DataService();
               final messenger = ScaffoldMessenger.of(context);
               final result = await _confirmDelete(context, prop);
               if (result == null) return;
-              // Notifier l'annonceur (suppression non remboursable)
-              await ds.addNotification(AppNotification(
-                id: 'notif_del_${prop.id}_${DateTime.now().millisecondsSinceEpoch}',
-                userId: prop.ownerId,
-                type: 'suppression',
-                title: 'Annonce supprimée',
-                body: 'Votre annonce "${prop.title}" a été supprimée.\nMotif : $result\n⚠️ Cette suppression est définitive et non remboursable.',
-                propertyId: prop.id,
-                propertyTitle: prop.title,
-                createdAt: DateTime.now(),
-              ));
-              await provider.deleteProperty(prop.id);
+              // Suppression douce : status='Supprimé' + deletedAt + notification
+              await provider.softDeleteProperty(prop.id, result);
               _loadData();
               messenger.showSnackBar(
                 SnackBar(
                   content: Row(
                     children: [
-                      const Icon(Icons.delete_forever, color: Colors.white, size: 18),
+                      const Icon(Icons.delete_outline, color: Colors.white, size: 18),
                       const SizedBox(width: 8),
                       Expanded(child: Text(
-                        'Annonce "${prop.title}" supprimée — annonceur notifié',
+                        'Annonce "${prop.title}" supprimée — restaurable 24 h',
                         style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       )),
@@ -201,7 +206,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                   backgroundColor: AppTheme.errorColor,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  duration: const Duration(seconds: 3),
+                  duration: const Duration(seconds: 4),
                 ),
               );
             },
@@ -426,6 +431,262 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDeletedList() {
+    final items = _filteredDeleted();
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.delete_sweep_outlined, size: 64,
+                color: AppTheme.textHint.withValues(alpha: 0.5)),
+            const SizedBox(height: 12),
+            const Text('Aucune annonce supprimée',
+                style: TextStyle(color: AppTheme.textSecondary, fontFamily: 'Poppins')),
+            const SizedBox(height: 6),
+            const Text('Les annonces supprimées apparaissent ici\npendant 24 h avant suppression définitive.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textHint, fontFamily: 'Poppins', fontSize: 12)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: AppTheme.accentColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final prop = items[index];
+          final deletedAt = prop.deletedAt;
+          final now = DateTime.now();
+          final canRestore = deletedAt == null ||
+              now.difference(deletedAt).inHours < 24;
+          final hoursLeft = deletedAt != null
+              ? (24 - now.difference(deletedAt).inHours).clamp(0, 24)
+              : 24;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: canRestore
+                    ? Colors.orange.shade200
+                    : Colors.red.shade200,
+                width: 1.5,
+              ),
+              boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8, offset: const Offset(0, 2),
+              )],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _buildPropertyImage(prop.mainImage, 72),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(prop.title,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins', color: AppTheme.textPrimary),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('${prop.commune}, ${prop.city}',
+                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary,
+                                fontFamily: 'Poppins')),
+                        Text('Annonceur: ${prop.ownerName}',
+                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary,
+                                fontFamily: 'Poppins')),
+                        const SizedBox(height: 6),
+                        // Barre de temps restant
+                        if (canRestore)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.timer_outlined, size: 13, color: Colors.orange),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hoursLeft <= 1
+                                      ? 'Restaurable encore < 1 h'
+                                      : 'Restaurable encore $hoursLeft h',
+                                  style: const TextStyle(
+                                      fontSize: 10, fontFamily: 'Poppins',
+                                      color: Color(0xFFE65100), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade300),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.cancel_outlined, size: 13, color: Colors.red),
+                                SizedBox(width: 4),
+                                Text('Délai 24 h dépassé — suppression définitive',
+                                    style: TextStyle(fontSize: 10, fontFamily: 'Poppins',
+                                        color: Colors.red, fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (canRestore)
+                              MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    final provider = context.read<PropertyProvider>();
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    try {
+                                      await provider.restoreProperty(prop.id);
+                                      _loadData();
+                                      messenger.showSnackBar(SnackBar(
+                                        content: Row(children: [
+                                          const Icon(Icons.restore, color: Colors.white, size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: Text(
+                                            'Annonce "${prop.title}" restaurée',
+                                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                                            overflow: TextOverflow.ellipsis,
+                                          )),
+                                        ]),
+                                        backgroundColor: AppTheme.successColor,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        duration: const Duration(seconds: 3),
+                                      ));
+                                    } catch (e) {
+                                      messenger.showSnackBar(SnackBar(
+                                        content: Text('Erreur: $e',
+                                            style: const TextStyle(fontFamily: 'Poppins')),
+                                        backgroundColor: AppTheme.errorColor,
+                                      ));
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.successColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.restore, color: Colors.white, size: 15),
+                                        SizedBox(width: 5),
+                                        Text('Restaurer',
+                                            style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                                                fontWeight: FontWeight.w600, color: Colors.white)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            // Suppression définitive immédiate
+                            MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  final provider = context.read<PropertyProvider>();
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final ok = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16)),
+                                      title: const Text('Suppression définitive',
+                                          style: TextStyle(fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w700, fontSize: 16)),
+                                      content: Text(
+                                        'Supprimer définitivement "${prop.title}" ?\nCette action est irréversible.',
+                                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: const Text('Annuler',
+                                              style: TextStyle(fontFamily: 'Poppins')),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.errorColor),
+                                          child: const Text('Supprimer',
+                                              style: TextStyle(fontFamily: 'Poppins',
+                                                  color: Colors.white)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (ok != true) return;
+                                  await provider.deleteProperty(prop.id);
+                                  _loadData();
+                                  messenger.showSnackBar(SnackBar(
+                                    content: const Text('Annonce supprimée définitivement',
+                                        style: TextStyle(fontFamily: 'Poppins')),
+                                    backgroundColor: AppTheme.errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                  ));
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.errorColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.4)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.delete_forever, color: AppTheme.errorColor, size: 15),
+                                      SizedBox(width: 5),
+                                      Text('Supprimer',
+                                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                                              fontWeight: FontWeight.w600, color: AppTheme.errorColor)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

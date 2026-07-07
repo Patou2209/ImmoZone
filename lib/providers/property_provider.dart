@@ -296,6 +296,18 @@ class PropertyProvider extends ChangeNotifier {
     await loadAllProperties();
   }
 
+  /// Suppression douce (admin) — status → 'Supprimé' + deletedAt, restaurable 24 h
+  Future<void> softDeleteProperty(String id, String reason) async {
+    await _dataService.softDeleteProperty(id, reason);
+    await loadAllProperties();
+  }
+
+  /// Restaurer une annonce supprimée → status → 'En attente'
+  Future<void> restoreProperty(String id) async {
+    await _dataService.restoreProperty(id);
+    await loadAllProperties();
+  }
+
   Future<void> updateStatus(String id, String status) async {
     await _dataService.updatePropertyStatus(id, status);
     await loadAllProperties();

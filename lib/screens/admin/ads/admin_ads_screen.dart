@@ -856,12 +856,12 @@ class _AdFormSheetState extends State<_AdFormSheet> {
                       style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 10,
-                          color: AppTheme.)textHint)),
+                          color: AppTheme.textHint)),
                   const SizedBox(height: 20),
                 ],
               ),
       ),
-    );
+    ));
   }
 
   /// Affiche l'aperçu de l'image sélectionnée (base64 ou fichier local)

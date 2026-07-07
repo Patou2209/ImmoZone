@@ -234,11 +234,11 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
               if (val == 'toggle') setState(() { _contacts[index]['hidden'] = !isHidden; });
               if (val == 'edit')   _showContactDialog(index: index);
               if (val == 'delete') _confirmDelete(index, c['label'] ?? 'ce contact');
-)            },
+            },
           ),
         ]),
       ),
-    );
+    ));
   }
 
   void _confirmDelete(int index, String label) {

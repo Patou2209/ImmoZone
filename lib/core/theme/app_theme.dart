@@ -108,7 +108,6 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 1,
-          mouseCursor: SystemMouseCursors.click,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -118,7 +117,7 @@ class AppTheme {
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
-        ),
+        ).copyWith(mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click)),
       ),
 
       // Outlined Button
@@ -126,7 +125,6 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primaryColor,
           side: const BorderSide(color: primaryColor, width: 1.5),
-          mouseCursor: SystemMouseCursors.click,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -136,34 +134,31 @@ class AppTheme {
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
-        ),
+        ).copyWith(mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click)),
       ),
 
       // Text Button
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primaryColor,
-          mouseCursor: SystemMouseCursors.click,
           textStyle: const TextStyle(
             fontFamily: 'Poppins',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
-        ),
+        ).copyWith(mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click)),
       ),
 
       // IconButton — curseur pointeur sur web
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
-          mouseCursor: SystemMouseCursors.click,
-        ),
+        ).copyWith(mouseCursor: const WidgetStatePropertyAll(SystemMouseCursors.click)),
       ),
 
       // Chip — curseur pointeur sur web
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFFEEF2FA),
         selectedColor: primaryColor,
-        mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
         labelStyle: const TextStyle(
           fontFamily: 'Poppins',
           fontSize: 12,

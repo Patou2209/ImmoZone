@@ -61,6 +61,7 @@ class PropertyModel {
   // Période de tarification pour Appartement/Flat en location
   // 'mensuel' (défaut) | 'journalier'
   final String pricePeriod;
+  final DateTime? deletedAt;  // Timestamp de suppression douce (soft-delete)
 
   PropertyModel({
     required this.id,
@@ -121,6 +122,7 @@ class PropertyModel {
     this.commissionPct,
     this.longueurM,
     this.largeurM,
+    this.deletedAt,
   });
 
   bool get isBoostActive => isFeatured && boostEnd != null && boostEnd!.isAfter(DateTime.now());
@@ -158,6 +160,7 @@ class PropertyModel {
     bool? hasBreakfast, double? pricePerDay, int? capacity,
     double? minLeaseDuration, int? garantieMois, bool? hasCommission, double? commissionPct,
     double? longueurM, double? largeurM,
+    DateTime? deletedAt,
   }) => PropertyModel(
     id: id ?? this.id, title: title ?? this.title,
     description: description ?? this.description, type: type ?? this.type,
@@ -201,6 +204,7 @@ class PropertyModel {
     longueurM: longueurM ?? this.longueurM,
     largeurM: largeurM ?? this.largeurM,
     pricePeriod: pricePeriod ?? this.pricePeriod,
+    deletedAt: deletedAt ?? this.deletedAt,
   );
 
   Map<String, dynamic> toMap() => {
@@ -230,6 +234,7 @@ class PropertyModel {
     'hasCommission': hasCommission, 'commissionPct': commissionPct,
     'longueurM': longueurM, 'largeurM': largeurM,
     'pricePeriod': pricePeriod,
+    'deletedAt': deletedAt?.toIso8601String(),
   };
 
   factory PropertyModel.fromMap(Map<String, dynamic> m) => PropertyModel(
@@ -277,6 +282,7 @@ class PropertyModel {
     longueurM: m['longueurM']?.toDouble(),
     largeurM: m['largeurM']?.toDouble(),
     pricePeriod: m['pricePeriod'] ?? 'mensuel',
+    deletedAt: m['deletedAt'] != null ? DateTime.tryParse(m['deletedAt']) : null,
   );
 
   // Prix complet sans abréviation (1000 USD, pas 1K USD)

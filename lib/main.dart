@@ -143,6 +143,7 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
+  bool _navigating = false; // évite double-navigation
 
   @override
   void initState() {
@@ -162,9 +163,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuth() async {
-    // ── Protection deep-link : GoRouter ne devrait JAMAIS instancier
-    // SplashScreen si l'URL est /property/:id (grâce à initialLocation +
-    // redirect). Ce check est une sécurité supplémentaire.
+    // ── Protection deep-link ─────────────────────────────────────────────
     if (_isDeepLink) return;
     if (kIsWeb) {
       final path = Uri.base.path;
@@ -174,16 +173,27 @@ class _SplashScreenState extends State<SplashScreen>
       }
     }
 
-    // ── Vérification auth avec timeout 3 s maximum ────────────────────────
-    // On lance checkAuth() ET un timer de 3 s en parallèle.
-    // On navigue dès que l'un des deux se termine en premier.
-    // Plus aucun délai artificiel — l'écran splash s'affiche max 3 secondes.
     final auth = context.read<AuthProvider>();
+    final propProvider = context.read<PropertyProvider>();
+
+    // ── Lancer auth + prefetch propriétés + timer 4 s en parallèle ───────
+    // Le timer 4 s garantit le splash minimum; on attend aussi que
+    // le prefetch soit lancé pour éviter une page blanche après navigation.
     await Future.any([
-      auth.checkAuth(),
-      Future.delayed(const Duration(seconds: 3)),
+      Future.wait([
+        auth.checkAuth(),
+        propProvider.loadAllProperties(), // prefetch pour éviter page blanche
+      ]),
+      Future.delayed(const Duration(seconds: 4)),
     ]);
-    if (!mounted || _isDeepLink) return;
+
+    if (!mounted || _isDeepLink || _navigating) return;
+    _navigating = true;
+
+    // Petite pause pour s'assurer que le premier frame est rendu avant
+    // de naviguer — élimine l'écran blanc intermédiaire.
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (!mounted) return;
 
     if (auth.isLoggedIn) {
       if (auth.isAnyAdmin) {
@@ -202,8 +212,21 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  /// Taille du logo responsive selon la largeur de l'écran.
+  double _logoWidth(double screenW) {
+    if (screenW < 360) return screenW * 0.72;
+    if (screenW < 480) return screenW * 0.68;
+    if (screenW < 768) return screenW * 0.60;
+    if (screenW < 1024) return screenW * 0.45;
+    if (screenW < 1440) return screenW * 0.35;
+    return screenW * 0.28;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final logoW = _logoWidth(screenW);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -216,19 +239,22 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 Image.asset(
                   'assets/images/immozone_logo.png',
-                  width: 260,
+                  width: logoW,
                   fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.home_work_rounded,
-                          size: 80, color: AppTheme.primaryColor),
+                          size: logoW * 0.35, color: AppTheme.primaryColor),
                       const SizedBox(height: 12),
                       RichText(
-                        text: const TextSpan(
-                          style: TextStyle(fontFamily: 'Poppins',
-                              fontSize: 36, fontWeight: FontWeight.w800),
-                          children: [
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: logoW * 0.13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          children: const [
                             TextSpan(text: 'Immo',
                                 style: TextStyle(color: AppTheme.primaryColor)),
                             TextSpan(text: 'Zone',
@@ -239,27 +265,27 @@ class _SplashScreenState extends State<SplashScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 64),
+                const SizedBox(height: 56),
                 SizedBox(
-                  width: 28,
-                  height: 28,
+                  width: 32,
+                  height: 32,
                   child: CircularProgressIndicator(
                     color: AppTheme.primaryColor,
-                    strokeWidth: 2.5,
+                    strokeWidth: 3,
                     backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.12),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: Text(
                     'La 1ère plateforme de l\'immobilier\nen RD Congo et au Congo Brazzaville',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.textHint,
                       fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w700,
                       height: 1.5,
                       letterSpacing: 0.2,
                     ),

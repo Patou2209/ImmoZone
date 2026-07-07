@@ -2674,13 +2674,13 @@ class _PendingPropertyCard extends StatelessWidget {
                           Text('Rejeter', style: TextStyle(color: Colors.white, fontSize: 10,
                               fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                         ])),
-       )           ))),
+                        ))),
                 ]),
               ]),
             ),
           ),
         ]),
       ),
-    );
+    ));
   }
 }

@@ -431,8 +431,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         _err('La capacité (personnes) est obligatoire pour ce type de bien'); return false;
       }
     }
-    // Chambres & SDB obligatoires pour Maison et Appartement/Flat
-    final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Appartement / flat';
+    // Chambres & SDB obligatoires pour Maison, Villa et Appartement/Flat
+    final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Villa' || _selectedType == 'Appartement / flat';
     if (requiresRooms) {
       if (_bedroomsCtrl.text.trim().isEmpty || int.tryParse(_bedroomsCtrl.text.trim()) == null) {
         _err('Nombre de chambres requis pour ce type de bien'); return false;
@@ -2107,9 +2107,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         // Zone principale photo
         AspectRatio(
           aspectRatio: 16 / 9,
-          child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-            onTap: () async { await _pickMainPhoto(fromCamera: false); },
-            child: Container(
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () async { await _pickMainPhoto(fromCamera: false); },
+              child: Container(
               decoration: BoxDecoration(
                 color: _mainPhoto != null
                     ? Colors.transparent
@@ -2172,14 +2174,15 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                       Text('Cette photo sera la couverture de votre annonce',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                              color: AppTheme.textHint))),
+                              color: AppTheme.textHint)),
                     ]),
+              ),
             ),
           ),
         ),
 
         // Boutons galerie / caméra (photo principale)
-        if (_mainPhoto == null) ...([
+        if (_mainPhoto == null) ...[
           const SizedBox(height: 10),
           Row(children: [
             Expanded(
@@ -2213,7 +2216,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               ),
             ),
           ]),
-        ]),
+        ],
 
         const SizedBox(height: 24),
 

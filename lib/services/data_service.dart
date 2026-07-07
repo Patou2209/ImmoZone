@@ -778,11 +778,90 @@ class DataService {
     await _propertiesCol.doc(id).delete();
   }
 
+  /// Suppression douce : marque status='Supprimé' + deletedAt, ne supprime pas de Firestore.
+  /// La restauration est possible dans les 24 h.
+  Future<void> softDeleteProperty(String id, String reason) async {
+    final now = DateTime.now();
+    // Récupérer l'annonce pour notification
+    try {
+      final snap = await _propertiesCol.doc(id).get();
+      if (snap.exists) {
+        final prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+        if (prop.ownerId.isNotEmpty) {
+          await addNotification(AppNotification(
+            id: 'notif_del_${prop.id}_${now.millisecondsSinceEpoch}',
+            userId: prop.ownerId,
+            type: 'suppression',
+            title: 'Annonce supprimée',
+            body: 'Votre annonce "${prop.title}" a été supprimée.\nMotif : $reason\n⚠️ Cette suppression est définitive et non remboursable.',
+            propertyId: prop.id,
+            propertyTitle: prop.title,
+            createdAt: now,
+          ));
+        }
+      }
+    } catch (_) {}
+    await _propertiesCol.doc(id).update({
+      'status': 'Supprimé',
+      'deletedAt': now.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+    });
+  }
+
+  /// Restaurer une annonce supprimée (dans les 24 h) → remet status='En attente'.
+  Future<void> restoreProperty(String id) async {
+    final now = DateTime.now();
+    // Vérifier que deletedAt < 24 h
+    final snap = await _propertiesCol.doc(id).get();
+    if (!snap.exists) throw Exception('Annonce introuvable');
+    final data = snap.data() as Map<String, dynamic>;
+    final deletedAtStr = data['deletedAt'] as String?;
+    if (deletedAtStr != null) {
+      final deletedAt = DateTime.tryParse(deletedAtStr);
+      if (deletedAt != null && now.difference(deletedAt).inHours >= 24) {
+        throw Exception('Délai de restauration de 24 h dépassé');
+      }
+    }
+    await _propertiesCol.doc(id).update({
+      'status': 'En attente',
+      'deletedAt': null,
+      'updatedAt': now.toIso8601String(),
+    });
+    // Notifier l'annonceur
+    try {
+      final prop = PropertyModel.fromMap(data);
+      if (prop.ownerId.isNotEmpty) {
+        await addNotification(AppNotification(
+          id: 'notif_restore_${prop.id}_${now.millisecondsSinceEpoch}',
+          userId: prop.ownerId,
+          type: 'restauration',
+          title: '🔄 Annonce restaurée',
+          body: 'Votre annonce "${prop.title}" a été restaurée et est à nouveau en cours de révision.',
+          propertyId: prop.id,
+          propertyTitle: prop.title,
+          createdAt: now,
+        ));
+      }
+    } catch (_) {}
+  }
+
   Future<void> updatePropertyStatus(String id, String status) async {
     await _propertiesCol.doc(id).update({
       'status': status,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+    // Notifier l'annonceur si l'annonce vient d'être approuvée
+    if (status == 'Actif') {
+      try {
+        final snap = await _propertiesCol.doc(id).get();
+        if (snap.exists) {
+          final prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+          if (prop.ownerId.isNotEmpty) {
+            await notifyPropertyApproved(prop);
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   /// Renouvelle une annonce expirée : remet le statut à 'En attente' et
@@ -1037,6 +1116,19 @@ class DataService {
     for (final doc in snap.docs) {
       await doc.reference.update({'isRead': true});
     }
+  }
+
+  Future<void> notifyPropertyApproved(PropertyModel prop) async {
+    await addNotification(AppNotification(
+      id: 'notif_approved_${prop.id}_${DateTime.now().millisecondsSinceEpoch}',
+      userId: prop.ownerId,
+      type: 'approbation',
+      title: '✅ Annonce approuvée et en ligne !',
+      body: 'Félicitations ! Votre annonce "${prop.title}" a été approuvée par notre équipe et est maintenant visible en ligne.',
+      propertyId: prop.id,
+      propertyTitle: prop.title,
+      createdAt: DateTime.now(),
+    ));
   }
 
   Future<void> notifyPropertyRejected(PropertyModel prop, String reason) async {

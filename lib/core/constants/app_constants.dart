@@ -64,6 +64,7 @@ class AppConstants {
   // ── Categories par mode ──────────────────────────────────────────────────
   static const List<String> categoriesLocation = [
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Bureau',
     'Propriété commerciale',
@@ -76,6 +77,7 @@ class AppConstants {
 
   static const List<String> categoriesAchat = [
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Bureau',
     'Propriété commerciale',
@@ -89,6 +91,7 @@ class AppConstants {
 
   static const List<String> categoriesPublication = [
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Bureau',
     'Propriété commerciale',
@@ -103,6 +106,7 @@ class AppConstants {
 
   static const List<String> propertyTypes = [
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Bureau',
     'Propriété commerciale',
@@ -123,6 +127,7 @@ class AppConstants {
   // ── Filtres avances par categorie ───────────────────────────────────────
   static const List<String> catWithRooms = [
     'Maison',
+    'Villa',
     'Appartement / flat',
   ];
   static const List<String> catWithBeds = [
@@ -137,6 +142,7 @@ class AppConstants {
   // Superficie OPTIONNELLE pour ces types
   static const List<String> catWithSurfaceOptional = [
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Chambre d\'hôtel',
     'Espace funéraire',
@@ -148,6 +154,7 @@ class AppConstants {
     'Propriété commerciale',
     'Propriété industrielle',
     'Maison',
+    'Villa',
     'Appartement / flat',
     'Chambre d\'hôtel',
     'Espace funéraire',
