@@ -243,12 +243,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   /// Label du champ prix en mode Location selon le type de bien :
   /// • Loyer  → Maison, Appartement, Bureau, Propriété Commerciale, Propriété Industrielle
-  /// • Tarif  → Salle de Fêtes, Chambre d'hôtel, Espace Funéraire, Salle polyvalente
+  /// • Tarif  → Salle de fêtes, Chambre d'hôtel, Espace funéraire, Salle polyvalente
   String get _priceLabelForLocation {
     const tarifTypes = [
-      'Salle de Fêtes',
+      'Salle de fêtes',
       'Chambre d\'hôtel',
-      'Espace Funéraire',
+      'Espace funéraire',
       'Salle polyvalente',
     ];
     return tarifTypes.contains(_selectedType) ? 'Tarif *' : 'Loyer *';

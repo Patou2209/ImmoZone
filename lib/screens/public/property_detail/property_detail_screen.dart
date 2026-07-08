@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
 import '../../../core/utils/web_url_helper.dart';
+import '../annonceur/annonceur_profile_screen.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel property;
@@ -31,6 +32,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   bool _messageExpanded = false;
   String _ownerSince = '';
   bool _ownerSinceLoaded = false; // true une fois la requête terminée
+  // Avatar de l'annonceur — chargé depuis Firestore (peut être null)
+  String? _ownerAvatar;
   // Compteur de vues local — mis à jour après incrément Firestore
   late int _views;
 
@@ -42,6 +45,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     _checkFavorite();
     _loadOfficialMessage();
     _loadOwnerSince();
+    _loadOwnerAvatar();
     _incrementAndRefreshViews();
     // ── Synchroniser l'URL du navigateur web ──────────────────────────────
     WebUrlHelper.setPropertyUrl(widget.property.id);
@@ -167,6 +171,108 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       case 'Loue': return AppTheme.statusRented;
       default: return Colors.grey;
     }
+  }
+
+  // ── Charge l'avatar de l'annonceur depuis Firestore ──────────────────────
+  Future<void> _loadOwnerAvatar() async {
+    final ownerId = widget.property.ownerId;
+    if (ownerId.isEmpty) return;
+    try {
+      final user = await _ds.getUserById(ownerId);
+      if (mounted && user?.avatar != null && user!.avatar!.isNotEmpty) {
+        setState(() => _ownerAvatar = user.avatar);
+      }
+    } catch (_) {}
+  }
+
+  // ── Widget avatar de l'annonceur (photo ou initiale) ─────────────────────
+  Widget _buildOwnerAvatar(dynamic p) {
+    final avatarData = _ownerAvatar;
+    Widget inner;
+    if (avatarData != null && avatarData.isNotEmpty) {
+      try {
+        final b64 = avatarData.contains(',')
+            ? avatarData.split(',').last : avatarData;
+        final bytes = base64Decode(b64);
+        inner = Image.memory(bytes, width: 52, height: 52,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _ownerInitialWidget(p));
+      } catch (_) {
+        inner = _ownerInitialWidget(p);
+      }
+    } else {
+      inner = _ownerInitialWidget(p);
+    }
+    return Container(
+      width: 52, height: 52,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
+      ),
+      child: ClipOval(child: inner),
+    );
+  }
+
+  Widget _ownerInitialWidget(dynamic p) {
+    return Center(child: Text(
+      (p.ownerName as String).isNotEmpty
+          ? (p.ownerName as String)[0].toUpperCase() : '?',
+      style: const TextStyle(fontWeight: FontWeight.w800,
+          color: AppTheme.accentColor, fontFamily: 'Poppins', fontSize: 20),
+    ));
+  }
+
+  // ── Plein écran avatar annonceur (si photo disponible) ───────────────────
+  void _showOwnerAvatarFullscreen(dynamic p) {
+    final avatarData = _ownerAvatar;
+    if (avatarData == null || avatarData.isEmpty) {
+      // Pas de photo → ouvrir directement le profil annonceur
+      Navigator.push(context, MaterialPageRoute(builder: (_) =>
+          AnnonceurProfileScreen(
+              ownerId: p.ownerId as String,
+              ownerName: p.ownerName as String)));
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(children: [
+          InteractiveViewer(
+            child: Center(child: Builder(builder: (ctx) {
+              try {
+                final b64 = avatarData.contains(',')
+                    ? avatarData.split(',').last : avatarData;
+                final bytes = base64Decode(b64);
+                return Image.memory(bytes, fit: BoxFit.contain,
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height);
+              } catch (_) {
+                return const Icon(Icons.broken_image,
+                    color: Colors.white, size: 64);
+              }
+            })),
+          ),
+          Positioned(
+            top: 40, right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54, shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white30),
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   void _copyToClipboard(String text, String label) {
@@ -906,39 +1012,39 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         color: AppTheme.textPrimary)),
                 const SizedBox(height: 14),
                 Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  // ── Avatar initiale ──────────────────────────────────────
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: AppTheme.accentColor.withValues(alpha: 0.4), width: 1.5),
-                    ),
-                    child: Center(
-                      child: Text(
-                        p.ownerName.isNotEmpty ? p.ownerName[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.accentColor,
-                            fontFamily: 'Poppins',
-                            fontSize: 20),
-                      ),
+                  // ── Avatar cliquable (plein écran) ─────────────────────
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => _showOwnerAvatarFullscreen(p),
+                      child: _buildOwnerAvatar(p),
                     ),
                   ),
                   const SizedBox(width: 14),
 
-                  // ── Nom + Téléphone + Badge catégorie (Expanded) ──────────
+                  // ── Nom (cliquable → profil annonceur) + Tél + Badge ────
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(p.ownerName,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Poppins',
-                              color: AppTheme.textPrimary),
-                          overflow: TextOverflow.ellipsis),
+                      MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) =>
+                                  AnnonceurProfileScreen(
+                                    ownerId:   p.ownerId,
+                                    ownerName: p.ownerName,
+                                  ))),
+                          child: Text(p.ownerName,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Poppins',
+                                  color: AppTheme.primaryColor,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: AppTheme.primaryColor),
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ),
                       const SizedBox(height: 3),
                       if (p.ownerPhone.isNotEmpty)
                         MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(

@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,6 +19,7 @@ import '../../../core/widgets/ad_banner_card.dart';
 import '../../../models/ad_model.dart';
 import '../../../services/data_service.dart';
 import '../../../models/property_model.dart';
+import '../../../models/user_model.dart';
 import '../../../models/app_notification_model.dart';
 import '../property_detail/property_detail_screen.dart';
 import '../favorites/favorites_screen.dart';
@@ -873,13 +879,15 @@ class _HomeTabState extends State<_HomeTab>
           !_normalize(p.commune).contains(_normalize(_commune!))) return false;
 
       // Recherche texte multi-mots : chaque mot doit trouver une correspondance
-      // dans au moins un champ — "Location maison Lemba" → 3 mots indépendants
+      // dans au moins un champ — "Location maison Lemba" / "NGANDU BENA" → OR logique
       if (isTextSearch) {
         final keywords = _searchQuery.toLowerCase().trim().split(RegExp(r'\s+'));
         final searchable = [
           p.title, p.city, p.province, p.type,
           p.description, p.commune, p.country ?? '',
           p.transactionType, p.id,
+          // ← recherche par nom d'annonceur
+          p.ownerName, p.ownerPhone,
         ].map((s) => s.toLowerCase()).join(' ');
         // Au moins un mot-clé doit matcher (OR logique)
         final anyMatch = keywords.any((kw) => kw.isNotEmpty && searchable.contains(kw));
@@ -1324,7 +1332,7 @@ class _HomeTabState extends State<_HomeTab>
               style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                   color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                hintText: 'Recherche par mots-clés (ex: maison Lemba, Ref: Iz2209, 2 chambres...)',
+                hintText: 'Recherche par mots-clés, type, ville, annonceur...',
                 hintStyle: TextStyle(fontFamily: 'Poppins',
                     fontSize: 12, color: AppTheme.textHint),
                 prefixIcon: Icon(Icons.search_rounded,
@@ -2522,26 +2530,239 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
   bool _loading = true;
   int _availableCredits = 0;
 
+  // ── Photo de profil ──────────────────────────────────────────────────────
+  bool _uploadingPhoto = false;
+
+  // ── Message d'accueil ────────────────────────────────────────────────────
+  final TextEditingController _descCtrl = TextEditingController();
+  bool _editingDesc    = false;
+  bool _savingDesc     = false;
+  static const int _maxDescChars = 1000;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     final userId = _ds.currentUserId;
-    // Charger les credits disponibles
     final credits = await _ds.getUserAvailableCredits(userId);
     final all = await _ds.getUserProperties(userId);
-    // Verifier et supprimer auto les annonces vendues de plus de 72h
     await _checkAutoDelete(all);
     final updated = await _ds.getUserProperties(userId);
     if (mounted) setState(() {
       _availableCredits = credits;
       _myProperties = updated;
       _loading = false;
+      // Pré-remplir le champ description avec la valeur Firestore
+      final user = context.read<AuthProvider>().currentUser;
+      _descCtrl.text = user?.description ?? '';
     });
+  }
+
+  // ── Avatar : photo ou initiales ──────────────────────────────────────────
+  Widget _buildDashboardAvatar(UserModel? user, AuthProvider auth) {
+    return Stack(alignment: Alignment.bottomRight, children: [
+      MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: user?.avatar != null && user!.avatar!.isNotEmpty
+              ? () => _showFullscreenAvatar(user)
+              : null,
+          child: Container(
+            width: 60, height: 60,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFA726).withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFFFA726), width: 2),
+            ),
+            child: ClipOval(child: _buildAvatarContent(user)),
+          ),
+        ),
+      ),
+      Positioned(
+        bottom: 0, right: 0,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _uploadingPhoto ? null : () => _pickAndUploadPhoto(auth),
+            child: Container(
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: _uploadingPhoto
+                  ? const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.5, color: Colors.white))
+                  : const Icon(Icons.camera_alt_rounded,
+                      color: Colors.white, size: 12),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildAvatarContent(UserModel? user) {
+    final avatarData = user?.avatar;
+    if (avatarData != null && avatarData.isNotEmpty) {
+      try {
+        final base64Str = avatarData.contains(',')
+            ? avatarData.split(',').last
+            : avatarData;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(bytes, width: 60, height: 60,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _initialsWidget(user));
+      } catch (_) {
+        return _initialsWidget(user);
+      }
+    }
+    return _initialsWidget(user);
+  }
+
+  Widget _initialsWidget(UserModel? user) {
+    return Center(child: Text(
+      user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+      style: const TextStyle(fontFamily: 'Poppins',
+          fontWeight: FontWeight.w800, fontSize: 20,
+          color: Color(0xFFFFA726)),
+    ));
+  }
+
+  void _showFullscreenAvatar(UserModel user) {
+    final avatarData = user.avatar;
+    if (avatarData == null || avatarData.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(children: [
+          InteractiveViewer(
+            child: Center(child: Builder(builder: (ctx) {
+              try {
+                final base64Str = avatarData.contains(',')
+                    ? avatarData.split(',').last : avatarData;
+                final bytes = base64Decode(base64Str);
+                return Image.memory(bytes, fit: BoxFit.contain,
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height);
+              } catch (_) {
+                return const Icon(Icons.broken_image,
+                    color: Colors.white, size: 64);
+              }
+            })),
+          ),
+          Positioned(
+            top: 40, right: 16,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54, shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white30),
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 22),
+                ),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadPhoto(AuthProvider auth) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    final picker = ImagePicker();
+    try {
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50, maxWidth: 512, maxHeight: 512,
+      );
+      if (picked == null) return;
+      setState(() => _uploadingPhoto = true);
+      final Uint8List bytes = kIsWeb
+          ? await picked.readAsBytes()
+          : await File(picked.path).readAsBytes();
+      final ext = picked.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+      final dataUrl = 'data:image/$ext;base64,${base64Encode(bytes)}';
+      final updatedUser = user.copyWith(avatar: dataUrl);
+      await _ds.updateUser(updatedUser);
+      auth.updateCurrentUserLocally(updatedUser);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Photo mise à jour !',
+              style: TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur : $e',
+              style: const TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  Future<void> _saveDescription(AuthProvider auth) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    final text = _descCtrl.text.trim();
+    setState(() => _savingDesc = true);
+    try {
+      final updatedUser = user.copyWith(description: text);
+      await _ds.updateUser(updatedUser);
+      auth.updateCurrentUserLocally(updatedUser);
+      if (mounted) setState(() => _editingDesc = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Message d\'accueil enregistré !',
+              style: TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur : $e',
+              style: const TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _savingDesc = false);
+    }
   }
 
   Future<void> _checkAutoDelete(List<PropertyModel> props) async {
@@ -2720,22 +2941,8 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                       border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
-                      Container(
-                        width: 54, height: 54,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFA726).withValues(alpha: 0.25),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFFFA726), width: 2),
-                        ),
-                        child: Center(
-                          child: Text(
-                            user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
-                            style: const TextStyle(fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w800, fontSize: 20,
-                                color: Color(0xFFFFA726)),
-                          ),
-                        ),
-                      ),
+                      // ── Avatar avec bouton caméra ──────────────────────────────
+                      _buildDashboardAvatar(user, auth),
                       const SizedBox(width: 14),
                       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         // Nom + badge solde sur la meme ligne
@@ -2799,7 +3006,162 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                       ])),
                     ]),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+
+                  // ── Message d'accueil ────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.dividerColor),
+                      boxShadow: [BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 15, color: AppTheme.primaryColor),
+                        const SizedBox(width: 6),
+                        const Expanded(
+                          child: Text('Message d\'accueil',
+                              style: TextStyle(fontFamily: 'Poppins',
+                                  fontSize: 13, fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimary)),
+                        ),
+                        if (!_editingDesc)
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: () => setState(() => _editingDesc = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                                ),
+                                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.edit_rounded,
+                                      size: 12, color: AppTheme.primaryColor),
+                                  SizedBox(width: 4),
+                                  Text('Modifier', style: TextStyle(fontFamily: 'Poppins',
+                                      fontSize: 11, fontWeight: FontWeight.w600,
+                                      color: AppTheme.primaryColor)),
+                                ]),
+                              ),
+                            ),
+                          ),
+                      ]),
+                      const SizedBox(height: 10),
+
+                      if (_editingDesc) ...[
+                        TextField(
+                          controller: _descCtrl,
+                          maxLines: 4,
+                          maxLength: _maxDescChars,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 13, color: AppTheme.textPrimary),
+                          decoration: InputDecoration(
+                            hintText:
+                                'Présentez-vous ou décrivez votre activité...',
+                            hintStyle: const TextStyle(fontFamily: 'Poppins',
+                                fontSize: 13, color: AppTheme.textHint),
+                            filled: true,
+                            fillColor: AppTheme.backgroundColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                  color: AppTheme.dividerColor),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                  color: AppTheme.primaryColor, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _savingDesc ? null : () {
+                                final user = auth.currentUser;
+                                _descCtrl.text = user?.description ?? '';
+                                setState(() => _editingDesc = false);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Annuler',
+                                  style: TextStyle(fontFamily: 'Poppins',
+                                      fontSize: 12, color: AppTheme.textSecondary)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _savingDesc
+                                  ? null
+                                  : () => _saveDescription(auth),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: _savingDesc
+                                  ? const SizedBox(width: 16, height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
+                                  : const Text('Enregistrer',
+                                      style: TextStyle(fontFamily: 'Poppins',
+                                          fontSize: 12, fontWeight: FontWeight.w700,
+                                          color: Colors.white)),
+                            ),
+                          ),
+                        ]),
+                      ] else ...[
+                        // Affichage du message enregistré
+                        Builder(builder: (ctx) {
+                          final desc = auth.currentUser?.description ?? '';
+                          if (desc.isEmpty) {
+                            return GestureDetector(
+                              onTap: () => setState(() => _editingDesc = true),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.backgroundColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: AppTheme.dividerColor,
+                                      style: BorderStyle.solid),
+                                ),
+                                child: const Text(
+                                  'Appuyez sur Modifier pour ajouter un message d\'accueil...',
+                                  style: TextStyle(fontFamily: 'Poppins',
+                                      fontSize: 12, color: AppTheme.textHint,
+                                      fontStyle: FontStyle.italic),
+                                ),
+                              ),
+                            );
+                          }
+                          return Text(desc,
+                              style: const TextStyle(fontFamily: 'Poppins',
+                                  fontSize: 13, color: AppTheme.textSecondary,
+                                  height: 1.5));
+                        }),
+                      ],
+                    ]),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Statistiques rapides
                   Row(children: [
