@@ -722,6 +722,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                       ],
                       if (p.hasCommission &&
+                          p.commissionPct != null &&
+                          p.commissionPct! > 0 &&
                           p.type != 'Chambre d\'hôtel' &&
                           p.type != 'Salle de Fêtes' &&
                           p.type != 'Espace Funéraire' &&

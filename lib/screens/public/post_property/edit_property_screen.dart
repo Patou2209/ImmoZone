@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
@@ -22,9 +23,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   bool _saving = false;
 
   // ── Photos ────────────────────────────────────────────────────────────────
-  // null = utiliser les images existantes de la propriété (p.images)
+  // Limite : 1 principale + 9 secondaires = 10 max (même que la création)
+  static const int _maxSecondaryPhotos = 9;
   XFile? _newMainPhoto;                       // nouvelle photo principale (remplace [0])
-  final List<XFile> _newSecondaryPhotos = []; // nouvelles photos secondaires (remplacent [1..3])
+  final List<XFile> _newSecondaryPhotos = []; // nouvelles photos secondaires (max 9)
+  // Bytes web — XFile.path = blob URL invalide hors picker
+  Uint8List? _webMainBytes;
+  final List<Uint8List> _webSecondaryBytes = [];
   bool _photosChanged = false;                // true = re-encoder à la sauvegarde
   final _picker = ImagePicker();
 
@@ -104,30 +109,60 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   // ── Photo helpers ─────────────────────────────────────────────────────────
   Future<void> _pickMainPhoto() async {
     final picked = await _picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 50);
+        source: ImageSource.gallery, imageQuality: 50,
+        maxWidth: 1024, maxHeight: 1024);
     if (picked != null) {
-      setState(() {
-        _newMainPhoto = picked;
-        _photosChanged = true;
-      });
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          _newMainPhoto = picked;
+          _webMainBytes = bytes;
+          _photosChanged = true;
+        });
+      } else {
+        setState(() {
+          _newMainPhoto = picked;
+          _photosChanged = true;
+        });
+      }
     }
   }
 
   Future<void> _pickSecondaryPhoto() async {
-    if (_newSecondaryPhotos.length >= 3) return;
+    // Calculer le total de secondaires (nouvelles + existantes conservées)
+    final existingCount = widget.property.images.length > 1
+        ? widget.property.images.length - 1
+        : 0;
+    final totalSecondary = _newSecondaryPhotos.isEmpty
+        ? existingCount
+        : _newSecondaryPhotos.length;
+    if (totalSecondary >= _maxSecondaryPhotos) return;
     final picked = await _picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 50);
+        source: ImageSource.gallery, imageQuality: 50,
+        maxWidth: 1024, maxHeight: 1024);
     if (picked != null) {
-      setState(() {
-        _newSecondaryPhotos.add(picked);
-        _photosChanged = true;
-      });
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        setState(() {
+          _newSecondaryPhotos.add(picked);
+          _webSecondaryBytes.add(bytes);
+          _photosChanged = true;
+        });
+      } else {
+        setState(() {
+          _newSecondaryPhotos.add(picked);
+          _photosChanged = true;
+        });
+      }
     }
   }
 
   void _removeSecondaryPhoto(int index) {
     setState(() {
       _newSecondaryPhotos.removeAt(index);
+      if (kIsWeb && index < _webSecondaryBytes.length) {
+        _webSecondaryBytes.removeAt(index);
+      }
       _photosChanged = true;
     });
   }
@@ -151,27 +186,56 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
       // ── Encoder les nouvelles photos si modifiées ─────────────────────────
       List<String> finalImages = p.images; // conserver les anciennes par défaut
-      if (_photosChanged && !kIsWeb) {
+      if (_photosChanged) {
         final newImages = <String>[];
         int totalBytes = 0;
         const int maxDocBytes = 900000;
-        final allNew = [
-          if (_newMainPhoto != null) _newMainPhoto!,
-          ..._newSecondaryPhotos,
-        ];
-        if (allNew.isNotEmpty) {
-          for (final xfile in allNew) {
+
+        if (kIsWeb) {
+          // ── Web : utiliser les bytes lus lors de la sélection ───────────
+          final allWebBytes = <Uint8List>[
+            if (_webMainBytes != null) _webMainBytes!,
+            ..._webSecondaryBytes,
+          ];
+          final allXFiles = <XFile>[
+            if (_newMainPhoto != null) _newMainPhoto!,
+            ..._newSecondaryPhotos,
+          ];
+          for (int i = 0; i < allWebBytes.length; i++) {
             if (totalBytes >= maxDocBytes) break;
-            try {
-              final bytes = await File(xfile.path).readAsBytes();
-              if (totalBytes + bytes.length > maxDocBytes) break;
-              final b64 = base64Encode(bytes);
-              final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
-              newImages.add('data:image/$ext;base64,$b64');
-              totalBytes += bytes.length;
-            } catch (_) {}
+            final bytes = allWebBytes[i];
+            if (totalBytes + bytes.length > maxDocBytes) break;
+            final xfile = i < allXFiles.length ? allXFiles[i] : null;
+            final ext = (xfile?.name.toLowerCase().endsWith('.png') ?? false) ? 'png' : 'jpeg';
+            newImages.add('data:image/$ext;base64,${base64Encode(bytes)}');
+            totalBytes += bytes.length;
           }
-          finalImages = newImages;
+          // Si aucune nouvelle photo web sélectionnée, garder les anciennes
+          if (newImages.isEmpty) {
+            finalImages = p.images;
+          } else {
+            finalImages = newImages;
+          }
+        } else {
+          // ── Mobile/Desktop : lire depuis le chemin fichier ─────────────
+          final allNew = [
+            if (_newMainPhoto != null) _newMainPhoto!,
+            ..._newSecondaryPhotos,
+          ];
+          if (allNew.isNotEmpty) {
+            for (final xfile in allNew) {
+              if (totalBytes >= maxDocBytes) break;
+              try {
+                final bytes = await File(xfile.path).readAsBytes();
+                if (totalBytes + bytes.length > maxDocBytes) break;
+                final b64 = base64Encode(bytes);
+                final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+                newImages.add('data:image/$ext;base64,$b64');
+                totalBytes += bytes.length;
+              } catch (_) {}
+            }
+            if (newImages.isNotEmpty) finalImages = newImages;
+          }
         }
       }
       // Build updated model — use PropertyModel constructor directly to allow
@@ -262,10 +326,12 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     // Photo principale : nouvelle si choisie, sinon première image existante
     Widget mainPhotoWidget;
     if (_newMainPhoto != null) {
-      mainPhotoWidget = kIsWeb
-          ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
-              child: const Icon(Icons.image_rounded, size: 40, color: AppTheme.accentColor))
-          : Image.file(File(_newMainPhoto!.path), fit: BoxFit.cover);
+      mainPhotoWidget = kIsWeb && _webMainBytes != null
+          ? Image.memory(_webMainBytes!, fit: BoxFit.cover)
+          : kIsWeb
+              ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  child: const Icon(Icons.image_rounded, size: 40, color: AppTheme.accentColor))
+              : Image.file(File(_newMainPhoto!.path), fit: BoxFit.cover);
     } else if (existingImages.isNotEmpty) {
       final src = existingImages[0];
       if (src.startsWith('data:image')) {
@@ -294,7 +360,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
           Icon(Icons.info_outline, size: 14, color: AppTheme.accentColor),
           SizedBox(width: 8),
           Expanded(child: Text(
-            'Appuyez sur une photo pour la remplacer. Max 4 photos (1 principale + 3 secondaires).',
+            'Appuyez sur une photo pour la remplacer. Max 10 photos (1 principale + 9 secondaires).',
             style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
                 color: AppTheme.accentColor),
           )),
@@ -368,7 +434,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               // Existing secondary photos (if no new ones chosen)
               if (_newSecondaryPhotos.isEmpty && existingImages.length > 1)
                 ...List.generate(
-                  (existingImages.length - 1).clamp(0, 3),
+                  (existingImages.length - 1).clamp(0, _maxSecondaryPhotos),
                   (i) {
                     final src = existingImages[i + 1];
                     Widget img;
@@ -409,11 +475,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                           color: AppTheme.accentColor.withValues(alpha: 0.6)),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: kIsWeb
-                        ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                            child: const Icon(Icons.image_rounded,
-                                color: AppTheme.accentColor))
-                        : Image.file(File(xfile.path), fit: BoxFit.cover),
+                    child: kIsWeb && i < _webSecondaryBytes.length
+                        ? Image.memory(_webSecondaryBytes[i], fit: BoxFit.cover)
+                        : kIsWeb
+                            ? Container(color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                                child: const Icon(Icons.image_rounded,
+                                    color: AppTheme.accentColor))
+                            : Image.file(File(xfile.path), fit: BoxFit.cover),
                   ),
                   Positioned(
                     top: 2, right: 2,
@@ -434,8 +502,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
               }),
 
               // Add button (if < 3 secondary)
-              if (_newSecondaryPhotos.length < 3 ||
-                  (_newSecondaryPhotos.isEmpty && existingImages.length < 4))
+              if (_newSecondaryPhotos.length < _maxSecondaryPhotos ||
+                  (_newSecondaryPhotos.isEmpty && existingImages.length < (_maxSecondaryPhotos + 1)))
                 MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                   onTap: _pickSecondaryPhoto,
                   child: Container(

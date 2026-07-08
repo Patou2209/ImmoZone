@@ -9,6 +9,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import 'register_screen.dart';
 import 'otp_reset_password_screen.dart';
+import '../admin/admin_home_screen.dart';
+import '../public/home/public_home_screen.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -66,10 +68,20 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok) {
       // Tous les rôles admin (admin, admin_financier, admin_service_client)
       // sont redirigés vers /admin — AdminHomeScreen affiche l'écran approprié
+      //
+      // NOTE: context.go() échoue sur Web quand LoginScreen est ouvert via
+      // Navigator.push (modal). On utilise pushAndRemoveUntil pour garantir
+      // la navigation dans tous les contextes (web + mobile).
       if (auth.isAnyAdmin) {
-        context.go('/admin');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+          (_) => false,
+        );
       } else {
-        context.go('/public');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+          (_) => false,
+        );
       }
     } else {
       _showError(auth.error ?? 'Numéro ou mot de passe incorrect.');
