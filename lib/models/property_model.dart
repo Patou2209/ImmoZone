@@ -30,6 +30,7 @@ class PropertyModel {
   final String ownerEmail;
   final String ownerWhatsApp; // numéro WhatsApp du vendeur
   final String ownerCategory; // 'Agence Immobilière' | 'Commissionnaire' | 'Propriétaire'
+  final String? ownerAvatar;  // base64 data URL (chargé en contexte, stocké dans User)
   final String status; // Brouillon | Publié | Actif | Expiré | Suspendu | Supprimé | Vendu | En location
   final bool isSold;         // marqué vendu par le vendeur
   final bool isRented;       // marqué loué par le vendeur
@@ -96,6 +97,7 @@ class PropertyModel {
     required this.ownerEmail,
     this.ownerWhatsApp = '',
     this.ownerCategory = '',
+    this.ownerAvatar,
     this.status = 'Actif',
     this.isSold = false,
     this.isRented = false,
@@ -151,7 +153,8 @@ class PropertyModel {
     bool? hasAscenseur, bool? hasCuisineEquipee,
     List<String>? amenities, List<String>? images, int? mainImageIndex,
     String? ownerId, String? ownerName, String? ownerPhone,
-    String? ownerEmail, String? ownerWhatsApp, String? ownerCategory, String? status,
+    String? ownerEmail, String? ownerWhatsApp, String? ownerCategory,
+    String? ownerAvatar, String? status,
     bool? isSold, bool? isRented,
     DateTime? createdAt, DateTime? updatedAt, DateTime? expiresAt,
     int? views, bool? isFeatured, DateTime? boostEnd, String? boostType, int? boostLevel,
@@ -181,6 +184,7 @@ class PropertyModel {
     ownerPhone: ownerPhone ?? this.ownerPhone, ownerEmail: ownerEmail ?? this.ownerEmail,
     ownerWhatsApp: ownerWhatsApp ?? this.ownerWhatsApp,
     ownerCategory: ownerCategory ?? this.ownerCategory,
+    ownerAvatar: ownerAvatar ?? this.ownerAvatar,
     status: status ?? this.status, isSold: isSold ?? this.isSold,
     isRented: isRented ?? this.isRented,
     createdAt: createdAt ?? this.createdAt, updatedAt: updatedAt ?? this.updatedAt,
@@ -219,6 +223,7 @@ class PropertyModel {
     'ownerId': ownerId, 'ownerName': ownerName, 'ownerPhone': ownerPhone,
     'ownerEmail': ownerEmail, 'ownerWhatsApp': ownerWhatsApp,
     'ownerCategory': ownerCategory,
+    'ownerAvatar': ownerAvatar,
     'status': status, 'isSold': isSold, 'isRented': isRented,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
@@ -258,6 +263,7 @@ class PropertyModel {
     ownerPhone: m['ownerPhone'] ?? '', ownerEmail: m['ownerEmail'] ?? '',
     ownerWhatsApp: m['ownerWhatsApp'] ?? '',
     ownerCategory: m['ownerCategory'] ?? '',
+    ownerAvatar: m['ownerAvatar'],
     status: m['status'] ?? 'Actif',
     isSold: m['isSold'] ?? false, isRented: m['isRented'] ?? false,
     createdAt: DateTime.tryParse(m['createdAt'] ?? '') ?? DateTime.now(),

@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../models/property_model.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../models/user_model.dart';
 import '../../../services/data_service.dart';
 import '../property_detail/property_detail_screen.dart';
@@ -106,6 +108,13 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
     return Center(child: Text(initials, style: TextStyle(
         fontSize: radius * 0.7, fontWeight: FontWeight.w800,
         color: AppTheme.primaryColor, fontFamily: 'Poppins')));
+  }
+
+  Future<void> _shareProperty(PropertyModel p) async {
+    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
+    final text = '${p.title} — Réf. $ref\n$link';
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   void _showFullscreen(String avatarData) {
@@ -310,6 +319,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: PropertyCard(
                         property: p,
+                        onShare: () => _shareProperty(p),
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(
                                 builder: (_) => PropertyDetailScreen(

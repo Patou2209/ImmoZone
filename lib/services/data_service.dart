@@ -585,6 +585,41 @@ class DataService {
     }
   }
 
+  // ── Cache avatar en mémoire (évite les N+1 queries) ─────────────────────
+  final Map<String, String?> _avatarCache = {};
+
+  /// Enrichit une liste de PropertyModel avec l'avatar de chaque annonceur.
+  /// Utilise un cache en mémoire pour éviter les requêtes Firestore répétées.
+  /// Groupement par ownerId → 1 requête par annonceur unique.
+  Future<List<PropertyModel>> enrichWithAvatars(List<PropertyModel> props) async {
+    // Collecter les ownerIds uniques qui ne sont pas encore dans le cache
+    final missingIds = props
+        .map((p) => p.ownerId)
+        .toSet()
+        .where((id) => id.isNotEmpty && !_avatarCache.containsKey(id))
+        .toList();
+
+    // Charger les avatars manquants
+    await Future.wait(missingIds.map((id) async {
+      try {
+        final snap = await _usersCol.doc(id).get();
+        if (snap.exists) {
+          final data = snap.data() as Map<String, dynamic>?;
+          _avatarCache[id] = data?['avatar'] as String?;
+        } else {
+          _avatarCache[id] = null;
+        }
+      } catch (_) {
+        _avatarCache[id] = null;
+      }
+    }));
+
+    // Injecter les avatars dans les PropertyModel
+    return props.map((p) => p.ownerId.isNotEmpty
+        ? p.copyWith(ownerAvatar: _avatarCache[p.ownerId])
+        : p).toList();
+  }
+
   Future<UserModel?> getUserById(String id) async {
     if (id.isEmpty) return null;
     try {
@@ -708,7 +743,9 @@ class DataService {
         return now.difference(p.updatedAt!).inHours < AppConstants.soldAutoDeleteHours;
       }).toList();
 
-      return [...boosted, ...normal, ...soldOccupied];
+      final merged = [...boosted, ...normal, ...soldOccupied];
+      // Enrichir avec les avatars annonceurs (cache groupé, 1 requête/annonceur unique)
+      return enrichWithAvatars(merged);
     } catch (_) {
       return [];
     }

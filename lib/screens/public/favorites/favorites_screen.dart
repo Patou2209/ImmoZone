@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../models/property_model.dart';
 import '../../../services/data_service.dart';
+import '../../../core/constants/app_constants.dart';
 import '../property_detail/property_detail_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -38,6 +40,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _toggleFavorite(String id) async {
     await _ds.toggleFavorite(id);
     await _load();
+  }
+
+  Future<void> _shareProperty(PropertyModel p) async {
+    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
+    final text = '${p.title} — Réf. $ref\n$link';
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   @override
@@ -124,6 +133,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           property: p,
                           isFavorite: true,
                           onFavorite: () => _toggleFavorite(p.id),
+                          onShare: () => _shareProperty(p),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(

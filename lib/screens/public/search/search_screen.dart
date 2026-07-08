@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../providers/property_provider.dart';
@@ -113,6 +114,13 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _toggleFavorite(String id) async {
     await _dataService.toggleFavorite(id);
     await _loadFavorites();
+  }
+
+  Future<void> _shareProperty(PropertyModel p) async {
+    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
+    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
+    final text = '${p.title} — Réf. $ref\n$link';
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   void _applyFilters() {
@@ -753,6 +761,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     property: p,
                     isFavorite: _favorites.contains(p.id),
                     onFavorite: () => _toggleFavorite(p.id),
+                    onShare: () => _shareProperty(p),
                     onTap: () => Navigator.push(ctx,
                         MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
                   );
@@ -855,6 +864,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 property: p,
                 isFavorite: _favorites.contains(p.id),
                 onFavorite: () => _toggleFavorite(p.id),
+                onShare: () => _shareProperty(p),
                 onTap: () => Navigator.push(gridCtx,
                     MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p))),
               );
