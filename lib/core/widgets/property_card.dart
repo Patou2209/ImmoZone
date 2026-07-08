@@ -64,10 +64,9 @@ class PropertyCard extends StatelessWidget {
   static const double _cardRadius  = 18;
 
   // ── Avatar annonceur : photo base64 ou initiale ──────────────────────────
-  Widget _buildOwnerAvatar() {
-    // Taille relative à l'image de la card (~15% de la hauteur image)
-    const double size = 40;
-    final avatarData = property.ownerAvatar; // peut être null si pas encore dans le modèle
+  // [size] est déterminé dans build() via MediaQuery : 60px si ≤768px, 80px sinon.
+  Widget _buildOwnerAvatar(double size) {
+    final avatarData = property.ownerAvatar;
     Widget inner;
 
     if (avatarData != null && avatarData.isNotEmpty) {
@@ -125,6 +124,10 @@ class PropertyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Taille avatar : 60px sur mobile/tablette (≤768px), 80px sur desktop/large
+    final screenWidth = MediaQuery.of(context).size.width;
+    final double avatarSize = screenWidth <= 768 ? 60.0 : 80.0;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -190,7 +193,7 @@ class PropertyCard extends StatelessWidget {
                     Positioned(
                       top: 0,
                       right: 0,
-                      child: _buildOwnerAvatar(),
+                      child: _buildOwnerAvatar(avatarSize),
                     ),
 
                     // ── Status badge (admin, top-right décalé) ───────────
