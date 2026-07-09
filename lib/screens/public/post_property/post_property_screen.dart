@@ -588,13 +588,22 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   /// Commission : toujours Oui / 100% pour la location
   /// ⚠️ Doit être appelé DANS un bloc setState() existant.
   void _applyGarantieDefaults() {
-    if (_selectedTransaction == 'Location') {
+    // Pas de garantie ni commission pour types à tarification courte durée
+    const noGarantieTypes = [
+      'Chambre d\'hôtel', 'Salle de fêtes', 'Salle polyvalente', 'Espace funéraire',
+    ];
+    if (_selectedTransaction == 'Location' && !noGarantieTypes.contains(_selectedType)) {
       final isResidentiel = _selectedType == 'Maison' ||
           _selectedType == 'Villa' ||
           _selectedType == 'Appartement / flat';
       _garantieMois = isResidentiel ? 3 : 6;
       _hasCommission = true;
       _commissionPctCtrl.text = '100';
+    } else {
+      // Réinitialiser si type change vers une catégorie sans garantie
+      _garantieMois = 0;
+      _hasCommission = false;
+      _commissionPctCtrl.text = '';
     }
   }
 
@@ -744,8 +753,37 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      _err('Erreur lors de la soumission : $e');
+      final msg = _friendlyError(e.toString());
+      _err(msg);
     }
+  }
+
+  /// Traduit les erreurs techniques en messages lisibles pour l'utilisateur.
+  String _friendlyError(String raw) {
+    // Firestore document trop volumineux (photos trop grandes)
+    if (raw.contains('invalid-argument') && raw.contains('maximum allowed size')) {
+      // Extraire la taille réelle si possible
+      final match = RegExp(r'its size \((\d+) bytes\)').firstMatch(raw);
+      String actualSize = '';
+      if (match != null) {
+        final bytes = int.tryParse(match.group(1) ?? '0') ?? 0;
+        final mb = (bytes / 1024 / 1024).toStringAsFixed(1);
+        actualSize = ' (taille actuelle : ~$mb MB)';
+      }
+      return 'Les photos sélectionnées sont trop volumineuses$actualSize.\n\n'
+          'Veuillez choisir des images de moins de 1 MB chacune, '
+          'ou réduire leur qualité/résolution avant de les ajouter.';
+    }
+    // Réseau / timeout
+    if (raw.contains('network') || raw.contains('timeout') || raw.contains('unavailable')) {
+      return 'Problème de connexion réseau. Vérifiez votre connexion internet et réessayez.';
+    }
+    // Permissions Firestore
+    if (raw.contains('permission-denied')) {
+      return 'Accès refusé. Veuillez vous reconnecter et réessayer.';
+    }
+    // Erreur générique propre (sans stacktrace)
+    return 'Une erreur est survenue lors de la publication. Veuillez réessayer.';
   }
 
   @override
@@ -1059,10 +1097,15 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                     Icons.monetization_on_outlined, '0',
                     type: TextInputType.number, suffix: _currencyDropdown()),
 
-        // ── Garantie & Commission (Location uniquement, catégories applicables) ────
+        // ── Garantie & Commission (Location uniquement, résidentiel/bureau) ──────
+        // Exclues pour : Salle de fêtes, Salle polyvalente, Chambre d'hôtel,
+        //                Espace funéraire (tarification à la nuitée/journée, pas de bail)
         if (_selectedTransaction == 'Location' &&
             AppConstants.categoriesLocation.contains(_selectedType) &&
-            _selectedType != 'Chambre d\'hôtel') ...[  
+            _selectedType != 'Chambre d\'hôtel' &&
+            _selectedType != 'Salle de fêtes' &&
+            _selectedType != 'Salle polyvalente' &&
+            _selectedType != 'Espace funéraire') ...[
           _garantieDropdown(),
           _commissionField(),
         ],

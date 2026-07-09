@@ -265,17 +265,28 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            Text(
-              'La 1ère plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
+            RichText(
               textAlign: TextAlign.center,
               maxLines: 2,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textHint,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700,
-                height: 1.45,
-                letterSpacing: 0.1,
+              text: const TextSpan(
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textHint,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  height: 1.45,
+                  letterSpacing: 0.1,
+                ),
+                children: [
+                  TextSpan(text: 'La '),
+                  TextSpan(
+                    text: '1ère',
+                    style: TextStyle(color: AppTheme.accentColor),
+                  ),
+                  TextSpan(
+                    text: ' plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
+                  ),
+                ],
               ),
             ),
           ],

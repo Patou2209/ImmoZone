@@ -1139,6 +1139,44 @@ class _HomeTabState extends State<_HomeTab>
   /// Logo texte ImmoZone — taille responsive selon la largeur de l'écran.
   /// Ratio du PNG : 1024×223 ≈ 4.59:1 (horizontal).
   /// Principe : plus le viewport est large, plus le logo est grand.
+  /// Cercle avatar 42px dans la top-bar : photo base64 ou initiales.
+  Widget _buildTopBarAvatar(UserModel? user) {
+    final avatarData = user?.avatar;
+    Widget inner;
+    if (avatarData != null && avatarData.isNotEmpty) {
+      try {
+        final b64 = avatarData.contains(',') ? avatarData.split(',').last : avatarData;
+        final bytes = base64Decode(b64);
+        inner = Image.memory(bytes, width: 42, height: 42, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _topBarInitials(user));
+      } catch (_) {
+        inner = _topBarInitials(user);
+      }
+    } else {
+      inner = _topBarInitials(user);
+    }
+    return Container(
+      width: 42, height: 42,
+      decoration: const BoxDecoration(
+        color: Color(0xFFD8E0EE), shape: BoxShape.circle),
+      child: ClipOval(child: inner),
+    );
+  }
+
+  Widget _topBarInitials(UserModel? user) {
+    final name = user?.name ?? '';
+    final initials = name.length >= 2
+        ? name.substring(0, 2).toUpperCase()
+        : name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    return Container(
+      color: const Color(0xFFD8E0EE),
+      child: Center(child: Text(initials,
+          style: const TextStyle(fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700, fontSize: 13,
+              color: AppTheme.textPrimary))),
+    );
+  }
+
   Widget _buildResponsiveLogo(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final screenW = MediaQuery.of(context).size.width;
@@ -1190,48 +1228,76 @@ class _HomeTabState extends State<_HomeTab>
           Builder(builder: (ctx) {
             final auth = ctx.watch<AuthProvider>();
             if (auth.isLoggedIn) {
-              return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                onTap: () {
-                  if (auth.isAdmin) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
+              // Admin : accès direct au panneau admin
+              if (auth.isAdmin) {
+                return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
+                  onTap: () => Navigator.pushAndRemoveUntil(context,
                       MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
-                      (route) => false,
-                    );
-                  } else {
+                      (route) => false),
+                  child: Container(
+                    width: 42, height: 42,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryColor, shape: BoxShape.circle),
+                    child: const Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.white, size: 20),
+                  ),
+                ));
+              }
+              // Annonceur connecté : avatar photo/initiales + PopupMenu
+              final user = auth.currentUser;
+              return PopupMenuButton<String>(
+                offset: const Offset(0, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 8,
+                onSelected: (val) {
+                  if (val == 'dashboard') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
+                  } else if (val == 'reglages') {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
                   }
                 },
-                child: Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(
-                    color: auth.isAdmin
-                        ? AppTheme.primaryColor
-                        : const Color(0xFFD8E0EE),
-                    shape: BoxShape.circle,
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'dashboard',
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.dashboard_rounded,
+                            size: 18, color: AppTheme.primaryColor),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Mon tableau de bord',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                    ]),
                   ),
-                  child: Center(
-                    child: auth.isAdmin
-                        ? const Icon(Icons.admin_panel_settings_rounded,
-                            color: Colors.white, size: 20)
-                        : Text(
-                            () {
-                              final name = auth.currentUser?.name ?? '';
-                              if (name.length >= 2) return name.substring(0, 2).toUpperCase();
-                              if (name.length == 1) return name[0].toUpperCase();
-                              return 'U';
-                            }(),
-                            style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
+                  PopupMenuItem(
+                    value: 'reglages',
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accentColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.settings_rounded,
+                            size: 18, color: AppTheme.accentColor),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Réglages',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                    ]),
                   ),
-                ),
-              ));
+                ],
+                child: _buildTopBarAvatar(user),
+              );
             }
             return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
               onTap: () => Navigator.push(context,
@@ -3551,4 +3617,441 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 
   String _formatDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ÉCRAN RÉGLAGES — Photo de profil + Message d'accueil
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _UserReglagesScreen extends StatefulWidget {
+  const _UserReglagesScreen();
+  @override
+  State<_UserReglagesScreen> createState() => _UserReglagesScreenState();
+}
+
+class _UserReglagesScreenState extends State<_UserReglagesScreen> {
+  final DataService _ds = DataService();
+  bool _uploadingPhoto = false;
+  bool _savingDesc     = false;
+  bool _editingDesc    = false;
+  static const int _maxDescChars = 1000;
+  late final TextEditingController _descCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _descCtrl = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final u = context.read<AuthProvider>().currentUser;
+      _descCtrl.text = u?.description ?? '';
+    });
+  }
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Photo upload ─────────────────────────────────────────────────────────────
+  Future<void> _pickAndUploadPhoto(AuthProvider auth) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    final picker = ImagePicker();
+    try {
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 50, maxWidth: 512, maxHeight: 512,
+      );
+      if (picked == null) return;
+      setState(() => _uploadingPhoto = true);
+      final Uint8List bytes = kIsWeb
+          ? await picked.readAsBytes()
+          : await File(picked.path).readAsBytes();
+      final ext = picked.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+      final dataUrl = 'data:image/$ext;base64,${base64Encode(bytes)}';
+      final updatedUser = user.copyWith(avatar: dataUrl);
+      await _ds.updateUser(updatedUser);
+      auth.updateCurrentUserLocally(updatedUser);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Photo mise à jour !',
+              style: TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  // ── Description save ─────────────────────────────────────────────────────────
+  Future<void> _saveDescription(AuthProvider auth) async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    setState(() => _savingDesc = true);
+    try {
+      final updatedUser = user.copyWith(description: _descCtrl.text.trim());
+      await _ds.updateUser(updatedUser);
+      auth.updateCurrentUserLocally(updatedUser);
+      if (mounted) setState(() => _editingDesc = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Message d\'accueil enregistré !',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } finally {
+      if (mounted) setState(() => _savingDesc = false);
+    }
+  }
+
+  // ── Avatar widget ─────────────────────────────────────────────────────────────
+  Widget _buildAvatarWidget(UserModel? user, AuthProvider auth) {
+    final avatarData = user?.avatar;
+    Widget avatarInner;
+    if (avatarData != null && avatarData.isNotEmpty) {
+      try {
+        final b64 = avatarData.contains(',') ? avatarData.split(',').last : avatarData;
+        final bytes = base64Decode(b64);
+        avatarInner = Image.memory(bytes, width: 100, height: 100, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _initialsWidget(user));
+      } catch (_) {
+        avatarInner = _initialsWidget(user);
+      }
+    } else {
+      avatarInner = _initialsWidget(user);
+    }
+    return Stack(alignment: Alignment.bottomRight, children: [
+      GestureDetector(
+        onTap: avatarData != null && avatarData.isNotEmpty
+            ? () => _showFullscreen(avatarData)
+            : null,
+        child: Container(
+          width: 100, height: 100,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFFFA726).withValues(alpha: 0.2),
+            border: Border.all(color: const Color(0xFFFFA726), width: 2.5),
+          ),
+          child: ClipOval(child: avatarInner),
+        ),
+      ),
+      Positioned(
+        bottom: 0, right: 0,
+        child: GestureDetector(
+          onTap: _uploadingPhoto ? null : () => _pickAndUploadPhoto(auth),
+          child: Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor, shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 1.5),
+            ),
+            child: _uploadingPhoto
+                ? const Padding(padding: EdgeInsets.all(5),
+                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white))
+                : const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 14),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _initialsWidget(UserModel? user) {
+    final name = user?.name ?? '';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    return Container(
+      color: const Color(0xFFFFA726).withValues(alpha: 0.2),
+      child: Center(child: Text(initial,
+          style: const TextStyle(fontFamily: 'Poppins',
+              fontWeight: FontWeight.w800, fontSize: 36,
+              color: Color(0xFFFFA726)))),
+    );
+  }
+
+  void _showFullscreen(String avatarData) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(children: [
+          InteractiveViewer(
+            child: Center(child: Builder(builder: (ctx) {
+              try {
+                final b64 = avatarData.contains(',')
+                    ? avatarData.split(',').last : avatarData;
+                final bytes = base64Decode(b64);
+                return Image.memory(bytes, fit: BoxFit.contain,
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height);
+              } catch (_) {
+                return const Icon(Icons.broken_image, color: Colors.white, size: 64);
+              }
+            })),
+          ),
+          Positioned(
+            top: 40, right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54, shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white30),
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.currentUser;
+    final descLength = _descCtrl.text.length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FB),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppTheme.textPrimary,
+        elevation: 0,
+        centerTitle: false,
+        title: const Text('Réglages',
+            style: TextStyle(fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700, fontSize: 18,
+                color: AppTheme.textPrimary)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFE8ECF4), height: 1),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // ── Section : Photo de profil ───────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Photo de profil',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 15,
+                      color: AppTheme.textPrimary)),
+              const SizedBox(height: 6),
+              const Text('Visible par les visiteurs sur vos annonces.',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontSize: 12, color: AppTheme.textHint)),
+              const SizedBox(height: 20),
+              Center(child: _buildAvatarWidget(user, auth)),
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _uploadingPhoto ? null : () => _pickAndUploadPhoto(auth),
+                  icon: const Icon(Icons.photo_library_rounded, size: 16),
+                  label: const Text('Changer la photo',
+                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                  style: TextButton.styleFrom(foregroundColor: AppTheme.accentColor),
+                ),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Section : Message d'accueil ─────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text('Message d\'accueil',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 15,
+                        color: AppTheme.textPrimary)),
+                if (!_editingDesc)
+                  TextButton.icon(
+                    onPressed: () => setState(() => _editingDesc = true),
+                    icon: const Icon(Icons.edit_rounded, size: 15),
+                    label: const Text('Modifier',
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                  ),
+              ]),
+              const SizedBox(height: 4),
+              const Text('Présenté sur votre profil public (max 1000 caractères).',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontSize: 12, color: AppTheme.textHint)),
+              const SizedBox(height: 14),
+              if (_editingDesc) ...[
+                TextField(
+                  controller: _descCtrl,
+                  maxLines: 5,
+                  maxLength: _maxDescChars,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Présentez-vous, vos services, votre expérience...',
+                    hintStyle: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 12, color: AppTheme.textHint),
+                    filled: true,
+                    fillColor: const Color(0xFFF4F6FB),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryColor),
+                    ),
+                    counterText: '${descLength}/$_maxDescChars',
+                    counterStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11),
+                  ),
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  TextButton(
+                    onPressed: () => setState(() => _editingDesc = false),
+                    child: const Text('Annuler',
+                        style: TextStyle(fontFamily: 'Poppins',
+                            color: AppTheme.textHint)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _savingDesc ? null : () => _saveDescription(auth),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                    ),
+                    child: _savingDesc
+                        ? const SizedBox(width: 16, height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Enregistrer',
+                            style: TextStyle(fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F6FB),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    (user?.description?.isNotEmpty == true)
+                        ? user!.description!
+                        : 'Aucun message d\'accueil défini.',
+                    style: TextStyle(
+                      fontFamily: 'Poppins', fontSize: 13,
+                      color: (user?.description?.isNotEmpty == true)
+                          ? AppTheme.textPrimary : AppTheme.textHint,
+                      fontStyle: (user?.description?.isNotEmpty == true)
+                          ? FontStyle.normal : FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ]),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Section : Infos du compte (lecture seule) ───────────────────────
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Informations du compte',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 15,
+                      color: AppTheme.textPrimary)),
+              const SizedBox(height: 16),
+              _infoRow(Icons.person_rounded, 'Nom', user?.name ?? '—'),
+              const Divider(height: 20),
+              _infoRow(Icons.email_rounded, 'Email', user?.email ?? '—'),
+              const Divider(height: 20),
+              _infoRow(Icons.phone_rounded, 'Téléphone', user?.phone ?? '—'),
+              const Divider(height: 20),
+              _infoRow(Icons.business_center_rounded, 'Catégorie',
+                  user?.category ?? '—'),
+            ]),
+          ),
+
+          const SizedBox(height: 30),
+        ]),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(children: [
+      Icon(icon, size: 16, color: AppTheme.primaryColor),
+      const SizedBox(width: 10),
+      Text('$label : ',
+          style: const TextStyle(fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600, fontSize: 12,
+              color: AppTheme.textSecondary)),
+      Expanded(child: Text(value,
+          style: const TextStyle(fontFamily: 'Poppins',
+              fontSize: 12, color: AppTheme.textPrimary),
+          overflow: TextOverflow.ellipsis)),
+    ]);
+  }
 }
