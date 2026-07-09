@@ -189,17 +189,22 @@ class PropertyCard extends StatelessWidget {
                       ),
                     ),
 
-                    // ── Avatar annonceur (top-right, collé au bord) ──────
+                    // ── Share + Favori (top-right) ───────────────────────
                     Positioned(
-                      top: 0,
-                      right: 0,
-                      child: _buildOwnerAvatar(avatarSize),
+                      top: 8, right: 8,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (onShare != null) ...[_iconBtn(icon: Icons.share_rounded, color: AppTheme.primaryColor, onTap: onShare!), const SizedBox(width: 6)],
+                          if (onFavorite != null) _iconBtn(icon: isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? Colors.red : Colors.grey, onTap: onFavorite!),
+                        ],
+                      ),
                     ),
 
                     // ── Status badge (admin, top-right décalé) ───────────
                     if (showStatus)
                       Positioned(
-                        top: 10, right: 50,
+                        top: 10, right: 10,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
@@ -271,7 +276,7 @@ class PropertyCard extends StatelessWidget {
                     if (property.isBoostActive &&
                         !property.isSold && !property.isRented)
                       Positioned(
-                        bottom: 36, left: 8,
+                        top: 44, left: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
@@ -315,90 +320,34 @@ class PropertyCard extends StatelessWidget {
                         ),
                       ),
 
-                    // ── Badge Référence IZ (bottom-left) ─────────────────
+                    // ── Avatar annonceur + nom (bottom-left) ─────────────
                     Positioned(
                       bottom: 8, left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'REF: IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
-                          style: const TextStyle(
-                            color: Colors.white, fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Poppins', letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // ── Badge catégorie annonceur (bottom-center) ─────────
-                    if (property.ownerCategory.isNotEmpty)
-                      Positioned(
-                        bottom: 8,
-                        left: 0, right: 0,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _getCategoryColor(property.ownerCategory),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.25),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1)),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(_getCategoryIcon(property.ownerCategory),
-                                    color: Colors.white, size: 10),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _categoryShortLabel(property.ownerCategory),
-                                  style: const TextStyle(
-                                    color: Colors.white, fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // ── Favoris + Partage (bottom-right) ─────────────────
-                    Positioned(
-                      bottom: 8, right: 8,
-                      child: Row(
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Bouton partage
-                          if (onShare != null) ...[
-                            _iconBtn(
-                              icon: Icons.share_rounded,
-                              color: AppTheme.primaryColor,
-                              onTap: onShare!,
+                          _buildOwnerAvatar(avatarSize),
+                          const SizedBox(height: 3),
+                          Container(
+                            constraints: BoxConstraints(maxWidth: avatarSize * 1.6),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            const SizedBox(width: 6),
-                          ],
-                          // Bouton favori
-                          if (onFavorite != null)
-                            _iconBtn(
-                              icon: isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: isFavorite ? Colors.red : Colors.grey,
-                              onTap: onFavorite!,
+                            child: Text(
+                              property.ownerName.isNotEmpty ? property.ownerName : 'Annonceur',
+                              style: const TextStyle(
+                                color: Colors.white, fontSize: 8,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
                             ),
+                          ),
                         ],
                       ),
                     ),
@@ -419,15 +368,29 @@ class PropertyCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: Text(
-                                  property.title,
-                                  style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w600,
-                                    color: AppTheme.textPrimary,
-                                    fontFamily: 'Poppins',
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      property.title,
+                                      style: const TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w600,
+                                        color: AppTheme.textPrimary,
+                                        fontFamily: 'Poppins',
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Réf. IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
+                                      style: const TextStyle(
+                                        fontSize: 9, fontWeight: FontWeight.w500,
+                                        color: AppTheme.textHint,
+                                        fontFamily: 'Poppins', letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 6),
@@ -673,22 +636,6 @@ class PropertyCard extends StatelessWidget {
       case 'Agence Immobilière': return const Color(0xFF1565C0);
       case 'Commissionnaire':    return const Color(0xFF6A1B9A);
       default:                   return const Color(0xFF2E7D32);
-    }
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Agence Immobilière': return Icons.business_rounded;
-      case 'Commissionnaire':    return Icons.handshake_rounded;
-      default:                   return Icons.home_rounded;
-    }
-  }
-
-  String _categoryShortLabel(String category) {
-    switch (category) {
-      case 'Agence Immobilière': return 'Agence';
-      case 'Commissionnaire':    return 'Commis.';
-      default:                   return 'Propriétaire';
     }
   }
 
