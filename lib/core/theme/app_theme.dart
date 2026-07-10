@@ -10,6 +10,7 @@ class AppTheme {
   static const Color primaryLight   = Color(0xFF1A52B0); // Bleu marine clair
   static const Color primaryDark    = Color(0xFF062A70); // Bleu marine très foncé
   static const Color accentColor    = Color(0xFF0A3A8F); // Même bleu marine
+  static const Color orangeColor    = Color(0xFFF06428); // Orange logo (toit)
 
   // Couleur secondaire (vert Location badge)
   static const Color successColor   = Color(0xFF2E9E5B); // Vert badge Location

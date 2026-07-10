@@ -281,7 +281,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   const TextSpan(text: 'La '),
                   TextSpan(
                     text: '1ère',
-                    style: TextStyle(color: AppTheme.accentColor),
+                    style: TextStyle(color: AppTheme.orangeColor),
                   ),
                   const TextSpan(
                     text: ' plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
