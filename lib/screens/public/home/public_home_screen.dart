@@ -869,18 +869,27 @@ class _HomeTabState extends State<_HomeTab>
         if (!typeNorm.contains(catNorm) && !catNorm.contains(typeNorm)) return false;
       }
 
-      // Pays (filtre avance — uniquement si different du defaut)
-      if (_country.isNotEmpty && _country != AppConstants.defaultCountry) {
-        // Le modele PropertyModel stocke le pays dans p.country
+      // ── Pays — toujours appliqué, y compris pour le pays par défaut ────────
+      // BUG CORRIGÉ : avant, le filtre pays était désactivé quand _country ==
+      // defaultCountry, ce qui laissait passer des annonces de Brazzaville.
+      if (_country.isNotEmpty) {
         if (!_normalize(p.country ?? '').contains(_normalize(_country)) &&
             !_normalize(_country).contains(_normalize(p.country ?? ''))) {
           return false;
         }
       }
 
-      // Province / Ville / Commune (filtres avances optionnels)
-      if (_province != null && _province!.isNotEmpty &&
-          !_normalize(p.province).contains(_normalize(_province!))) return false;
+      // ── Province — enforcer Kinshasa par défaut quand aucune recherche texte
+      // et aucune province explicitement sélectionnée par l'utilisateur.
+      // Cela garantit que l'écran par défaut (Congo RDC / Kinshasa) ne montre
+      // que des annonces de Kinshasa, même si _province est null.
+      final effectiveProvince = _province ??
+          (_country == AppConstants.defaultCountry && !isTextSearch
+              ? AppConstants.defaultProvince
+              : null);
+
+      if (effectiveProvince != null && effectiveProvince.isNotEmpty &&
+          !_normalize(p.province).contains(_normalize(effectiveProvince))) return false;
       if (_city != null && _city!.isNotEmpty &&
           !_normalize(p.city).contains(_normalize(_city!))) return false;
       if (_commune != null && _commune!.isNotEmpty &&

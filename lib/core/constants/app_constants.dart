@@ -48,6 +48,7 @@ class AppConstants {
   static const String defaultMode        = 'Location';
   static const String defaultCategory   = 'Maison';
   static const String defaultCountry    = 'Congo (RDC)';
+  static const String defaultProvince   = 'Kinshasa'; // Province par défaut (filtre strict)
 
   // ── Pays disponibles dans les filtres (2 principaux) ─────────────────────
   static const List<String> filterCountries = [
