@@ -268,8 +268,8 @@ class _SplashScreenState extends State<SplashScreen> {
             RichText(
               textAlign: TextAlign.center,
               maxLines: 2,
-              text: const TextSpan(
-                style: TextStyle(
+              text: TextSpan(
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppTheme.textHint,
                   fontFamily: 'Poppins',
@@ -278,12 +278,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   letterSpacing: 0.1,
                 ),
                 children: [
-                  TextSpan(text: 'La '),
+                  const TextSpan(text: 'La '),
                   TextSpan(
                     text: '1ère',
                     style: TextStyle(color: AppTheme.accentColor),
                   ),
-                  TextSpan(
+                  const TextSpan(
                     text: ' plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
                   ),
                 ],
