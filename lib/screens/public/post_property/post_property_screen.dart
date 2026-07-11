@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
@@ -90,7 +90,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   // ── Bytes pour le web (XFile.path = blob URL, inutilisable sur web) ─────
   Uint8List? _webMainPhotoBytes;
   final List<Uint8List> _webSecondaryBytes = [];
-  // Compatibilité avec l'ancien système URL (conserver pour _addSampleImages)
+  // URLs réseau pour les photos hébergées (ex: URLs Firestore Storage)
   final List<String> _imageUrls = [];
   final _imageUrlCtrl = TextEditingController();
 
@@ -535,16 +535,22 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     if (!auth.isLoggedIn) return;
     final ds = DataService();
     final userId = auth.currentUser!.id;
+    // ── IMPORTANT : checkPublicationRight rafraîchit le cache des zones si
+    // nécessaire. On l'appelle EN PREMIER pour que getCreditsForCommune
+    // utilise ensuite les données à jour (évite le bug : zone inconnue → required=1).
+    final right = await ds.checkPublicationRight(userId,
+        commune: _selectedCommune, days: _selectedDuration,
+        transactionType: _selectedTransaction);
+    // Calculer les crédits requis APRÈS que le cache des zones soit à jour
     final required = ds.getCreditsForCommune(_selectedCommune,
         days: _selectedDuration, transactionType: _selectedTransaction);
     // Count paid credits only (free quota handled separately via checkPublicationRight)
     final available = await ds.getUserAvailableCredits(userId);
-    // Use the authoritative publication right check (free trial, free quota, paid credit, no right)
-    final right = await ds.checkPublicationRight(userId,
-        commune: _selectedCommune, days: _selectedDuration,
-        transactionType: _selectedTransaction);
     // "enough" = free trial active, OR free monthly quota still available, OR sufficient paid credits
-    final enough = (right == 'free_trial') || (right == 'free_quota') || (right == 'paid_credit');
+    // GARDE SUPPLÉMENTAIRE : pour 'paid_credit', vérifier que available >= required
+    // (protection contre le bug : cache de zones vide → required=1 → paid_credit incorrect)
+    final bool paidCreditOk = (right == 'paid_credit') && (available >= required);
+    final enough = (right == 'free_trial') || (right == 'free_quota') || paidCreditOk;
     // Récupérer le quota de bienvenue (year=0)
     final quota    = await ds.getCurrentQuota(userId);
     final freeLeft = (quota.freeQuota - quota.usedFreeQuota).clamp(0, 999);
@@ -615,9 +621,31 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       final auth = context.read<AuthProvider>();
       final user = auth.currentUser!;
 
-      // Consume the publication right (handles free trial, free quota, or paid credits)
+      // ── VÉRIFICATION FINALE DES CRÉDITS avant soumission ─────────────────────
+      // Protection contre toute incohérence d'état (cache stale, race condition).
+      // On re-vérifie avec les données Firestore fraîches juste avant de débiter.
       if (_hasEnoughCredits) {
         final ds = DataService();
+        final rightNow = await ds.checkPublicationRight(user.id,
+            commune: _selectedCommune, days: _selectedDuration,
+            transactionType: _selectedTransaction);
+        final requiredNow = ds.getCreditsForCommune(_selectedCommune,
+            days: _selectedDuration, transactionType: _selectedTransaction);
+        final availableNow = await ds.getUserAvailableCredits(user.id);
+        final stillEnough = (rightNow == 'free_trial') ||
+            (rightNow == 'free_quota') ||
+            (rightNow == 'paid_credit' && availableNow >= requiredNow);
+        if (!stillEnough) {
+          setState(() {
+            _submitting = false;
+            _hasEnoughCredits = false;
+            _publicationRight = rightNow;
+            _requiredCredits = requiredNow;
+            _userAvailableCredits = availableNow;
+          });
+          _err('Solde insuffisant : $availableNow crédit${availableNow != 1 ? 's' : ''} disponible${availableNow != 1 ? 's' : ''}, $requiredNow requis. Veuillez recharger.');
+          return;
+        }
         await ds.consumePublicationRight(user.id,
             commune: _selectedCommune, days: _selectedDuration,
             transactionType: _selectedTransaction);
@@ -2669,23 +2697,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           ]),
         ),
 
-        // ── Exemples de test ──────────────────────────────────────────────────
-        if (kDebugMode || true) ...([
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _addSampleImages,
-            icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
-            label: const Text('Remplir avec des exemples (test)',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.textHint,
-              side: const BorderSide(color: AppTheme.dividerColor),
-              minimumSize: const Size(double.infinity, 38),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ]),
-
         const SizedBox(height: 28),
         _navButtons(
           onNext: () { if (_validateStep2()) _goTo(2); },
@@ -2754,24 +2765,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     } catch (_) {
       // Toute autre erreur : ignorer silencieusement (ex. double-tap)
     }
-  }
-
-  void _addSampleImages() {
-    setState(() {
-      // Réinitialiser les photos locales
-      _mainPhoto = null;
-      _webMainPhotoBytes = null;
-      _secondaryPhotos.clear();
-      _webSecondaryBytes.clear();
-      // Charger exactement 4 URLs exemple
-      _imageUrls.clear();
-      _imageUrls.addAll([
-        'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800',
-        'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800',
-        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800',
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800',
-      ]);
-    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

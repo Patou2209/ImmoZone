@@ -76,6 +76,10 @@ class DataService {
     await _prefs?.setString(AppConstants.keyUserEmail, user.email);
     await _prefs?.setString(AppConstants.keyUserRole, user.role);
     await _prefs?.setBool(AppConstants.keyIsLoggedIn, true);
+    // ── Cache du profil complet pour survie aux refreshs web (Firestore lent) ──
+    try {
+      await _prefs?.setString('cached_user_profile', jsonEncode(user.toMap()));
+    } catch (_) {}
   }
 
   Future<void> _clearSession() async {
@@ -84,6 +88,18 @@ class DataService {
     await _prefs?.remove(AppConstants.keyUserEmail);
     await _prefs?.remove(AppConstants.keyUserRole);
     await _prefs?.setBool(AppConstants.keyIsLoggedIn, false);
+    await _prefs?.remove('cached_user_profile');
+  }
+
+  /// Retourne le profil mis en cache lors du dernier login (fallback réseau).
+  UserModel? getCachedUser() {
+    final raw = _prefs?.getString('cached_user_profile');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return UserModel.fromMap(Map<String, dynamic>.from(jsonDecode(raw)));
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── PARAMÈTRES SYSTÈME ────────────────────────────────────────────────────
@@ -622,16 +638,14 @@ class DataService {
 
   Future<UserModel?> getUserById(String id) async {
     if (id.isEmpty) return null;
-    try {
-      final snap = await _usersCol.doc(id).get();
-      if (!snap.exists) return null;
-      // Injecter le document ID dans la map — Firestore ne l'inclut pas dans data()
-      final data = Map<String, dynamic>.from(snap.data() as Map<String, dynamic>);
-      data['id'] = snap.id;
-      return UserModel.fromMap(data);
-    } catch (_) {
-      return null;
-    }
+    // ── Ne pas attraper les erreurs réseau ici — on les laisse remonter
+    // pour que checkAuth() puisse distinguer "user inexistant" vs "réseau lent".
+    final snap = await _usersCol.doc(id).get();
+    if (!snap.exists) return null;
+    // Injecter le document ID dans la map — Firestore ne l'inclut pas dans data()
+    final data = Map<String, dynamic>.from(snap.data() as Map<String, dynamic>);
+    data['id'] = snap.id;
+    return UserModel.fromMap(data);
   }
 
   Future<void> updateUser(UserModel user) async {
@@ -1898,6 +1912,15 @@ class DataService {
     if (promoQuota != null) return 'free_quota';
 
     // 3. Crédits payants disponibles ?
+    // ── CORRECTION CRITIQUE : s'assurer que le cache des zones est chargé ────
+    // geographicZones lit depuis SharedPreferences. Si le cache est vide
+    // (premier lancement, cache expiré, ou nouvelle commune), la commune n'est
+    // pas trouvée et required tombe à 1 — ce qui laisse passer n'importe quel
+    // solde. On force un refresh Firestore si la commune n'est pas dans le cache.
+    if (commune.isNotEmpty && !geographicZones.containsKey(commune)) {
+      await refreshZonesCache();
+      await refreshZonesConfigCache();
+    }
     final required = commune.isNotEmpty
         ? getCreditsForCommune(commune, days: days, transactionType: transactionType)
         : 1;

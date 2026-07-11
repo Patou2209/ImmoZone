@@ -96,10 +96,28 @@ class AuthProvider extends ChangeNotifier {
 
     // Priorité 1 : session locale SharedPreferences (persiste entre les lancements)
     if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
-      final user = await _dataService.getUserById(_dataService.currentUserId);
-      if (user != null) {
-        _currentUser = user;
-        notifyListeners();
+      try {
+        final user = await _dataService.getUserById(_dataService.currentUserId)
+            .timeout(const Duration(seconds: 6));
+        if (user != null) {
+          _currentUser = user;
+          notifyListeners();
+          return;
+        }
+        // user == null → compte supprimé → effacer la session corrompue
+        await _dataService.logout();
+        return;
+      } catch (_) {
+        // ── Réseau lent ou Firestore indisponible au moment du refresh ──────
+        // On utilise le profil mis en cache localement pour ne PAS déconnecter
+        // l'utilisateur. Le profil sera rafraîchi au prochain accès réseau.
+        final cached = _dataService.getCachedUser();
+        if (cached != null) {
+          _currentUser = cached;
+          notifyListeners();
+          return;
+        }
+        // Aucun cache disponible — on laisse l'utilisateur non connecté
         return;
       }
     }
@@ -107,10 +125,20 @@ class AuthProvider extends ChangeNotifier {
     // Priorité 2 : session Firebase Auth active (admin email virtuel)
     final firebaseUser = _auth.currentUser;
     if (firebaseUser != null) {
-      final user = await _dataService.loginById(firebaseUser.uid);
-      if (user != null) {
-        _currentUser = user;
-        notifyListeners();
+      try {
+        final user = await _dataService.loginById(firebaseUser.uid)
+            .timeout(const Duration(seconds: 6));
+        if (user != null) {
+          _currentUser = user;
+          notifyListeners();
+        }
+      } catch (_) {
+        // Réseau lent — utiliser le cache si disponible
+        final cached = _dataService.getCachedUser();
+        if (cached != null) {
+          _currentUser = cached;
+          notifyListeners();
+        }
       }
     }
   }

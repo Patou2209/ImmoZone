@@ -321,8 +321,8 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                       children: [
                         _navItem(0, Icons.search_rounded, Icons.search_rounded, 'Recherche'),
                         _navItem(1, Icons.favorite_border_rounded, Icons.favorite_rounded, 'Favoris'),
-                        // Spacer for FAB center
-                        const SizedBox(width: 64),
+                        // Spacer for FAB pill center (wider pill needs more space)
+                        const SizedBox(width: 160),
                         // Alertes
                         _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
                         // Contact
@@ -351,31 +351,48 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                     ),
                   ),
                 ),
-                // FAB circle Publier — floating above nav bar
+                // FAB pill Publier — floating above nav bar
                 Positioned(
-                  top: -20,
+                  top: -22,
                   left: 0,
                   right: 0,
                   child: Center(
-                    child: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                      onTap: () => _openPublish(context, auth),
-                      child: Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.40),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _openPublish(context, auth),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor,
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primaryColor.withValues(alpha: 0.40),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.add, color: Colors.white, size: 20),
+                              SizedBox(width: 6),
+                              Text(
+                                'Publier une annonce',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: const Icon(Icons.add, color: Colors.white, size: 30),
                       ),
-                    )),
+                    ),
                   ),
                 ),
               ],
