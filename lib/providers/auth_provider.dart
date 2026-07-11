@@ -88,7 +88,7 @@ class AuthProvider extends ChangeNotifier {
       try {
         await _auth.authStateChanges()
             .first
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 4));
       } catch (_) {
         // timeout ou erreur — on continue avec les autres méthodes
       }
@@ -98,7 +98,7 @@ class AuthProvider extends ChangeNotifier {
     if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
       try {
         final user = await _dataService.getUserById(_dataService.currentUserId)
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 7));
         if (user != null) {
           _currentUser = user;
           notifyListeners();
@@ -127,7 +127,7 @@ class AuthProvider extends ChangeNotifier {
     if (firebaseUser != null) {
       try {
         final user = await _dataService.loginById(firebaseUser.uid)
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 7));
         if (user != null) {
           _currentUser = user;
           notifyListeners();

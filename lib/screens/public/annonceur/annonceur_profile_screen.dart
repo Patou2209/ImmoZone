@@ -315,17 +315,31 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
                       ),
                     )
                   else
-                    ..._listings.map((p) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: PropertyCard(
-                        property: p,
-                        onShare: () => _shareProperty(p),
-                        onTap: () => Navigator.push(context,
-                            MaterialPageRoute(
-                                builder: (_) => PropertyDetailScreen(
-                                    property: p))),
-                      ),
-                    )),
+                    LayoutBuilder(builder: (context, constraints) {
+                      final cols = (constraints.maxWidth / 340).floor().clamp(1, 99);
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cols,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 400 / 450,
+                        ),
+                        itemCount: _listings.length,
+                        itemBuilder: (context, index) {
+                          final p = _listings[index];
+                          return PropertyCard(
+                            property: p,
+                            onShare: () => _shareProperty(p),
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => PropertyDetailScreen(
+                                        property: p))),
+                          );
+                        },
+                      );
+                    }),
                 ]),
               ),
             ),

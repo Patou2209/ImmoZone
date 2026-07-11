@@ -170,15 +170,23 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (kIsWeb) {
       // ── WEB : l'HTML overlay gère tout le visuel du splash.
-      // Timeout 8 s sur web pour laisser le temps à Firebase Auth de restaurer
-      // la session depuis IndexedDB (peut prendre 2-3 s sur connexion lente).
+      //
+      // STRATÉGIE en 2 phases pour éviter le logout sur Windows/desktop :
+      //
+      // Phase 1 — auth UNIQUEMENT, timeout 12s (authStateChanges 5s +
+      //   getUserById 6s = 11s max ; 12s = marge confortable).
+      //   Auth doit TOUJOURS terminer avant la navigation — sinon la session
+      //   est perdue sur les connexions lentes (Windows/desktop).
+      //
+      // Phase 2 — propriétés en parallèle, timeout 6s.
+      //   Si le chargement des propriétés est trop lent, on navigue quand même
+      //   (les propriétés se chargeront après la navigation).
       await Future.any([
-        Future.wait([
-          auth.checkAuth(),
-          propProvider.loadAllProperties(),
-        ]),
-        Future.delayed(const Duration(seconds: 8)),
+        auth.checkAuth(),
+        Future.delayed(const Duration(seconds: 12)),
       ]);
+      // Lancer le chargement des propriétés (non bloquant pour la navigation)
+      propProvider.loadAllProperties().ignore();
     } else {
       // ── MOBILE : on affiche notre propre splash Flutter.
       // Timer 4 s minimum, auth en parallèle.

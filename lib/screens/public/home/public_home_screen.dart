@@ -321,8 +321,8 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                       children: [
                         _navItem(0, Icons.search_rounded, Icons.search_rounded, 'Recherche'),
                         _navItem(1, Icons.favorite_border_rounded, Icons.favorite_rounded, 'Favoris'),
-                        // Spacer for FAB pill center
-                        const SizedBox(width: 110),
+                        // Spacer for FAB circle center
+                        const SizedBox(width: 72),
                         // Alertes
                         _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
                         // Contact
@@ -351,41 +351,40 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                     ),
                   ),
                 ),
-                // FAB pill Publier — floating above nav bar
-                Positioned(
-                  top: -22,
-                  left: 0,
-                  right: 0,
+                // FAB circle Publier — au même niveau que les nav items
+                Positioned.fill(
                   child: Center(
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
                         onTap: () => _openPublish(context, auth),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          width: 64,
+                          height: 64,
                           decoration: BoxDecoration(
                             color: AppTheme.primaryColor,
-                            borderRadius: BorderRadius.circular(32),
+                            shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.40),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
+                                color: AppTheme.primaryColor.withValues(alpha: 0.45),
+                                blurRadius: 16,
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: const [
-                              Icon(Icons.add, color: Colors.white, size: 20),
-                              SizedBox(width: 6),
+                              Icon(Icons.add, color: Colors.white, size: 22),
+                              SizedBox(height: 2),
                               Text(
                                 'Publier',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontFamily: 'Poppins',
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13,
+                                  fontSize: 9,
+                                  height: 1.0,
                                 ),
                               ),
                             ],
