@@ -4,7 +4,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, Persistence;
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -33,7 +33,14 @@ void main() async {
     );
   }
 
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    // ── Web : forcer la persistance LOCAL (survit aux refreshs de page) ──────
+    // Sans cet appel, Firebase Auth utilise SESSION par défaut sur web,
+    // ce qui détruit la session à chaque refresh de page.
+    try {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    } catch (_) {}
+  } else {
     try {
       await FirebaseAuth.instance.setSettings(
         forceRecaptchaFlow: false,
@@ -163,14 +170,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (kIsWeb) {
       // ── WEB : l'HTML overlay gère tout le visuel du splash.
-      // On lance auth + prefetch en parallèle avec un timer 4 s.
-      // SplashScreen reste blanc/transparent — aucun Flutter widget visible.
+      // Timeout 8 s sur web pour laisser le temps à Firebase Auth de restaurer
+      // la session depuis IndexedDB (peut prendre 2-3 s sur connexion lente).
       await Future.any([
         Future.wait([
           auth.checkAuth(),
           propProvider.loadAllProperties(),
         ]),
-        Future.delayed(const Duration(seconds: 4)),
+        Future.delayed(const Duration(seconds: 8)),
       ]);
     } else {
       // ── MOBILE : on affiche notre propre splash Flutter.

@@ -78,6 +78,22 @@ class AuthProvider extends ChangeNotifier {
   //      dont la session Firebase est encore active).
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> checkAuth() async {
+    // ── Sur WEB : attendre que Firebase Auth réhydrate sa session depuis
+    // IndexedDB (peut prendre 1-3 s après un refresh de page).
+    // On utilise authStateChanges().first avec timeout court — si Firebase
+    // répond avec un user non-null, c'est une session admin (email virtuel).
+    // Pour les utilisateurs OTP (non-admin), la source de vérité reste
+    // SharedPreferences + Firestore.
+    if (kIsWeb) {
+      try {
+        await _auth.authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // timeout ou erreur — on continue avec les autres méthodes
+      }
+    }
+
     // Priorité 1 : session locale SharedPreferences (persiste entre les lancements)
     if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
       final user = await _dataService.getUserById(_dataService.currentUserId);

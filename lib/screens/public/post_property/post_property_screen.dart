@@ -49,8 +49,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   // ── Champs conditionnels selon la catégorie ──────────────────────────────
   final _floorsCtrl    = TextEditingController(); // Maison, Appartement, Bureau
   bool _hasParking        = false;
-  bool _hasElectricity     = true;
-  bool _hasWater           = true;
+  bool _hasElectricity     = false;
+  bool _hasWater           = false;
   bool _hasAscenseur       = false;
   bool _hasAirConditioning = false; // Climatisation (Appart/Maison/Bureau/Hotel)
   bool _hasCuisineEquipee  = false;
@@ -72,8 +72,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   final _longueurCtrl = TextEditingController();
   final _largeurCtrl  = TextEditingController();
   // Location: garantie (mois) + commission
-  int _garantieMois = 0;           // 0 = pas de garantie
-  bool _hasCommission = false;
+  int _garantieMois = 3;           // 3 mois par défaut
+  bool _hasCommission = true;      // commission activée par défaut
   final _commissionPctCtrl = TextEditingController();
   // Période de tarification Appartement/Flat en location
   // 'mensuel' | 'journalier'
@@ -267,6 +267,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   @override
   void initState() {
     super.initState();
+    // Valeurs par défaut garantie + commission
+    _commissionPctCtrl.text = '100';
     // Rafraîchir le cache zones + zones_config pour que les tarifs soient à jour
     _refreshZonesCache();
     // Pre-remplir avec les infos de l'utilisateur connecte
@@ -2837,8 +2839,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   List<Widget> _buildCreditStatus(
       List<Map<String, dynamic>> packs, List<Map<String, dynamic>> methods) {
-    final costUsd = (_requiredCredits * 0.1).toStringAsFixed(2);
-
     // ── Détermine l'affichage du solde selon le TYPE de droit ─────────────────
     // free_trial  → badge "Mode gratuit actif"
     // free_quota  → badge "1 publication gratuite ce mois"  (PAS "0 crédits ✅")
@@ -2918,8 +2918,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                   Text('$_requiredCredits crédit${_requiredCredits > 1 ? 's' : ''}',
                       style: const TextStyle(fontFamily: 'Poppins',
                           fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
-                  Text('≈ \$$costUsd', style: const TextStyle(fontFamily: 'Poppins',
-                      fontSize: 11, color: Colors.white70)),
                 ]),
               ),
             ),
@@ -3247,19 +3245,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
       // ── ETAPE A : Choisir le pack ─────────────────────────────────────
       _stepBadge('1', 'Choisissez une recharge de crédits'),
-      const SizedBox(height: 4),
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: AppTheme.accentColor.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Text(
-          '10 USD = 100 crédits — les crédits restants sont conservés pour vos prochaines annonces.',
-          style: TextStyle(fontSize: 11, fontFamily: 'Poppins',
-              color: AppTheme.accentColor, height: 1.4),
-        ),
-      ),
       const SizedBox(height: 10),
       ...packs.map((pack) => _packTile(pack)),
       const SizedBox(height: 20),
