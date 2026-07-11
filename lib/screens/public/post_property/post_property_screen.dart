@@ -3397,9 +3397,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final isSelected = _selectedPack?['id'] == pack['id'];
     final qty = (pack['qty'] as num?)?.toInt() ?? 0;
     final price = (pack['price'] as num?)?.toDouble() ?? 0.0;
-    final credits = (qty > 0) ? qty : (price * DataService.creditsPerDollar).round();
     final isCredits = pack['type'] == 'credits';
-    final desc = pack['description'] as String?;
     return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => setState(() => _selectedPack = pack),
       child: Container(
@@ -3434,11 +3432,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 14,
               color: isSelected ? Colors.white : AppTheme.textPrimary,
             )),
-            if (desc != null)
-              Text(desc, style: TextStyle(
-                fontFamily: 'Poppins', fontSize: 11,
-                color: isSelected ? Colors.white70 : AppTheme.textSecondary,
-              )),
           ])),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

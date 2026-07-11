@@ -321,8 +321,8 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                       children: [
                         _navItem(0, Icons.search_rounded, Icons.search_rounded, 'Recherche'),
                         _navItem(1, Icons.favorite_border_rounded, Icons.favorite_rounded, 'Favoris'),
-                        // Spacer for FAB pill center (wider pill needs more space)
-                        const SizedBox(width: 160),
+                        // Spacer for FAB pill center
+                        const SizedBox(width: 110),
                         // Alertes
                         _navItemWithBadge(2, Icons.notifications_none_rounded, Icons.notifications_rounded, 'Alertes', _unreadNotifCount),
                         // Contact
@@ -362,7 +362,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                       child: GestureDetector(
                         onTap: () => _openPublish(context, auth),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryColor,
                             borderRadius: BorderRadius.circular(32),
@@ -380,12 +380,12 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                               Icon(Icons.add, color: Colors.white, size: 20),
                               SizedBox(width: 6),
                               Text(
-                                'Publier une annonce',
+                                'Publier',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontFamily: 'Poppins',
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 12,
+                                  fontSize: 13,
                                 ),
                               ),
                             ],
