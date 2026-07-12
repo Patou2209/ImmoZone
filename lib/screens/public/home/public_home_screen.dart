@@ -59,6 +59,15 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUnreadCount();
       _loadWaContact();
+      // Si on arrive ici sans passer par SplashScreen (refresh direct sur /public),
+      // l'AuthProvider n'a pas encore appelé checkAuth(). On le lance maintenant
+      // en arrière-plan — les widgets se mettront à jour via notifyListeners().
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) {
+        auth.checkAuth().then((_) {
+          if (mounted) _loadUnreadCount();
+        });
+      }
     });
   }
 
@@ -374,16 +383,35 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                             ],
                           ),
                           child: Center(
-                            child: const Text(
-                                'Publier',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                  height: 1.0,
-                                ),
-                              ),
+                            child: LayoutBuilder(
+                              builder: (ctx, box) {
+                                // Petits écrans (< 360 px) → texte plus petit
+                                final screenW = MediaQuery.of(ctx).size.width;
+                                final fs = screenW < 360 ? 9.0 : 10.0;
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text('Publier',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: fs,
+                                          height: 1.2,
+                                        )),
+                                    Text('annonce',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: fs,
+                                          height: 1.2,
+                                        )),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
@@ -425,15 +453,27 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                 ),
                 if (badge > 0)
                   Positioned(
-                    top: -4, right: -6,
+                    top: -5, right: -8,
                     child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: Colors.red, shape: BoxShape.circle),
-                      child: Text('$badge',
+                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: badge < 10 ? BoxShape.circle : BoxShape.rectangle,
+                        borderRadius: badge >= 10 ? BorderRadius.circular(9) : null,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Center(
+                        child: Text(
+                          badge > 99 ? '99+' : '$badge',
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 8,
-                              fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Poppins',
+                              height: 1.0),
+                        ),
+                      ),
                     ),
                   ),
               ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import '../../services/data_service.dart';
+import '../../providers/auth_provider.dart';
 import 'dashboard/admin_dashboard_screen.dart';
 import 'reception/admin_reception_screen.dart';
 import 'properties/admin_properties_screen.dart';
@@ -33,7 +35,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPendingCount());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadPendingCount();
+      // Si on arrive ici sans SplashScreen (refresh direct sur /admin),
+      // déclencher checkAuth() en arrière-plan.
+      final auth = context.read<AuthProvider>();
+      if (!auth.isLoggedIn) {
+        auth.checkAuth();
+      }
+    });
   }
 
   Future<void> _loadPendingCount() async {

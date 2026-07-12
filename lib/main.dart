@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'web_storage_helper.dart' if (dart.library.io) 'web_storage_helper_stub.dart' as ws;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -59,12 +60,39 @@ void main() async {
 // Utilisé par GoRouter redirect ET SplashScreen pour éviter tout conflit.
 bool _isDeepLink = false;
 
+// ── Lecture synchrone du localStorage pour décider de la route initiale ────
+// SharedPreferences web stocke ses clés sous le préfixe 'flutter.'.
+// Cette lecture est synchrone (pas d'async) et se fait AVANT runApp().
 String _getInitialLocation() {
   if (kIsWeb) {
     final path = Uri.base.path;
+
+    // Deep-link /property/:id → toujours prioritaire
     if (path.startsWith('/property/')) {
       _isDeepLink = true;
       return path;
+    }
+
+    // Lire le localStorage directement (synchrone) pour savoir si
+    // l'utilisateur est déjà connecté → sauter le SplashScreen.
+    try {
+      final isLoggedIn = ws.readLocal('flutter.is_logged_in');
+      final userId     = ws.readLocal('flutter.user_id') ?? '';
+      final userRole   = ws.readLocal('flutter.user_role') ?? '';
+      final hasCache   = ws.readLocal('flutter.cached_user_profile') != null;
+
+      if (isLoggedIn == 'true' && userId.isNotEmpty && hasCache) {
+        // Utilisateur connu → aller directement à la bonne page.
+        // L'AuthProvider rechargera le profil en arrière-plan.
+        if (userRole == 'admin' ||
+            userRole == 'admin_financier' ||
+            userRole == 'admin_service_client') {
+          return '/admin';
+        }
+        return '/public';
+      }
+    } catch (_) {
+      // Pas de localStorage (SSR, incognito strict) → splash normal
     }
   }
   return '/';
