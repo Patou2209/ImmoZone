@@ -817,11 +817,7 @@ class _HomeTabState extends State<_HomeTab>
         });
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
-      _loadFavorites();
-      _loadStats();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAll());
   }
 
   @override
@@ -835,24 +831,35 @@ class _HomeTabState extends State<_HomeTab>
           ? AppConstants.categoriesLocation
           : AppConstants.categoriesAchat;
 
-  Future<void> _loadData() async {
-    await context.read<PropertyProvider>().loadProperties();
-    final ads = await _ds.getLiveAds();
+  /// Charge toutes les données en parallèle et n'appelle setState qu'UNE SEULE
+  /// fois à la fin — élimine les 4-6 redraws successifs qui causaient le tremblement.
+  Future<void> _loadAll() async {
+    final propProvider = context.read<PropertyProvider>();
+
+    // Lancer TOUT en parallèle : annonces + pubs + favoris + stats + prefs
+    final results = await Future.wait([
+      propProvider.loadProperties(),                  // [0] notifie le provider
+      _ds.getLiveAds(),                               // [1] → List<AdModel>
+      _ds.getFavorites(),                             // [2] → List<String>
+      _ds.getPublicStats(),                           // [3] → Map<String,dynamic>
+      SharedPreferences.getInstance()                 // [4] → prefs
+          .then((p) => p.getInt(_kAdRotKey) ?? 0),
+    ]);
+
     if (!mounted) return;
-    // Récupérer l'index de rotation sauvegardé
-    final prefs = await SharedPreferences.getInstance();
-    final savedIndex = prefs.getInt(_kAdRotKey) ?? 0;
+
+    // Un seul setState pour tout — un seul redraw
     setState(() {
-      _liveAds = ads;
-      _adRotationIndex = savedIndex;
+      _liveAds        = results[1] as List<AdModel>;
+      _favorites      = results[2] as List<String>;
+      _stats          = results[3] as Map<String, dynamic>;
+      _statsLoading   = false;
+      _adRotationIndex = results[4] as int;
     });
   }
 
-  Future<void> _loadFavorites() async {
-    final f = await _ds.getFavorites();
-    if (mounted) setState(() => _favorites = f);
-  }
-
+  // Conservé pour le pull-to-refresh (onRefresh: _loadAll)
+  Future<void> _loadData() => _loadAll();
   Future<void> _loadStats() async {
     final s = await _ds.getPublicStats();
     if (mounted) setState(() { _stats = s; _statsLoading = false; });
@@ -874,7 +881,8 @@ class _HomeTabState extends State<_HomeTab>
 
   Future<void> _toggleFavorite(String id) async {
     await _ds.toggleFavorite(id);
-    await _loadFavorites();
+    final f = await _ds.getFavorites();
+    if (mounted) setState(() => _favorites = f);
   }
 
   Future<void> _shareProperty(PropertyModel p) async {
@@ -1058,7 +1066,7 @@ class _HomeTabState extends State<_HomeTab>
           Expanded(
             child: RefreshIndicator(
               color: AppTheme.accentColor,
-              onRefresh: () async { await _loadData(); await _loadStats(); },
+              onRefresh: _loadAll,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(children: [

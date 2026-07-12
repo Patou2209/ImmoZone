@@ -80,8 +80,10 @@ class PropertyProvider extends ChangeNotifier {
 
   Future<void> loadProperties() async {
     _isLoading = true;
-    _historiqueMode = false; // mode normal : annonces actives uniquement
-    notifyListeners();
+    _historiqueMode = false;
+    // Pas de notifyListeners() ici — on n'annonce PAS le début du chargement
+    // pour éviter un premier rendu "vide" qui cause le tremblement visuel.
+    // On notifie UNE SEULE FOIS quand les données sont prêtes.
     try {
       _properties = await _dataService.getActiveProperties();
       _applyFilters();
@@ -89,7 +91,7 @@ class PropertyProvider extends ChangeNotifier {
       _error = 'Erreur de chargement';
     }
     _isLoading = false;
-    notifyListeners();
+    notifyListeners(); // rendu unique, données complètes
   }
 
   /// Charge UNIQUEMENT les annonces vendues ou occupées dans les 3 derniers jours (72h).
@@ -116,7 +118,7 @@ class PropertyProvider extends ChangeNotifier {
 
   Future<void> loadAllProperties() async {
     _isLoading = true;
-    notifyListeners();
+    // Pas de notifyListeners() au départ — évite le flash vide initial.
     try {
       _properties = await _dataService.getProperties();
       _filteredProperties = List.from(_properties);
@@ -124,7 +126,7 @@ class PropertyProvider extends ChangeNotifier {
       _error = 'Erreur de chargement';
     }
     _isLoading = false;
-    notifyListeners();
+    notifyListeners(); // rendu unique
   }
 
   Future<List<PropertyModel>> getUserProperties(String userId) async {
