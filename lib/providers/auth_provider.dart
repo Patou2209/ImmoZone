@@ -86,9 +86,11 @@ class AuthProvider extends ChangeNotifier {
     // SharedPreferences + Firestore.
     if (kIsWeb) {
       try {
+        // Laisser 6 s à Firebase pour réhydrater la session depuis IndexedDB.
+        // Chrome peut être plus lent qu'Edge pour lire l'IndexedDB au démarrage.
         await _auth.authStateChanges()
             .first
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 6));
       } catch (_) {
         // timeout ou erreur — on continue avec les autres méthodes
       }
@@ -104,7 +106,18 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
           return;
         }
-        // user == null → compte supprimé → effacer la session corrompue
+        // getUserById() returned null : le document Firestore n'existe pas OU
+        // Firestore a répondu depuis le cache local hors-ligne.
+        // → Avant de déconnecter, tenter le profil mis en cache localement.
+        //   Si le cache est présent, c'est probablement un problème réseau
+        //   transitoire — on garde la session active.
+        final cached = _dataService.getCachedUser();
+        if (cached != null) {
+          _currentUser = cached;
+          notifyListeners();
+          return;
+        }
+        // Aucun cache → compte probablement supprimé → effacer la session
         await _dataService.logout();
         return;
       } catch (_) {

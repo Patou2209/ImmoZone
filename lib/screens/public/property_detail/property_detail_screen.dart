@@ -765,27 +765,39 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                 fontFamily: 'Poppins')),
                       ])),
                     ] else ...[
-                    Text(p.formattedPrice,
-                        style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.accentColor,
-                            fontFamily: 'Poppins')),
-                    if (p.transactionType == 'Location') ...[
-                      Text(
-                        p.type == 'Chambre d\'hôtel'
-                            ? 'par nuitée'
-                            : (p.type == 'Salle de Fêtes' ||
-                               p.type == 'Espace Funéraire' ||
-                               p.type == 'Salle polyvalente')
-                                ? 'par jour'
-                                : p.type.contains('Appartement')
-                                    ? (p.pricePeriod == 'journalier' ? 'par jour' : 'par mois')
-                                    : 'par mois',
+                    if (p.transactionType != 'Location') ...[
+                      Text(p.formattedPrice,
                           style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.accentColor,
+                              fontFamily: 'Poppins')),
+                    ],
+                    if (p.transactionType == 'Location') ...[
+                      RichText(text: TextSpan(children: [
+                        TextSpan(
+                          text: p.formattedPrice,
+                          style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.accentColor,
+                              fontFamily: 'Poppins')),
+                        TextSpan(
+                          text: ' / ${p.type == 'Chambre d\'hôtel'
+                              ? 'nuitée'
+                              : (p.type == 'Salle de Fêtes' ||
+                                 p.type == 'Espace Funéraire' ||
+                                 p.type == 'Salle polyvalente')
+                                  ? 'jour'
+                                  : p.type.contains('Appartement')
+                                      ? (p.pricePeriod == 'journalier' ? 'jour' : 'mois')
+                                      : 'mois'}',
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                               color: AppTheme.textSecondary,
                               fontFamily: 'Poppins')),
+                      ])),
                       if (p.type != 'Chambre d\'hôtel' &&
                           p.type != 'Salle de Fêtes' &&
                           p.type != 'Espace Funéraire' &&

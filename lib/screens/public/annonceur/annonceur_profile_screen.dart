@@ -48,10 +48,12 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
       final activeProps = allProps
           .where((p) => p.status == 'Actif' && !p.isSold && !p.isRented)
           .toList();
+      // Enrichir avec les avatars pour afficher la photo du propriétaire sur chaque carte
+      final enriched = await _ds.enrichWithAvatars(activeProps);
       if (mounted) {
         setState(() {
           _user   = user;
-          _listings = activeProps;
+          _listings = enriched;
           _loading = false;
         });
       }

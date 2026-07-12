@@ -372,22 +372,17 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                               ),
                             ],
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.add, color: Colors.white, size: 22),
-                              SizedBox(height: 2),
-                              Text(
+                          child: Center(
+                            child: const Text(
                                 'Publier',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontFamily: 'Poppins',
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 9,
+                                  fontSize: 13,
                                   height: 1.0,
                                 ),
                               ),
-                            ],
                           ),
                         ),
                       ),
@@ -990,8 +985,16 @@ class _HomeTabState extends State<_HomeTab>
   Widget build(BuildContext context) {
     final provider = context.watch<PropertyProvider>();
     final filtered = _filteredProperties;
-    final displayed = filtered.take(_displayCount).toList();
-    final hasMore = filtered.length > _displayCount;
+
+    // Sur écrans larges, calculer le nombre de colonnes de la grille et afficher
+    // au moins 2 rangées complètes avant de montrer le bouton "Voir plus".
+    final screenWidth = MediaQuery.of(context).size.width;
+    final gridCols = (screenWidth / 400).floor().clamp(1, 8);
+    final minDisplay = gridCols * 2; // 2 rangées complètes minimum
+    final effectiveDisplay = _displayCount < minDisplay ? minDisplay : _displayCount;
+
+    final displayed = filtered.take(effectiveDisplay).toList();
+    final hasMore = filtered.length > effectiveDisplay;
 
     // Annonces boostées filtrées selon le contexte courant
     final boosted = provider.getBoostedProperties(
@@ -1090,7 +1093,7 @@ class _HomeTabState extends State<_HomeTab>
                     _buildGridWithAds(context, displayed),
 
                   // Voir plus
-                  if (hasMore) _buildVoirPlus(filtered.length),
+                  if (hasMore) _buildVoirPlus(filtered.length, effectiveDisplay),
 
                   // Stats footer
                   _buildStatsFooter(),
@@ -1266,13 +1269,17 @@ class _HomeTabState extends State<_HomeTab>
                 offset: const Offset(0, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 elevation: 8,
-                onSelected: (val) {
+                onSelected: (val) async {
                   if (val == 'dashboard') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
                   } else if (val == 'reglages') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
+                  } else if (val == 'logout') {
+                    final authProv = context.read<AuthProvider>();
+                    await authProv.logout();
+                    if (context.mounted) context.go('/');
                   }
                 },
                 itemBuilder: (_) => [
@@ -1310,6 +1317,26 @@ class _HomeTabState extends State<_HomeTab>
                       const Text('Réglages',
                           style: TextStyle(fontFamily: 'Poppins',
                               fontWeight: FontWeight.w600, fontSize: 13)),
+                    ]),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.logout_rounded,
+                            size: 18, color: Colors.red),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Déconnexion',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600, fontSize: 13,
+                              color: Colors.red)),
                     ]),
                   ),
                 ],
@@ -2377,11 +2404,12 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   // ── VOIR PLUS ─────────────────────────────────────────────────────────────
-  Widget _buildVoirPlus(int total) {
+  Widget _buildVoirPlus(int total, int currentDisplay) {
+    final remaining = total - currentDisplay;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: OutlinedButton(
-        onPressed: () => setState(() => _displayCount += 8),
+        onPressed: () => setState(() => _displayCount = currentDisplay + 8),
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(double.infinity, 46),
           side: const BorderSide(color: AppTheme.accentColor, width: 1.5),
@@ -2390,7 +2418,7 @@ class _HomeTabState extends State<_HomeTab>
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.expand_more_rounded, color: AppTheme.accentColor, size: 20),
           const SizedBox(width: 8),
-          Text('Voir plus (${total - _displayCount} annonces restantes)',
+          Text('Voir plus ($remaining annonce${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''})',
               style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 13, color: AppTheme.accentColor)),
         ]),
@@ -2794,16 +2822,6 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         actionsIconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-            onPressed: () async {
-              await auth.logout();
-              if (mounted) context.go('/');
-            },
-            tooltip: 'Deconnexion',
-          ),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
