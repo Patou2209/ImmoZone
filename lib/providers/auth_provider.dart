@@ -78,64 +78,68 @@ class AuthProvider extends ChangeNotifier {
   //      dont la session Firebase est encore active).
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> checkAuth() async {
-    // ── Sur WEB : attendre que Firebase Auth réhydrate sa session depuis
-    // IndexedDB (peut prendre 1-3 s après un refresh de page).
-    // On utilise authStateChanges().first avec timeout court — si Firebase
-    // répond avec un user non-null, c'est une session admin (email virtuel).
-    // Pour les utilisateurs OTP (non-admin), la source de vérité reste
-    // SharedPreferences + Firestore.
-    if (kIsWeb) {
-      try {
-        // Laisser 6 s à Firebase pour réhydrater la session depuis IndexedDB.
-        // Chrome peut être plus lent qu'Edge pour lire l'IndexedDB au démarrage.
-        await _auth.authStateChanges()
-            .first
-            .timeout(const Duration(seconds: 6));
-      } catch (_) {
-        // timeout ou erreur — on continue avec les autres méthodes
+    // ════════════════════════════════════════════════════════════════════════
+    // STRATÉGIE MULTI-COUCHES — priorité au cache local pour éviter tout
+    // délai réseau (critique sur Chrome où Firestore et IndexedDB sont lents).
+    //
+    // Ordre de priorité :
+    //   1. Cache profil JSON (localStorage via SharedPrefs) — INSTANT
+    //   2. Firestore getUserById — réseau, avec fallback cache si échec
+    //   3. Firebase Auth currentUser — session email virtuel (admin)
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── ÉTAPE 0 : Cache immédiat (localStorage) ──────────────────────────────
+    // Restaure la session en quelques ms depuis localStorage, sans aucun
+    // appel réseau. Cela rend la persistence fiable même sur Chrome.
+    if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
+      final cached = _dataService.getCachedUser();
+      if (cached != null) {
+        _currentUser = cached;
+        notifyListeners();
+        // Session restaurée depuis le cache — rafraîchir le profil en fond
+        // sans bloquer la navigation.
+        _refreshProfileInBackground(cached.id);
+        return;
       }
     }
 
-    // Priorité 1 : session locale SharedPreferences (persiste entre les lancements)
+    // ── ÉTAPE 1 : Firebase Auth (admin email virtuel) — attendre IndexedDB ──
+    // Seulement si le cache local est vide (premier lancement ou cache effacé).
+    if (kIsWeb) {
+      try {
+        // 5 s maximum — si Firebase ne répond pas, on continue
+        await _auth.authStateChanges()
+            .first
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        // timeout ou erreur — on continue
+      }
+    }
+
+    // ── ÉTAPE 2 : Firestore getUserById ─────────────────────────────────────
     if (_dataService.isLoggedIn && _dataService.currentUserId.isNotEmpty) {
       try {
         final user = await _dataService.getUserById(_dataService.currentUserId)
-            .timeout(const Duration(seconds: 7));
+            .timeout(const Duration(seconds: 8));
         if (user != null) {
           _currentUser = user;
           notifyListeners();
           return;
         }
-        // getUserById() returned null : le document Firestore n'existe pas OU
-        // Firestore a répondu depuis le cache local hors-ligne.
-        // → Avant de déconnecter, tenter le profil mis en cache localement.
-        //   Si le cache est présent, c'est probablement un problème réseau
-        //   transitoire — on garde la session active.
-        final cached = _dataService.getCachedUser();
-        if (cached != null) {
-          _currentUser = cached;
-          notifyListeners();
-          return;
-        }
-        // Aucun cache → compte probablement supprimé → effacer la session
+        // getUserById() returned null — Firestore dit "document absent"
+        // C'est peut-être le cache Firestore hors-ligne (offline-first).
+        // On ne déconnecte PAS ici : le cache localStorage a déjà été vérifié
+        // à l'étape 0 et était vide. On accepte la déconnexion.
         await _dataService.logout();
         return;
       } catch (_) {
-        // ── Réseau lent ou Firestore indisponible au moment du refresh ──────
-        // On utilise le profil mis en cache localement pour ne PAS déconnecter
-        // l'utilisateur. Le profil sera rafraîchi au prochain accès réseau.
-        final cached = _dataService.getCachedUser();
-        if (cached != null) {
-          _currentUser = cached;
-          notifyListeners();
-          return;
-        }
-        // Aucun cache disponible — on laisse l'utilisateur non connecté
+        // Réseau lent ou timeout — on accepte l'état non-connecté
+        // (si le cache était présent, l'étape 0 aurait déjà retourné)
         return;
       }
     }
 
-    // Priorité 2 : session Firebase Auth active (admin email virtuel)
+    // ── ÉTAPE 3 : Session Firebase Auth active (admin email virtuel) ─────────
     final firebaseUser = _auth.currentUser;
     if (firebaseUser != null) {
       try {
@@ -146,7 +150,6 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (_) {
-        // Réseau lent — utiliser le cache si disponible
         final cached = _dataService.getCachedUser();
         if (cached != null) {
           _currentUser = cached;
@@ -154,6 +157,24 @@ class AuthProvider extends ChangeNotifier {
         }
       }
     }
+  }
+
+  /// Rafraîchit le profil utilisateur en arrière-plan sans bloquer l'UI.
+  /// Appelé après restauration depuis le cache local pour synchroniser
+  /// avec Firestore si possible.
+  void _refreshProfileInBackground(String userId) {
+    Future.microtask(() async {
+      try {
+        final user = await _dataService.getUserById(userId)
+            .timeout(const Duration(seconds: 10));
+        if (user != null && _currentUser?.id == userId) {
+          _currentUser = user;
+          notifyListeners();
+        }
+      } catch (_) {
+        // Non-bloquant — on garde le profil du cache
+      }
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

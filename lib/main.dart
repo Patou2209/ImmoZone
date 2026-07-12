@@ -183,7 +183,7 @@ class _SplashScreenState extends State<SplashScreen> {
       //   (les propriétés se chargeront après la navigation).
       await Future.any([
         auth.checkAuth(),
-        Future.delayed(const Duration(seconds: 14)),
+        Future.delayed(const Duration(seconds: 10)),
       ]);
       // Lancer le chargement des propriétés (non bloquant pour la navigation)
       propProvider.loadAllProperties().ignore();

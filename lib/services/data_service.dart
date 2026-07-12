@@ -1806,23 +1806,22 @@ class DataService {
             }
           }
 
-          // Notification détaillée avec bonus
+          // Notification de recharge (sans mention de l'admin)
           String bonusMsg = '';
           if (bonusCredits > 0 && bonusFreeAds > 0) {
-            bonusMsg = ' + $bonusCredits crédits bonus ($bonusPct%) + $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
+            bonusMsg = '\n+ $bonusCredits crédits bonus ($bonusPct%) + $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
           } else if (bonusCredits > 0) {
-            bonusMsg = ' + $bonusCredits crédits bonus ($bonusPct%) offerts !';
+            bonusMsg = '\n+ $bonusCredits crédits bonus ($bonusPct%) offerts !';
           } else if (bonusFreeAds > 0) {
-            bonusMsg = ' + $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
+            bonusMsg = '\n+ $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
           }
 
           await addNotification(AppNotification(
             id: 'notif_pay_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: payment.userId,
             type: 'paiement',
-            title: 'Paiement confirmé ✓',
-            body: 'Votre paiement a été validé par $adminName. '
-                '$totalCredits crédit(s) ajouté(s) à votre compte.$bonusMsg',
+            title: 'Recharge confirmée ✓',
+            body: 'Vous avez reçu $totalCredits crédit${totalCredits > 1 ? 's' : ''}, valable 30 jours.$bonusMsg',
             createdAt: DateTime.now(),
           ));
         }

@@ -28,6 +28,7 @@ import '../post_property/post_property_screen.dart';
 import '../post_property/edit_property_screen.dart';
 import '../../auth/login_screen.dart';
 import '../../admin/admin_home_screen.dart';
+import '../packs/public_packs_screen.dart';
 import '../search/search_screen.dart';
 
 class PublicHomeScreen extends StatefulWidget {
@@ -2833,47 +2834,93 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-                  // ── Solde de crédits ─────────────────────────────────────
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _availableCredits > 0
-                            ? AppTheme.accentColor.withValues(alpha: 0.12)
-                            : Colors.red.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _availableCredits > 0
-                              ? AppTheme.accentColor
-                              : Colors.red.shade300,
-                          width: 1,
+                  // ── Solde de crédits + bouton Recharger ─────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Solde disponible
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _availableCredits > 0
+                                ? AppTheme.accentColor.withValues(alpha: 0.10)
+                                : Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _availableCredits > 0
+                                  ? AppTheme.accentColor.withValues(alpha: 0.5)
+                                  : Colors.red.shade300,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(children: [
+                            Icon(
+                              _availableCredits > 0
+                                  ? Icons.toll_rounded
+                                  : Icons.warning_amber_rounded,
+                              color: _availableCredits > 0
+                                  ? AppTheme.accentColor
+                                  : Colors.red,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                                  children: [
+                                    TextSpan(
+                                      text: 'Solde disponible : ',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        color: _availableCredits > 0
+                                            ? AppTheme.textSecondary
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '$_availableCredits crédit${_availableCredits > 1 ? 's' : ''}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13,
+                                        color: _availableCredits > 0
+                                            ? AppTheme.accentColor
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ]),
                         ),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(
-                          _availableCredits > 0
-                              ? Icons.toll_rounded
-                              : Icons.warning_amber_rounded,
-                          color: _availableCredits > 0
-                              ? AppTheme.accentColor
-                              : Colors.red,
-                          size: 14,
+                      const SizedBox(width: 10),
+                      // Bouton Recharger
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(context,
+                            MaterialPageRoute(
+                              builder: (_) => const PublicPacksScreen()));
+                        },
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                        label: const Text('Recharger',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            )),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 2,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$_availableCredits crédit${_availableCredits > 1 ? 's' : ''}',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _availableCredits > 0
-                                ? AppTheme.accentColor
-                                : Colors.red,
-                          ),
-                        ),
-                      ]),
-                    ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
