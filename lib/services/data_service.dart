@@ -1545,6 +1545,23 @@ class DataService {
     await _prefs?.setString('payment_methods_cache', jsonEncode(methods));
   }
 
+  /// Rafraîchit les moyens de paiement depuis Firestore et met à jour le cache.
+  Future<void> refreshPaymentMethodsFromFirestore() async {
+    try {
+      final snap = await _paymentMethodsDoc.get();
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>?;
+        final list = data?['methods'] as List?;
+        if (list != null) {
+          final methods = list.cast<Map<String, dynamic>>();
+          await _prefs?.setString('payment_methods_cache', jsonEncode(methods));
+        }
+      }
+    } catch (_) {
+      // Utilise le cache existant en cas d'échec réseau
+    }
+  }
+
   List<Map<String, dynamic>> get subscriptionPacks {
     final raw = _prefs?.getString('packs_cache');
     if (raw != null) {

@@ -293,11 +293,65 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   final _refCtrl   = TextEditingController();
   bool _sending = false;
 
-  static const _operators = [
-    {'id': 'orange_money',  'name': 'Orange Money',  'color': 0xFFFF6600, 'icon': Icons.cell_tower},
-    {'id': 'mpesa',         'name': 'M-Pesa',         'color': 0xFF00A86B, 'icon': Icons.payments_outlined},
-    {'id': 'airtel_money',  'name': 'Airtel Money',   'color': 0xFFE4002B, 'icon': Icons.account_balance_wallet_outlined},
-  ];
+  // Moyens de paiement chargés depuis Firestore (source de vérité admin)
+  List<Map<String, dynamic>> _methods = [];
+  bool _loadingMethods = true;
+
+  // Mapping icon → operatorId pour faire le lien avec _operators
+  static const _iconToOperatorId = {
+    'mpesa':   'mpesa',
+    'orange':  'orange_money',
+    'airtel':  'airtel_money',
+  };
+
+  // Opérateurs UI avec couleurs et icônes
+  static const _operatorMeta = {
+    'mpesa':        {'color': 0xFF00A86B, 'icon': Icons.payments_outlined},
+    'orange_money': {'color': 0xFFFF6600, 'icon': Icons.cell_tower},
+    'airtel_money': {'color': 0xFFE4002B, 'icon': Icons.account_balance_wallet_outlined},
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMethods();
+  }
+
+  Future<void> _loadMethods() async {
+    await widget.ds.refreshPaymentMethodsFromFirestore();
+    if (!mounted) return;
+    setState(() {
+      _methods = widget.ds.paymentMethods
+          .where((m) => m['active'] == true)
+          .toList();
+      _loadingMethods = false;
+    });
+  }
+
+  /// Retourne le numéro marchand pour l'opérateur sélectionné depuis Firestore.
+  String _merchantNumber() {
+    if (_selectedOperator == null) return '';
+    // Cherche dans les méthodes Firestore le numéro correspondant à l'opérateur
+    for (final m in _methods) {
+      final iconKey = (m['icon'] as String? ?? '').toLowerCase();
+      final opId = _iconToOperatorId[iconKey];
+      if (opId == _selectedOperator) {
+        return m['number'] as String? ?? '';
+      }
+    }
+    return '';
+  }
+
+  /// Retourne le nom de l'opérateur depuis Firestore.
+  String _operatorName() {
+    if (_selectedOperator == null) return '';
+    for (final m in _methods) {
+      final iconKey = (m['icon'] as String? ?? '').toLowerCase();
+      final opId = _iconToOperatorId[iconKey];
+      if (opId == _selectedOperator) return m['name'] as String? ?? '';
+    }
+    return _selectedOperator!;
+  }
 
   @override
   void dispose() {
@@ -323,8 +377,8 @@ class _PaymentDialogState extends State<_PaymentDialog> {
       final packName = widget.pack['name'] ?? '';
 
       await widget.ds.submitManualPaymentRequest(
-        userId: widget.user.uid,
-        userName: widget.user.displayName ?? widget.user.email ?? '',
+        userId: widget.user.id as String,
+        userName: (widget.user.name as String?) ?? (widget.user.email as String?) ?? '',
         packId: widget.pack['id'] ?? '',
         packName: packName,
         credits: qty,
@@ -421,6 +475,15 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   }
 
   Widget _buildOperatorStep() {
+    if (_loadingMethods) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(color: AppTheme.accentColor),
+        ),
+      );
+    }
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Choisissez votre opérateur Mobile Money',
           style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
@@ -430,10 +493,18 @@ class _PaymentDialogState extends State<_PaymentDialog> {
           style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
               color: AppTheme.textSecondary, height: 1.5)),
       const SizedBox(height: 20),
-      ..._operators.map((op) {
-        final isSelected = _selectedOperator == op['id'];
-        final color = Color(op['color'] as int);
-        final opId  = op['id'] as String;
+
+      // ── Liste des opérateurs depuis Firestore (source admin) ──────────────
+      ..._methods.map((m) {
+        final iconKey = (m['icon'] as String? ?? '').toLowerCase();
+        final opId    = _iconToOperatorId[iconKey] ?? iconKey;
+        final meta    = _operatorMeta[opId] ?? {'color': 0xFF607D8B, 'icon': Icons.payment};
+        final color   = Color(meta['color'] as int);
+        final icon    = meta['icon'] as IconData;
+        final name    = m['name'] as String? ?? opId;
+        final number  = m['number'] as String? ?? '';
+        final isSelected = _selectedOperator == opId;
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Material(
@@ -458,13 +529,22 @@ class _PaymentDialogState extends State<_PaymentDialog> {
                       color: color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(op['icon'] as IconData, color: color, size: 22),
+                    child: Icon(icon, color: color, size: 22),
                   ),
                   const SizedBox(width: 14),
-                  Expanded(child: Text(op['name'] as String,
-                      style: TextStyle(fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700, fontSize: 14,
-                          color: isSelected ? color : AppTheme.textPrimary))),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700, fontSize: 14,
+                              color: isSelected ? color : AppTheme.textPrimary)),
+                      if (number.isNotEmpty)
+                        Text(number,
+                            style: const TextStyle(fontFamily: 'Poppins',
+                                fontSize: 11, color: AppTheme.textSecondary)),
+                    ],
+                  )),
                   if (isSelected)
                     Icon(Icons.check_circle_rounded, color: color, size: 22),
                 ]),
@@ -473,6 +553,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
           ),
         );
       }),
+
       const SizedBox(height: 24),
       SizedBox(
         width: double.infinity,
@@ -484,6 +565,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
             disabledBackgroundColor: AppTheme.dividerColor,
+            disabledForegroundColor: Colors.white60,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -496,18 +578,14 @@ class _PaymentDialogState extends State<_PaymentDialog> {
   }
 
   Widget _buildDetailsStep() {
-    final op = _operators.firstWhere((o) => o['id'] == _selectedOperator);
-    final opColor = Color(op['color'] as int);
-    final price   = (widget.pack['price'] as num).toDouble();
+    // Lire couleur et icône depuis _operatorMeta (pas depuis l'ancienne liste _operators)
+    final meta     = _operatorMeta[_selectedOperator] ?? {'color': 0xFF607D8B, 'icon': Icons.payment};
+    final opColor  = Color(meta['color'] as int);
+    final opIcon   = meta['icon'] as IconData;
+    final opName   = _operatorName();          // depuis Firestore
+    final merchantNum = _merchantNumber();     // depuis Firestore — source de vérité admin
+    final price    = (widget.pack['price'] as num).toDouble();
     final currency = widget.pack['currency'] ?? 'USD';
-
-    // Numéros marchands par opérateur
-    const merchantNumbers = {
-      'orange_money': '+243 8X XXX XXXX',
-      'mpesa':        '+243 9X XXX XXXX',
-      'airtel_money': '+243 9X XXX XXXX',
-    };
-    final merchantNum = merchantNumbers[_selectedOperator] ?? 'À configurer';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Opérateur sélectionné
@@ -519,9 +597,9 @@ class _PaymentDialogState extends State<_PaymentDialog> {
           border: Border.all(color: opColor.withValues(alpha: 0.3)),
         ),
         child: Row(children: [
-          Icon(op['icon'] as IconData, color: opColor, size: 20),
+          Icon(opIcon, color: opColor, size: 20),
           const SizedBox(width: 10),
-          Text(op['name'] as String,
+          Text(opName,
               style: TextStyle(fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700, fontSize: 13, color: opColor)),
           const Spacer(),
