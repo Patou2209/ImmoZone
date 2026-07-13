@@ -138,21 +138,32 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _badgeIcon(IconData icon, int count, {bool active = false}) {
+    if (count <= 0) return Icon(icon);
+    final label = count > 99 ? '99+' : '$count';
+    // Badge bien visible : fond rouge vif, texte blanc gras, taille lisible
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Icon(icon),
-        if (count > 0)
-          Positioned(
-            right: -6, top: -4,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
-              child: Text(count > 99 ? '99+' : '$count',
-                  style: const TextStyle(color: Colors.white, fontSize: 8,
-                      fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
+        Positioned(
+          right: -10, top: -6,
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white, width: 1.5),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 4, offset: const Offset(0, 1))],
             ),
+            child: Text(label,
+                style: const TextStyle(color: Colors.white, fontSize: 11,
+                    fontWeight: FontWeight.w900, fontFamily: 'Poppins',
+                    height: 1.1),
+                textAlign: TextAlign.center),
           ),
+        ),
       ],
     );
   }

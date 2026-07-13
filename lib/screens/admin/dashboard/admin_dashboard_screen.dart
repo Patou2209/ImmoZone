@@ -796,11 +796,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
                                 color: AppTheme.textPrimary, fontFamily: 'Poppins')),
                         const SizedBox(height: 14),
-                        GridView.count(
-                          crossAxisCount: 2, shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.4,
-                          children: [
+                        // Wrap avec largeur fixe — même taille sur mobile ET desktop
+                        LayoutBuilder(builder: (ctx, constraints) {
+                          // 2 colonnes max, largeur plafonnée à 200px par carte
+                          final spacing = 12.0;
+                          final cols = 2;
+                          final cardW = ((constraints.maxWidth - spacing * (cols - 1)) / cols)
+                              .clamp(0.0, 200.0);
+                          const cardH = 110.0;
+                          final cards = [
                             _statCard('Annonces actives', '${_stats['activeProperties'] ?? 0}',
                                 Icons.check_circle_outline, AppTheme.successColor),
                             _statCard('Boosts actifs', '${_stats['boostedProperties'] ?? 0}',
@@ -809,8 +813,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 Icons.home_outlined, AppTheme.primaryColor),
                             _statCard('Visiteurs', '${_stats['demandeurs'] ?? 0}',
                                 Icons.visibility_outlined, AppTheme.accentColor),
-                          ],
-                        ),
+                          ];
+                          return Wrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            children: cards.map((c) =>
+                              SizedBox(width: cardW, height: cardH, child: c)
+                            ).toList(),
+                          );
+                        }),
                         const SizedBox(height: 14),
                         // Revenu + alertes
                         Row(children: [
