@@ -354,44 +354,44 @@ class _PaymentSheetState extends State<_PaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final qty    = widget.pack['qty'] as int? ?? 0;
-    final price  = (widget.pack['price'] as num).toDouble();
+    final qty      = widget.pack['qty'] as int? ?? 0;
+    final price    = (widget.pack['price'] as num).toDouble();
     final currency = widget.pack['currency'] ?? 'USD';
+    final screenH  = MediaQuery.of(context).size.height;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(children: [
-          // ── Handle ──
-          Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 4),
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.dividerColor,
-              borderRadius: BorderRadius.circular(4),
-            ),
+    return Container(
+      height: screenH * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(children: [
+        // ── Handle ──
+        Container(
+          margin: const EdgeInsets.only(top: 10, bottom: 4),
+          width: 40, height: 4,
+          decoration: BoxDecoration(
+            color: AppTheme.dividerColor,
+            borderRadius: BorderRadius.circular(4),
           ),
-          // ── Header ──
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.inventory_2_outlined,
-                    color: AppTheme.accentColor, size: 20),
+        ),
+        // ── Header ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child: const Icon(Icons.inventory_2_outlined,
+                  color: AppTheme.accentColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(widget.pack['name'] ?? '',
                     style: const TextStyle(fontFamily: 'Poppins',
                         fontWeight: FontWeight.w700, fontSize: 15,
@@ -399,27 +399,28 @@ class _PaymentSheetState extends State<_PaymentSheet> {
                 Text('$qty crédits · $price $currency',
                     style: const TextStyle(fontFamily: 'Poppins',
                         fontSize: 12, color: AppTheme.textSecondary)),
-              ])),
-              if (_step < 2)
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: AppTheme.textHint),
-                ),
-            ]),
-          ),
-          const Divider(height: 1),
-          // ── Content ──
-          Expanded(child: SingleChildScrollView(
-            controller: scrollCtrl,
+              ],
+            )),
+            if (_step < 2)
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: AppTheme.textHint),
+              ),
+          ]),
+        ),
+        const Divider(height: 1),
+        // ── Content scrollable — PAS de scrollCtrl partagé ──
+        Expanded(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: _step == 0
                 ? _buildOperatorStep()
                 : _step == 1
                     ? _buildDetailsStep()
                     : _buildConfirmationStep(),
-          )),
-        ]),
-      ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -436,36 +437,43 @@ class _PaymentSheetState extends State<_PaymentSheet> {
       ..._operators.map((op) {
         final isSelected = _selectedOperator == op['id'];
         final color = Color(op['color'] as int);
-        return GestureDetector(
-          onTap: () => setState(() => _selectedOperator = op['id'] as String),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isSelected ? color.withValues(alpha: 0.07) : Colors.white,
+        final opId  = op['id'] as String;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Material(
+            color: isSelected ? color.withValues(alpha: 0.07) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isSelected ? color : AppTheme.dividerColor,
-                width: isSelected ? 2 : 1,
+              onTap: () => setState(() => _selectedOperator = opId),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSelected ? color : AppTheme.dividerColor,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(op['icon'] as IconData, color: color, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(child: Text(op['name'] as String,
+                      style: TextStyle(fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700, fontSize: 14,
+                          color: isSelected ? color : AppTheme.textPrimary))),
+                  if (isSelected)
+                    Icon(Icons.check_circle_rounded, color: color, size: 22),
+                ]),
               ),
             ),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(op['icon'] as IconData, color: color, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(child: Text(op['name'] as String,
-                  style: TextStyle(fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700, fontSize: 14,
-                      color: isSelected ? color : AppTheme.textPrimary))),
-              if (isSelected)
-                Icon(Icons.check_circle_rounded, color: color, size: 22),
-            ]),
           ),
         );
       }),
@@ -521,9 +529,14 @@ class _PaymentSheetState extends State<_PaymentSheet> {
               style: TextStyle(fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700, fontSize: 13, color: opColor)),
           const Spacer(),
-          GestureDetector(
-            onTap: () => setState(() { _step = 0; _selectedOperator = null; }),
-            child: Text('Changer',
+          TextButton(
+            onPressed: () => setState(() { _step = 0; _selectedOperator = null; }),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Changer',
                 style: TextStyle(fontFamily: 'Poppins',
                     fontSize: 11, color: AppTheme.primaryColor,
                     decoration: TextDecoration.underline)),
