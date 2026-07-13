@@ -382,35 +382,15 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: LayoutBuilder(
-                              builder: (ctx, box) {
-                                // Petits écrans (< 360 px) → texte plus petit
-                                final screenW = MediaQuery.of(ctx).size.width;
-                                final fs = screenW < 360 ? 9.0 : 10.0;
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text('Publier',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: fs,
-                                          height: 1.2,
-                                        )),
-                                    Text('annonce',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontFamily: 'Poppins',
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: fs,
-                                          height: 1.2,
-                                        )),
-                                  ],
-                                );
-                              },
+                          child: const Center(
+                            child: Text(
+                              'Publier',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
                             ),
                           ),
                         ),
@@ -1225,10 +1205,15 @@ class _HomeTabState extends State<_HomeTab>
       inner = _topBarInitials(user);
     }
     return Container(
-      width: 42, height: 42,
-      decoration: const BoxDecoration(
-        color: Color(0xFFD8E0EE), shape: BoxShape.circle),
-      child: ClipOval(child: inner),
+      width: 46, height: 46,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppTheme.accentColor, width: 2.0),
+      ),
+      child: ClipOval(child: Container(
+        color: const Color(0xFFD8E0EE),
+        child: inner,
+      )),
     );
   }
 
@@ -1322,6 +1307,9 @@ class _HomeTabState extends State<_HomeTab>
                   if (val == 'dashboard') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
+                  } else if (val == 'recharger') {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const PublicPacksScreen()));
                   } else if (val == 'reglages') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
@@ -1351,7 +1339,7 @@ class _HomeTabState extends State<_HomeTab>
                     ]),
                   ),
                   PopupMenuItem(
-                    value: 'reglages',
+                    value: 'recharger',
                     child: Row(children: [
                       Container(
                         padding: const EdgeInsets.all(6),
@@ -1359,8 +1347,26 @@ class _HomeTabState extends State<_HomeTab>
                           color: AppTheme.accentColor.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.settings_rounded,
+                        child: const Icon(Icons.add_circle_outline_rounded,
                             size: 18, color: AppTheme.accentColor),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Recharger',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: 'reglages',
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.blueGrey.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.settings_rounded,
+                            size: 18, color: Colors.blueGrey),
                       ),
                       const SizedBox(width: 12),
                       const Text('Réglages',
@@ -2685,6 +2691,59 @@ class _HomeTabState extends State<_HomeTab>
   }
 }
 
+// ── Helper partagé : bouton avatar avec bordure orange pour AppBar ─────────────
+Widget _buildAvatarActionButton(BuildContext context, UserModel? user) {
+  final avatarData = user?.avatar;
+  Widget inner;
+  if (avatarData != null && avatarData.isNotEmpty) {
+    try {
+      final b64 = avatarData.contains(',') ? avatarData.split(',').last : avatarData;
+      final bytes = base64Decode(b64);
+      inner = Image.memory(bytes, width: 36, height: 36, fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildAvatarInitials(user, size: 36));
+    } catch (_) {
+      inner = _buildAvatarInitials(user, size: 36);
+    }
+  } else {
+    inner = _buildAvatarInitials(user, size: 36);
+  }
+  return MouseRegion(
+    cursor: SystemMouseCursors.click,
+    child: GestureDetector(
+      onTap: () {
+        Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
+      },
+      child: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.accentColor, width: 2.0),
+        ),
+        child: ClipOval(child: Container(
+          color: const Color(0xFFD8E0EE),
+          child: inner,
+        )),
+      ),
+    ),
+  );
+}
+
+Widget _buildAvatarInitials(UserModel? user, {double size = 36}) {
+  final name = user?.name ?? '';
+  final initials = name.length >= 2
+      ? name.substring(0, 2).toUpperCase()
+      : name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  return Container(
+    width: size, height: size,
+    color: const Color(0xFFD8E0EE),
+    child: Center(child: Text(initials,
+        style: const TextStyle(fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700, fontSize: 13,
+            color: AppTheme.textPrimary))),
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD UTILISATEUR CONNECTE
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2871,6 +2930,15 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         actionsIconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Builder(builder: (ctx) {
+              final user = ctx.watch<AuthProvider>().currentUser;
+              return _buildAvatarActionButton(ctx, user);
+            }),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
@@ -2884,65 +2952,61 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 
                   // ── Solde de crédits + bouton Recharger ─────────────────
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      // Solde disponible
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
+                      // Solde disponible — fit-content (shrink-wrap)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _availableCredits > 0
+                              ? AppTheme.accentColor.withValues(alpha: 0.10)
+                              : Colors.red.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
                             color: _availableCredits > 0
-                                ? AppTheme.accentColor.withValues(alpha: 0.10)
-                                : Colors.red.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _availableCredits > 0
-                                  ? AppTheme.accentColor.withValues(alpha: 0.5)
-                                  : Colors.red.shade300,
-                              width: 1,
+                                ? AppTheme.accentColor.withValues(alpha: 0.5)
+                                : Colors.red.shade300,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                            _availableCredits > 0
+                                ? Icons.toll_rounded
+                                : Icons.warning_amber_rounded,
+                            color: _availableCredits > 0
+                                ? AppTheme.accentColor
+                                : Colors.red,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                              children: [
+                                TextSpan(
+                                  text: 'Solde disponible : ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: _availableCredits > 0
+                                        ? AppTheme.textSecondary
+                                        : Colors.red,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '$_availableCredits crédit${_availableCredits > 1 ? 's' : ''}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    color: _availableCredits > 0
+                                        ? AppTheme.accentColor
+                                        : Colors.red,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(children: [
-                            Icon(
-                              _availableCredits > 0
-                                  ? Icons.toll_rounded
-                                  : Icons.warning_amber_rounded,
-                              color: _availableCredits > 0
-                                  ? AppTheme.accentColor
-                                  : Colors.red,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-                                  children: [
-                                    TextSpan(
-                                      text: 'Solde disponible : ',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        color: _availableCredits > 0
-                                            ? AppTheme.textSecondary
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: '$_availableCredits crédit${_availableCredits > 1 ? 's' : ''}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 13,
-                                        color: _availableCredits > 0
-                                            ? AppTheme.accentColor
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ]),
-                        ),
+                        ]),
                       ),
                       const SizedBox(width: 10),
                       // Bouton Recharger
@@ -3579,6 +3643,15 @@ class _UserReglagesScreenState extends State<_UserReglagesScreen> {
           preferredSize: const Size.fromHeight(1),
           child: Container(color: const Color(0xFFE8ECF4), height: 1),
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Builder(builder: (ctx) {
+              final user = ctx.watch<AuthProvider>().currentUser;
+              return _buildAvatarActionButton(ctx, user);
+            }),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

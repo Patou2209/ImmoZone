@@ -1185,12 +1185,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 _selectedCommune = v ?? '';
               })),
 
-        // ── Bannière zone + sélecteur de durée ──────────────────────────────
-        if (_selectedCommune.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _buildZoneDurationWidget(),
-        ],
-
         _field(
           _quartierCtrl,
           _selectedType == 'Chambre d\'h\u00f4tel' ? 'Quartier *' : 'Quartier (optionnel)',
@@ -2875,7 +2869,30 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         balanceIcon  = Icons.warning_rounded;
     }
 
-    // ── Header: commune + coût + solde ──────────────────────────────────────────
+    // ── Zone info pour l'affichage dans le header ─────────────────────────────
+    final dsLocal = DataService();
+    final zoneName = dsLocal.getZoneStanding(_selectedCommune);
+    final Map<String, Color> zoneColorsMap = {
+      'Standard':      Colors.grey,
+      'Intermediaire': Colors.blue,
+      'Premium':       Colors.orange,
+      'Luxe':          Colors.purple,
+    };
+    final Map<String, String> zoneLabelsMap = {
+      'Standard':      'Standard',
+      'Intermediaire': 'Intermédiaire',
+      'Premium':       'Premium',
+      'Luxe':          'Luxe',
+    };
+    final zoneColor = zoneColorsMap[zoneName] ?? Colors.grey;
+    final zoneLabel = zoneLabelsMap[zoneName] ?? zoneName;
+
+    // Coûts par durée
+    final cost7  = dsLocal.getCreditsForCommune(_selectedCommune, days: 7,  transactionType: _selectedTransaction);
+    final cost15 = dsLocal.getCreditsForCommune(_selectedCommune, days: 15, transactionType: _selectedTransaction);
+    final cost30 = dsLocal.getCreditsForCommune(_selectedCommune, days: 30, transactionType: _selectedTransaction);
+
+    // ── Header: commune + zone + sélecteur durée + coût + solde ──────────────
     final headerCard = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -2883,7 +2900,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.6)),
       ),
-      child: Column(children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Ligne 1 : commune + badge zone ──────────────────────────────────
         Row(children: [
           const Icon(Icons.location_on, color: AppTheme.accentColor, size: 18),
           const SizedBox(width: 8),
@@ -2892,8 +2910,47 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
                 fontWeight: FontWeight.w600, color: Colors.white),
           )),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: zoneColor.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: zoneColor.withValues(alpha: 0.6)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.layers_rounded, color: zoneColor, size: 11),
+              const SizedBox(width: 4),
+              Text(
+                'Zone $zoneLabel',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                    fontWeight: FontWeight.w700, color: zoneColor),
+              ),
+            ]),
+          ),
         ]),
+
+        // ── Sélecteur de durée (uniquement si pas free_trial / free_quota) ──
+        if (!isFreeRight) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'Sélectionnez la durée de l\'annonce :',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                fontWeight: FontWeight.w500, color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          Row(children: [
+            _durationCostChip('7 Jours',  cost7,  zoneColor, _selectedDuration == 7,  7),
+            const SizedBox(width: 6),
+            _durationCostChip('15 Jours', cost15, zoneColor, _selectedDuration == 15, 15),
+            const SizedBox(width: 6),
+            _durationCostChip('30 Jours', cost30, zoneColor, _selectedDuration == 30, 30),
+          ]),
+        ],
+
         const SizedBox(height: 10),
+
+        // ── Ligne crédits : Requis | Votre solde ────────────────────────────
         Row(children: [
           // Bloc "Requis" — affiché uniquement si paiement par crédit nécessaire
           if (!isFreeRight) ...[
