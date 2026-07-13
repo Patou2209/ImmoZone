@@ -36,6 +36,10 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
     final subs = _packs.where((p) => p['type'] == 'subscription').toList();
     final pubs = _packs.where((p) => p['type'] != 'subscription').toList();
 
+    // Card width: fixed 160px — same size on mobile AND desktop
+    const double cardW = 160.0;
+    const double cardH = 190.0;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: const ImmoZoneAppBar(title: 'Recharger'),
@@ -60,7 +64,13 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                           style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
                               color: AppTheme.textSecondary)),
                       const SizedBox(height: 14),
-                      ...subs.map((s) => _subscriptionCard(s)),
+                      // Subscriptions also capped to 400px max
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: Column(
+                          children: subs.map((s) => _subscriptionCard(s)).toList(),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                     ],
 
@@ -72,17 +82,15 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                           style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
                               color: AppTheme.textSecondary)),
                       const SizedBox(height: 14),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.05,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemCount: pubs.length,
-                        itemBuilder: (_, i) => _pubPackCard(pubs[i]),
+                      // Wrap = fixed 160px cards — never stretches on desktop
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: pubs.map((p) => SizedBox(
+                          width: cardW,
+                          height: cardH,
+                          child: _pubPackCard(p),
+                        )).toList(),
                       ),
                     ],
 
@@ -189,51 +197,55 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
     final currency = pack['currency'] ?? 'USD';
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.dividerColor),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.accentColor.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.inventory_2_outlined, color: AppTheme.accentColor, size: 20),
-        ),
-        const SizedBox(height: 10),
-        Text(pack['name'] ?? '',
-            style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                fontSize: 12, color: AppTheme.textPrimary),
-            maxLines: 2, overflow: TextOverflow.ellipsis),
-        const Spacer(),
-        Text('$price $currency',
-            style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                fontSize: 16, color: AppTheme.accentColor)),
-        Text('$qty publication${qty > 1 ? 's' : ''}',
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                color: AppTheme.textSecondary)),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              textStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                  fontSize: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(9),
             ),
-            child: const Text('Choisir'),
+            child: const Icon(Icons.inventory_2_outlined, color: AppTheme.accentColor, size: 18),
           ),
-        ),
-      ]),
+          const SizedBox(height: 8),
+          Text(pack['name'] ?? '',
+              style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 11, color: AppTheme.textPrimary),
+              maxLines: 2, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 6),
+          Text('$price $currency',
+              style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                  fontSize: 15, color: AppTheme.accentColor)),
+          Text('$qty publication${qty > 1 ? 's' : ''}',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                  color: AppTheme.textSecondary)),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                textStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 11),
+              ),
+              child: const Text('Choisir'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
