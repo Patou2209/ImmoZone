@@ -534,7 +534,7 @@ class PropertyCard extends StatelessWidget {
                                           size: 9, color: AppTheme.accentColor),
                                       const SizedBox(width: 3),
                                       Text(
-                                        'Gar. ${property.garantieMois}m',
+                                        'Garantie ${property.garantieMois} mois',
                                         style: const TextStyle(
                                           fontSize: 9, fontWeight: FontWeight.w700,
                                           color: AppTheme.accentColor,

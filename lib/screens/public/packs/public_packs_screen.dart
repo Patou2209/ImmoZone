@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../services/data_service.dart';
+import '../../../providers/auth_provider.dart';
 
 class PublicPacksScreen extends StatefulWidget {
   const PublicPacksScreen({super.key});
@@ -99,6 +101,27 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
                 ),
               ),
       ),
+    );
+  }
+
+  // ── PAYMENT SHEET ───────────────────────────────────────────────────────────
+
+  void _showPaymentSheet(BuildContext context, Map<String, dynamic> pack) {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Veuillez vous connecter pour acheter un pack.',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppTheme.errorColor,
+      ));
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PaymentSheet(pack: pack, user: user, ds: _ds),
     );
   }
 
@@ -232,7 +255,7 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () => _showPaymentSheet(context, pack),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
@@ -248,4 +271,467 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
       ),
     );
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// _PaymentSheet — bottom sheet complet : opérateur → numéro → référence → envoi
+// ══════════════════════════════════════════════════════════════════════════════
+class _PaymentSheet extends StatefulWidget {
+  final Map<String, dynamic> pack;
+  final dynamic user;
+  final DataService ds;
+  const _PaymentSheet({required this.pack, required this.user, required this.ds});
+
+  @override
+  State<_PaymentSheet> createState() => _PaymentSheetState();
+}
+
+class _PaymentSheetState extends State<_PaymentSheet> {
+  // Étapes : 0=choix opérateur, 1=saisie numéro+ref, 2=confirmation envoyée
+  int _step = 0;
+  String? _selectedOperator;
+  final _phoneCtrl = TextEditingController();
+  final _refCtrl   = TextEditingController();
+  bool _sending = false;
+
+  static const _operators = [
+    {'id': 'orange_money',  'name': 'Orange Money',  'color': 0xFFFF6600, 'icon': Icons.cell_tower},
+    {'id': 'mpesa',         'name': 'M-Pesa',         'color': 0xFF00A86B, 'icon': Icons.payments_outlined},
+    {'id': 'airtel_money',  'name': 'Airtel Money',   'color': 0xFFE4002B, 'icon': Icons.account_balance_wallet_outlined},
+  ];
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _refCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitPayment() async {
+    final phone = _phoneCtrl.text.trim();
+    final ref   = _refCtrl.text.trim();
+    if (phone.isEmpty) {
+      _snack('Veuillez saisir votre numéro de téléphone.'); return;
+    }
+    if (ref.isEmpty) {
+      _snack('Veuillez saisir la référence de transaction.'); return;
+    }
+    setState(() => _sending = true);
+    try {
+      final qty    = widget.pack['qty'] as int? ?? 0;
+      final price  = (widget.pack['price'] as num).toDouble();
+      final currency = widget.pack['currency'] ?? 'USD';
+      final packName = widget.pack['name'] ?? '';
+
+      await widget.ds.submitManualPaymentRequest(
+        userId: widget.user.uid,
+        userName: widget.user.displayName ?? widget.user.email ?? '',
+        packId: widget.pack['id'] ?? '',
+        packName: packName,
+        credits: qty,
+        amount: price,
+        currency: currency,
+        operator: _selectedOperator!,
+        phoneNumber: phone,
+        transactionRef: ref,
+      );
+      if (mounted) setState(() { _step = 2; _sending = false; });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        _snack('Erreur lors de l\'envoi. Veuillez réessayer.');
+      }
+    }
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontFamily: 'Poppins')),
+      backgroundColor: AppTheme.errorColor,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final qty    = widget.pack['qty'] as int? ?? 0;
+    final price  = (widget.pack['price'] as num).toDouble();
+    final currency = widget.pack['currency'] ?? 'USD';
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(children: [
+          // ── Handle ──
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 4),
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.dividerColor,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          // ── Header ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.inventory_2_outlined,
+                    color: AppTheme.accentColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.pack['name'] ?? '',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 15,
+                        color: AppTheme.textPrimary)),
+                Text('$qty crédits · $price $currency',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 12, color: AppTheme.textSecondary)),
+              ])),
+              if (_step < 2)
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppTheme.textHint),
+                ),
+            ]),
+          ),
+          const Divider(height: 1),
+          // ── Content ──
+          Expanded(child: SingleChildScrollView(
+            controller: scrollCtrl,
+            padding: const EdgeInsets.all(20),
+            child: _step == 0
+                ? _buildOperatorStep()
+                : _step == 1
+                    ? _buildDetailsStep()
+                    : _buildConfirmationStep(),
+          )),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildOperatorStep() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Choisissez votre opérateur Mobile Money',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+              fontSize: 15, color: AppTheme.textPrimary)),
+      const SizedBox(height: 6),
+      const Text('Sélectionnez le service avec lequel vous effectuerez le paiement.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+              color: AppTheme.textSecondary, height: 1.5)),
+      const SizedBox(height: 20),
+      ..._operators.map((op) {
+        final isSelected = _selectedOperator == op['id'];
+        final color = Color(op['color'] as int);
+        return GestureDetector(
+          onTap: () => setState(() => _selectedOperator = op['id'] as String),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withValues(alpha: 0.07) : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? color : AppTheme.dividerColor,
+                width: isSelected ? 2 : 1,
+              ),
+            ),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(op['icon'] as IconData, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: Text(op['name'] as String,
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 14,
+                      color: isSelected ? color : AppTheme.textPrimary))),
+              if (isSelected)
+                Icon(Icons.check_circle_rounded, color: color, size: 22),
+            ]),
+          ),
+        );
+      }),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _selectedOperator == null
+              ? null
+              : () => setState(() => _step = 1),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: AppTheme.dividerColor,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Text('Continuer',
+              style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 14)),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildDetailsStep() {
+    final op = _operators.firstWhere((o) => o['id'] == _selectedOperator);
+    final opColor = Color(op['color'] as int);
+    final price   = (widget.pack['price'] as num).toDouble();
+    final currency = widget.pack['currency'] ?? 'USD';
+
+    // Numéros marchands par opérateur
+    const merchantNumbers = {
+      'orange_money': '+243 8X XXX XXXX',
+      'mpesa':        '+243 9X XXX XXXX',
+      'airtel_money': '+243 9X XXX XXXX',
+    };
+    final merchantNum = merchantNumbers[_selectedOperator] ?? 'À configurer';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Opérateur sélectionné
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: opColor.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: opColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          Icon(op['icon'] as IconData, color: opColor, size: 20),
+          const SizedBox(width: 10),
+          Text(op['name'] as String,
+              style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 13, color: opColor)),
+          const Spacer(),
+          GestureDetector(
+            onTap: () => setState(() { _step = 0; _selectedOperator = null; }),
+            child: Text('Changer',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontSize: 11, color: AppTheme.primaryColor,
+                    decoration: TextDecoration.underline)),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 16),
+
+      // Instruction de paiement
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.2)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.info_outline, color: AppTheme.primaryColor, size: 18),
+            const SizedBox(width: 8),
+            const Text('Instructions de paiement',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 13, color: AppTheme.primaryColor)),
+          ]),
+          const SizedBox(height: 10),
+          _instructionRow('1', 'Envoyez $price $currency au numéro ImmoZone :'),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.dividerColor),
+            ),
+            child: Row(children: [
+              const Icon(Icons.phone_rounded, color: AppTheme.accentColor, size: 16),
+              const SizedBox(width: 8),
+              Text(merchantNum,
+                  style: const TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w800, fontSize: 14,
+                      color: AppTheme.textPrimary)),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          _instructionRow('2', 'Notez la référence de la transaction reçue.'),
+          const SizedBox(height: 6),
+          _instructionRow('3', 'Remplissez le formulaire ci-dessous et soumettez.'),
+        ]),
+      ),
+      const SizedBox(height: 20),
+
+      // Formulaire
+      const Text('Votre numéro de téléphone',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
+              fontSize: 13, color: AppTheme.textPrimary)),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _phoneCtrl,
+        keyboardType: TextInputType.phone,
+        style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Ex: +243 81 234 5678',
+          hintStyle: const TextStyle(fontFamily: 'Poppins',
+              fontSize: 13, color: AppTheme.textHint),
+          prefixIcon: const Icon(Icons.phone_outlined, color: AppTheme.textHint, size: 20),
+          filled: true, fillColor: const Color(0xFFF5F7FA),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        ),
+      ),
+      const SizedBox(height: 16),
+      const Text('Référence de transaction',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600,
+              fontSize: 13, color: AppTheme.textPrimary)),
+      const SizedBox(height: 6),
+      TextField(
+        controller: _refCtrl,
+        style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Ex: TXN-20241201-XXXXX',
+          hintStyle: const TextStyle(fontFamily: 'Poppins',
+              fontSize: 13, color: AppTheme.textHint),
+          prefixIcon: const Icon(Icons.receipt_outlined, color: AppTheme.textHint, size: 20),
+          filled: true, fillColor: const Color(0xFFF5F7FA),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.dividerColor)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        ),
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _sending ? null : _submitPayment,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.accentColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _sending
+              ? const SizedBox(width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Soumettre la demande',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 14)),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _buildConfirmationStep() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.successColor.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check_circle_rounded,
+              color: AppTheme.successColor, size: 56),
+        ),
+        const SizedBox(height: 20),
+        const Text('Demande envoyée !',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                fontSize: 20, color: AppTheme.textPrimary)),
+        const SizedBox(height: 10),
+        const Text(
+          'Votre demande de recharge a été transmise à l\'administrateur.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+              color: AppTheme.textSecondary, height: 1.5),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.warningColor.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.35)),
+          ),
+          child: Column(children: [
+            _confirmRow(Icons.check_circle_outline, AppTheme.successColor,
+                'Demande enregistrée'),
+            const SizedBox(height: 10),
+            _confirmRow(Icons.admin_panel_settings, AppTheme.warningColor,
+                'Validation admin en cours'),
+            const SizedBox(height: 10),
+            _confirmRow(Icons.toll_outlined, AppTheme.textHint,
+                'Crédits ajoutés après approbation'),
+          ]),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Fermer',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 14)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _instructionRow(String num, String text) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 20, height: 20,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryColor,
+          shape: BoxShape.circle,
+        ),
+        child: Text(num, style: const TextStyle(fontFamily: 'Poppins',
+            fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: Text(text,
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+              color: AppTheme.textSecondary, height: 1.4))),
+    ],
+  );
+
+  Widget _confirmRow(IconData icon, Color color, String text) => Row(children: [
+    Icon(icon, color: color, size: 18),
+    const SizedBox(width: 10),
+    Text(text, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+        color: AppTheme.textPrimary)),
+  ]);
 }

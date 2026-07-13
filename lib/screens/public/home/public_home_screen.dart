@@ -371,15 +371,15 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                       child: GestureDetector(
                         onTap: () => _openPublish(context, auth),
                         child: Container(
-                          width: 64,
-                          height: 64,
+                          width: 54,
+                          height: 54,
                           decoration: BoxDecoration(
                             color: AppTheme.primaryColor,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.45),
-                                blurRadius: 16,
+                                color: AppTheme.primaryColor.withValues(alpha: 0.40),
+                                blurRadius: 12,
                                 offset: const Offset(0, 3),
                               ),
                             ],
@@ -391,7 +391,7 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
                                 color: Colors.white,
                                 fontFamily: 'Poppins',
                                 fontWeight: FontWeight.w600,
-                                fontSize: 11,
+                                fontSize: 10,
                               ),
                             ),
                           ),

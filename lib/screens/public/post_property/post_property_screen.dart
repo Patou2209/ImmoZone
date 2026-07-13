@@ -36,6 +36,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   String _selectedProvince = 'Kinshasa';
   String _selectedCity     = 'Kinshasa';
   String _selectedCommune  = 'Gombe';
+  // "Autre" custom saisie manuelle
+  final _customCityCtrl    = TextEditingController();
+  final _customCommuneCtrl = TextEditingController();
+  bool _isCityCustom    = false; // true si user a choisi "Autre" pour la ville
+  bool _isCommuneCustom = false; // true si user a choisi "Autre" pour la commune
   final _quartierCtrl  = TextEditingController();
   String _selectedType = AppConstants.propertyTypes.first;
   String _selectedTransaction = AppConstants.transactionTypes.first;
@@ -347,6 +352,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _longueurCtrl, _largeurCtrl,
       _commissionPctCtrl,
       _imageUrlCtrl,  _transactionRefCtrl,
+      _customCityCtrl, _customCommuneCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -369,6 +375,20 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   /// Construit l'adresse complète ordonnée selon :
   /// Pays, Province, Ville, Commune, Quartier, Av. Avenue N°Numéro, Réf: Référence
+  /// Construit le label "Publication dans : Commune, Ville" en évitant
+  /// les virgules orphelines quand commune ou ville sont vides.
+  String _buildPublicationLocationLabel() {
+    final parts = <String>[];
+    if (_selectedCommune.isNotEmpty) parts.add(_selectedCommune);
+    if (_selectedCity.isNotEmpty && _selectedCity != _selectedCommune) {
+      parts.add(_selectedCity);
+    }
+    if (parts.isEmpty && _selectedProvince.isNotEmpty) {
+      parts.add(_selectedProvince);
+    }
+    return 'Publication dans : ${parts.join(', ')}';
+  }
+
   String _buildFullAddress() {
     final parts = <String>[];
     if (_selectedCountry.isNotEmpty) parts.add(_selectedCountry);
@@ -1155,6 +1175,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           if (v != null) {
             setState(() {
               _selectedProvince = v;
+              _isCityCustom    = false;
+              _isCommuneCustom = false;
+              _customCityCtrl.clear();
+              _customCommuneCtrl.clear();
               final cities = AppConstants.getCitiesForProvince(_selectedCountry, v);
               _selectedCity    = cities.isNotEmpty ? cities.first : '';
               final communes   = AppConstants.getCommunesForCity(_selectedCity);
@@ -1163,27 +1187,76 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           }
         }),
 
-        // Ville dynamique selon province
+        // Ville/Cité dynamique selon province — avec option "Autre"
         if (_availableCities.isNotEmpty) ...[
-          _dropdown('Ville *', _selectedCity, _availableCities,
+          _dropdown('Ville/Cité *', _isCityCustom ? 'Autre' : _selectedCity,
+              [..._availableCities, 'Autre'],
               Icons.location_city, (v) {
-            if (v != null) {
+            if (v == null) return;
+            if (v == 'Autre') {
               setState(() {
-                _selectedCity = v;
-                final communes = AppConstants.getCommunesForCity(v);
+                _isCityCustom    = true;
+                _isCommuneCustom = true;
+                _selectedCity    = '';
+                _selectedCommune = '';
+                _customCityCtrl.clear();
+                _customCommuneCtrl.clear();
+              });
+            } else {
+              setState(() {
+                _isCityCustom    = false;
+                _isCommuneCustom = false;
+                _selectedCity    = v;
+                final communes   = AppConstants.getCommunesForCity(v);
                 _selectedCommune = communes.isNotEmpty ? communes.first : '';
               });
             }
           }),
+          // Champ texte si "Autre" sélectionné pour la ville
+          if (_isCityCustom) ...[
+            const SizedBox(height: 8),
+            _field(_customCityCtrl, 'Nom de la ville/cité *',
+                Icons.edit_location_alt_outlined,
+                'Ex: Idiofa, Kamituga, Gemena…',
+                onChanged: (v) => setState(() => _selectedCity = v.trim())),
+          ],
         ],
 
-        // Commune dynamique selon ville
-        if (_availableCommunes.isNotEmpty)
-          _dropdown('Commune *', _selectedCommune, _availableCommunes,
+        // Commune dynamique selon ville — avec option "Autre"
+        if (!_isCityCustom && _availableCommunes.isNotEmpty) ...[
+          _dropdown('Commune *', _selectedCommune,
+              [..._availableCommunes, 'Autre'],
+              Icons.location_on_outlined, (v) {
+            if (v == null) return;
+            if (v == 'Autre') {
+              setState(() {
+                _isCommuneCustom = true;
+                _selectedCommune = '';
+                _customCommuneCtrl.clear();
+              });
+            } else {
+              setState(() {
+                _isCommuneCustom = false;
+                _selectedCommune = v;
+              });
+            }
+          }),
+          if (_isCommuneCustom) ...[
+            const SizedBox(height: 8),
+            _field(_customCommuneCtrl, 'Nom de la commune *',
+                Icons.edit_location_alt_outlined,
+                'Ex: Ngaba, Kisenso, Bulungu…',
+                onChanged: (v) => setState(() => _selectedCommune = v.trim())),
+          ],
+        ],
+        // Saisie commune manuelle quand la ville aussi est manuelle
+        if (_isCityCustom) ...[
+          const SizedBox(height: 4),
+          _field(_customCommuneCtrl, 'Commune (optionnel)',
               Icons.location_on_outlined,
-              (v) => setState(() {
-                _selectedCommune = v ?? '';
-              })),
+              'Ex: Centre, Zone 1…',
+              onChanged: (v) => setState(() => _selectedCommune = v.trim())),
+        ],
 
         _field(
           _quartierCtrl,
@@ -2908,7 +2981,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           const Icon(Icons.location_on, color: AppTheme.accentColor, size: 18),
           const SizedBox(width: 8),
           Expanded(child: Text(
-            'Publication dans : $_selectedCommune${_selectedCity.isNotEmpty ? ", $_selectedCity" : ""}',
+            _buildPublicationLocationLabel(),
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                 fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
           )),
@@ -3159,9 +3232,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // CAS 3 — PAID CREDIT : crédits payants suffisants
+    // CAS 3 — PAID CREDIT + solde suffisant
     // ══════════════════════════════════════════════════════════════════
-    if (_publicationRight == 'paid_credit') {
+    if (_publicationRight == 'paid_credit' && _hasEnoughCredits) {
       return [
         headerCard,
         const SizedBox(height: 16),
@@ -3204,7 +3277,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // CAS 4 — NO RIGHT : solde insuffisant
+    // CAS 4 — NO RIGHT ou paid_credit insuffisant : solde insuffisant
     // ══════════════════════════════════════════════════════════════════
 
     // Sous-cas 4a : paiement déjà soumis, en attente admin
@@ -3853,6 +3926,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   Widget _field(TextEditingController ctrl, String label, IconData icon, String hint, {
     TextInputType type = TextInputType.text, int maxLines = 1, Widget? suffix,
+    void Function(String)? onChanged,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -3860,6 +3934,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         controller: ctrl,
         keyboardType: type,
         maxLines: maxLines,
+        onChanged: onChanged,
         style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
         decoration: InputDecoration(
           labelText: label,

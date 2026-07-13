@@ -1741,6 +1741,43 @@ class DataService {
     await _paymentsCol.doc(payment.id).set(payment.toMap());
   }
 
+  /// Soumet une demande de recharge manuelle depuis l'écran Recharger.
+  /// Crée un PaymentModel avec status='awaiting_manual' que l'admin valide.
+  Future<void> submitManualPaymentRequest({
+    required String userId,
+    required String userName,
+    required String packId,
+    required String packName,
+    required int credits,
+    required double amount,
+    required String currency,
+    required String operator,
+    required String phoneNumber,
+    required String transactionRef,
+  }) async {
+    final id = _paymentsCol.doc().id;
+    final payment = PaymentModel(
+      id: id,
+      userId: userId,
+      userName: userName,
+      orderId: 'PACK-${DateTime.now().millisecondsSinceEpoch}',
+      operator: operator,
+      phoneNumber: phoneNumber,
+      amount: amount,
+      currency: currency,
+      status: 'awaiting_manual',
+      transactionReference: transactionRef,
+      createdAt: DateTime.now(),
+      productType: packId.isNotEmpty ? packId : 'pack_credits',
+      creditsQty: credits,
+    );
+    await _paymentsCol.doc(id).set({
+      ...payment.toMap(),
+      'packName': packName,
+      'packId': packId,
+    });
+  }
+
   Future<void> validatePaymentManually(
     String paymentId, {
     required String adminId,
