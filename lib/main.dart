@@ -251,18 +251,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ── WEB : fond blanc pur, aucun widget Flutter visible.
-    // L'HTML overlay imz-loading recouvre tout jusqu'au premier frame.
-    // Dès que Flutter rend ce Scaffold blanc, l'overlay se fond en lui
-    // puis disparaît — transition imperceptible, zéro double-splash.
-    if (kIsWeb) {
-      return const Scaffold(backgroundColor: Colors.white);
-    }
-
-    // ── MOBILE : splash Flutter classique, propre, sans animation.
     final screenW = MediaQuery.of(context).size.width;
-    final logoW = _logoWidth(screenW);
+    final logoW   = _logoWidth(screenW);
 
+    // Contenu splash identique sur web et mobile —
+    // sur web il se superpose exactement à l'overlay HTML (même blanc, même logo),
+    // donc quand l'overlay HTML disparaît au flutter-first-frame, la transition
+    // est parfaitement continue : aucun blanc nu n'est visible.
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(

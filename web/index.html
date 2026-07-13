@@ -213,7 +213,6 @@
 
   <script>
     // Masque l'overlay dès que Flutter rend son premier frame.
-    // Timeout de sécurité : retire l'overlay après 4 s même si l'event ne vient pas.
     (function () {
       function hideOverlay() {
         var el = document.getElementById('imz-loading');
@@ -222,10 +221,8 @@
         // Retirer du DOM après la transition CSS (350 ms)
         setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 400);
       }
-      // Événement natif Flutter Web
+      // Événement natif Flutter Web — retire l'overlay au premier frame Flutter
       window.addEventListener('flutter-first-frame', hideOverlay, { once: true });
-      // Sécurité : retire après 4 secondes maximum
-      setTimeout(hideOverlay, 4000);
     })();
   </script>
 
