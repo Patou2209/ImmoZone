@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/message_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../models/message_model.dart';
 import 'conversation_screen.dart';
 import 'package:intl/intl.dart';
@@ -37,25 +38,24 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Messages'),
-        backgroundColor: AppTheme.primaryColor,
-        actions: [
+      appBar: ImmoZoneAppBar(
+        title: 'Messages',
+        extraActions: [
           if (msgProvider.unreadCount > 0)
-            Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '${msgProvider.unreadCount} non lus',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${msgProvider.unreadCount} non lus',
+                  style: const TextStyle(
+                    color: Colors.white, fontSize: 12,
+                    fontFamily: 'Poppins', fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

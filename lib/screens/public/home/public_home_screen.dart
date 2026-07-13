@@ -30,6 +30,8 @@ import '../../auth/login_screen.dart';
 import '../../admin/admin_home_screen.dart';
 import '../packs/public_packs_screen.dart';
 import '../search/search_screen.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
+import '../../../core/widgets/immozone_nav_helper.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -1306,13 +1308,13 @@ class _HomeTabState extends State<_HomeTab>
                 onSelected: (val) async {
                   if (val == 'dashboard') {
                     Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const _UserDashboardScreen()));
+                        MaterialPageRoute(builder: (_) => const UserDashboardScreen()));
                   } else if (val == 'recharger') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const PublicPacksScreen()));
                   } else if (val == 'reglages') {
                     Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
+                        MaterialPageRoute(builder: (_) => const UserReglagesScreen()));
                   } else if (val == 'logout') {
                     final authProv = context.read<AuthProvider>();
                     await authProv.logout();
@@ -2712,7 +2714,7 @@ Widget _buildAvatarActionButton(BuildContext context, UserModel? user) {
     child: GestureDetector(
       onTap: () {
         Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const _UserReglagesScreen()));
+            MaterialPageRoute(builder: (_) => const UserReglagesScreen()));
       },
       child: Container(
         width: 40, height: 40,
@@ -2747,13 +2749,13 @@ Widget _buildAvatarInitials(UserModel? user, {double size = 36}) {
 // ══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD UTILISATEUR CONNECTE
 // ══════════════════════════════════════════════════════════════════════════════
-class _UserDashboardScreen extends StatefulWidget {
-  const _UserDashboardScreen();
+class UserDashboardScreen extends StatefulWidget {
+  const UserDashboardScreen();
   @override
-  State<_UserDashboardScreen> createState() => _UserDashboardScreenState();
+  State<UserDashboardScreen> createState() => _UserDashboardScreenState();
 }
 
-class _UserDashboardScreenState extends State<_UserDashboardScreen> {
+class _UserDashboardScreenState extends State<UserDashboardScreen> {
   final DataService _ds = DataService();
   List<PropertyModel> _myProperties = [];
   bool _loading = true;
@@ -2921,24 +2923,9 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Mon Tableau de Bord',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                color: Colors.white)),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actionsIconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Builder(builder: (ctx) {
-              final user = ctx.watch<AuthProvider>().currentUser;
-              return _buildAvatarActionButton(ctx, user);
-            }),
-          ),
-        ],
+      appBar: ImmoZoneAppBar(
+        title: 'Mon Tableau de Bord',
+        onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentColor))
@@ -3420,13 +3407,13 @@ class _UserDashboardScreenState extends State<_UserDashboardScreen> {
 // ÉCRAN RÉGLAGES — Photo de profil + Message d'accueil
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _UserReglagesScreen extends StatefulWidget {
-  const _UserReglagesScreen();
+class UserReglagesScreen extends StatefulWidget {
+  const UserReglagesScreen();
   @override
-  State<_UserReglagesScreen> createState() => _UserReglagesScreenState();
+  State<UserReglagesScreen> createState() => _UserReglagesScreenState();
 }
 
-class _UserReglagesScreenState extends State<_UserReglagesScreen> {
+class _UserReglagesScreenState extends State<UserReglagesScreen> {
   final DataService _ds = DataService();
   bool _uploadingPhoto = false;
   bool _savingDesc     = false;
@@ -3630,28 +3617,9 @@ class _UserReglagesScreenState extends State<_UserReglagesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppTheme.textPrimary,
-        elevation: 0,
-        centerTitle: false,
-        title: const Text('Réglages',
-            style: TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700, fontSize: 18,
-                color: AppTheme.textPrimary)),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE8ECF4), height: 1),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Builder(builder: (ctx) {
-              final user = ctx.watch<AuthProvider>().currentUser;
-              return _buildAvatarActionButton(ctx, user);
-            }),
-          ),
-        ],
+      appBar: ImmoZoneAppBar(
+        title: 'Réglages',
+        onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

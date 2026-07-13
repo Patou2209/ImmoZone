@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../core/widgets/ad_banner_card.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../services/data_service.dart';
 import '../../../models/property_model.dart';
 import '../../../models/ad_model.dart';
@@ -156,19 +157,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Rechercher',
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700,
-                color: Colors.white)),
-        backgroundColor: AppTheme.primaryColor,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actionsIconTheme: const IconThemeData(color: Colors.white),
-        actions: [
+      appBar: ImmoZoneAppBar(
+        title: 'Rechercher',
+        extraActions: [
           IconButton(
             icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list,
-                color: Colors.white),
+                color: AppTheme.primaryColor),
             onPressed: () => setState(() => _showFilters = !_showFilters),
             tooltip: 'Filtres',
           ),

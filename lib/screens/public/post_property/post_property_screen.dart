@@ -2894,11 +2894,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
     // ── Header: commune + zone + sélecteur durée + coût + solde ──────────────
     final headerCard = Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.6)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8, offset: const Offset(0, 3))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Ligne 1 : commune + badge zone ──────────────────────────────────
@@ -2907,38 +2909,42 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           const SizedBox(width: 8),
           Expanded(child: Text(
             'Publication dans : $_selectedCommune${_selectedCity.isNotEmpty ? ", $_selectedCity" : ""}',
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                fontWeight: FontWeight.w600, color: Colors.white),
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
           )),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
-              color: zoneColor.withValues(alpha: 0.22),
+              color: zoneColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: zoneColor.withValues(alpha: 0.6)),
+              border: Border.all(color: zoneColor.withValues(alpha: 0.5)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.layers_rounded, color: zoneColor, size: 11),
+              Icon(Icons.layers_rounded, color: zoneColor, size: 12),
               const SizedBox(width: 4),
               Text(
                 'Zone $zoneLabel',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
                     fontWeight: FontWeight.w700, color: zoneColor),
               ),
             ]),
           ),
         ]),
 
+        // ── Séparateur ───────────────────────────────────────────────────────
+        const SizedBox(height: 14),
+        const Divider(height: 1, color: AppTheme.dividerColor),
+        const SizedBox(height: 12),
+
         // ── Sélecteur de durée (uniquement si pas free_trial / free_quota) ──
         if (!isFreeRight) ...[
-          const SizedBox(height: 12),
-          const Text(
+          Text(
             'Sélectionnez la durée de l\'annonce :',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                fontWeight: FontWeight.w500, color: Colors.white70),
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(children: [
             _durationCostChip('7 Jours',  cost7,  zoneColor, _selectedDuration == 7,  7),
             const SizedBox(width: 6),
@@ -2946,9 +2952,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             const SizedBox(width: 6),
             _durationCostChip('30 Jours', cost30, zoneColor, _selectedDuration == 30, 30),
           ]),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppTheme.dividerColor),
+          const SizedBox(height: 12),
         ],
-
-        const SizedBox(height: 10),
 
         // ── Ligne crédits : Requis | Votre solde ────────────────────────────
         Row(children: [
@@ -2958,16 +2965,18 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                 decoration: BoxDecoration(
-                  color: AppTheme.accentColor,
+                  color: AppTheme.accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.35)),
                 ),
                 child: Column(children: [
-                  const Text('Requis', style: TextStyle(fontFamily: 'Poppins',
-                      fontSize: 10, color: Colors.white70)),
+                  Text('Requis', style: TextStyle(fontFamily: 'Poppins',
+                      fontSize: 10, color: AppTheme.textSecondary)),
                   const SizedBox(height: 2),
                   Text('$_requiredCredits crédit${_requiredCredits > 1 ? 's' : ''}',
                       style: const TextStyle(fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white)),
+                          fontWeight: FontWeight.w800, fontSize: 16,
+                          color: AppTheme.accentColor)),
                 ]),
               ),
             ),
@@ -2978,7 +2987,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
               decoration: BoxDecoration(
-                color: balanceColor.withValues(alpha: 0.15),
+                color: balanceColor.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: balanceColor.withValues(alpha: 0.4)),
               ),

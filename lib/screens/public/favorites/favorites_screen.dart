@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../models/property_model.dart';
 import '../../../services/data_service.dart';
 import '../../../core/constants/app_constants.dart';
@@ -53,25 +54,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Mes Favoris'),
-        backgroundColor: AppTheme.primaryColor,
-        actions: [
+      appBar: ImmoZoneAppBar(
+        title: 'Mes Favoris',
+        extraActions: [
           if (_favorites.isNotEmpty)
             Center(
               child: Container(
-                margin: const EdgeInsets.only(right: 16),
+                margin: const EdgeInsets.only(right: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppTheme.accentColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   '${_favorites.length}',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppTheme.accentColor,
                     fontWeight: FontWeight.w700,
                     fontFamily: 'Poppins',
+                    fontSize: 13,
                   ),
                 ),
               ),

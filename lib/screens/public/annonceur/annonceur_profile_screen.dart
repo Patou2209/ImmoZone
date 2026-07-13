@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../models/property_model.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../models/user_model.dart';
@@ -200,16 +201,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: Text(displayName,
-            style: const TextStyle(fontFamily: 'Poppins',
-                fontWeight: FontWeight.w700, color: Colors.white),
-            overflow: TextOverflow.ellipsis),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
+      appBar: ImmoZoneAppBar(title: displayName),
       body: _loading
           ? const Center(child: CircularProgressIndicator(
               color: AppTheme.accentColor))
