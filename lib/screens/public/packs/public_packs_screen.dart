@@ -104,24 +104,23 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
     );
   }
 
-  // ── PAYMENT SHEET ───────────────────────────────────────────────────────────
+  // ── PAYMENT DIALOG ──────────────────────────────────────────────────────────
 
-  void _showPaymentSheet(BuildContext context, Map<String, dynamic> pack) {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
+  void _showPaymentSheet(BuildContext ctx, Map<String, dynamic> pack) {
+    final auth = Provider.of<AuthProvider>(ctx, listen: false);
     final user = auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
         content: Text('Veuillez vous connecter pour acheter un pack.',
             style: TextStyle(fontFamily: 'Poppins')),
         backgroundColor: AppTheme.errorColor,
       ));
       return;
     }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PaymentSheet(pack: pack, user: user, ds: _ds),
+    showDialog(
+      context: ctx,
+      barrierDismissible: true,
+      builder: (_) => _PaymentDialog(pack: pack, user: user, ds: _ds),
     );
   }
 
@@ -274,19 +273,19 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// _PaymentSheet — bottom sheet complet : opérateur → numéro → référence → envoi
+// _PaymentDialog — Dialog (pas bottom sheet) pour éviter bugs de gestes web
 // ══════════════════════════════════════════════════════════════════════════════
-class _PaymentSheet extends StatefulWidget {
+class _PaymentDialog extends StatefulWidget {
   final Map<String, dynamic> pack;
   final dynamic user;
   final DataService ds;
-  const _PaymentSheet({required this.pack, required this.user, required this.ds});
+  const _PaymentDialog({required this.pack, required this.user, required this.ds});
 
   @override
-  State<_PaymentSheet> createState() => _PaymentSheetState();
+  State<_PaymentDialog> createState() => _PaymentDialogState();
 }
 
-class _PaymentSheetState extends State<_PaymentSheet> {
+class _PaymentDialogState extends State<_PaymentDialog> {
   // Étapes : 0=choix opérateur, 1=saisie numéro+ref, 2=confirmation envoyée
   int _step = 0;
   String? _selectedOperator;
@@ -358,69 +357,66 @@ class _PaymentSheetState extends State<_PaymentSheet> {
     final price    = (widget.pack['price'] as num).toDouble();
     final currency = widget.pack['currency'] ?? 'USD';
     final screenH  = MediaQuery.of(context).size.height;
+    final screenW  = MediaQuery.of(context).size.width;
 
-    return Container(
-      height: screenH * 0.85,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenW > 600 ? (screenW - 520) / 2 : 16,
+        vertical: 32,
       ),
-      child: Column(children: [
-        // ── Handle ──
-        Container(
-          margin: const EdgeInsets.only(top: 10, bottom: 4),
-          width: 40, height: 4,
-          decoration: BoxDecoration(
-            color: AppTheme.dividerColor,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        // ── Header ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.accentColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: 520,
+        height: screenH * 0.82,
+        child: Column(children: [
+          // ── Header ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 12, 10),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.inventory_2_outlined,
+                    color: AppTheme.accentColor, size: 20),
               ),
-              child: const Icon(Icons.inventory_2_outlined,
-                  color: AppTheme.accentColor, size: 20),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.pack['name'] ?? '',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700, fontSize: 15,
+                          color: AppTheme.textPrimary)),
+                  Text('$qty crédits · $price $currency',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontSize: 12, color: AppTheme.textSecondary)),
+                ],
+              )),
+              if (_step < 2)
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, color: AppTheme.textHint),
+                ),
+            ]),
+          ),
+          const Divider(height: 1),
+          // ── Contenu — SingleChildScrollView simple, aucun controller partagé ──
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: _step == 0
+                  ? _buildOperatorStep()
+                  : _step == 1
+                      ? _buildDetailsStep()
+                      : _buildConfirmationStep(),
             ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.pack['name'] ?? '',
-                    style: const TextStyle(fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700, fontSize: 15,
-                        color: AppTheme.textPrimary)),
-                Text('$qty crédits · $price $currency',
-                    style: const TextStyle(fontFamily: 'Poppins',
-                        fontSize: 12, color: AppTheme.textSecondary)),
-              ],
-            )),
-            if (_step < 2)
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close, color: AppTheme.textHint),
-              ),
-          ]),
-        ),
-        const Divider(height: 1),
-        // ── Content scrollable — PAS de scrollCtrl partagé ──
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: _step == 0
-                ? _buildOperatorStep()
-                : _step == 1
-                    ? _buildDetailsStep()
-                    : _buildConfirmationStep(),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 
