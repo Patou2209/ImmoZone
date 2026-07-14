@@ -13,6 +13,7 @@ import '../../../models/payment_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
+import '../../../core/widgets/immozone_nav_helper.dart';
 
 class PostPropertyScreen extends StatefulWidget {
   const PostPropertyScreen({super.key});
@@ -846,81 +847,43 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        // Bouton retour Android : retour à l'étape précédente
         if (_step > 0) {
-          // Retour à l'étape précédente (ne quitte PAS la page)
           _goTo(_step - 1);
-        } else {
-          // Étape 0 : confirmer avant de quitter
-          final leave = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              title: const Text('Quitter la publication ?',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
-              content: const Text('Votre annonce en cours de création sera perdue.',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Continuer', style: TextStyle(fontFamily: 'Poppins')),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: const Text('Quitter', style: TextStyle(
-                      fontFamily: 'Poppins', color: Colors.red)),
-                ),
-              ],
-            ),
-          );
-          if (leave == true && context.mounted) {
-            Navigator.of(context).pop();
-          }
         }
+        // À l'étape 0 : le bouton retour Android ne fait rien —
+        // utiliser le ✕ dans l'AppBar pour abandonner.
       },
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          backgroundColor: AppTheme.primaryColor,
-          title: const Text('Publier une annonce',
-            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17,
-                color: Colors.white)),
-          foregroundColor: Colors.white,
-          automaticallyImplyLeading: false,
-          leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () async {
-              if (_step > 0) {
-                _goTo(_step - 1);
-              } else {
-                final leave = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    title: const Text('Quitter la publication ?',
-                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
-                    content: const Text('Votre annonce en cours de création sera perdue.',
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(false),
-                        child: const Text('Continuer', style: TextStyle(fontFamily: 'Poppins')),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(true),
-                        child: const Text('Quitter', style: TextStyle(
-                            fontFamily: 'Poppins', color: Colors.red)),
-                      ),
-                    ],
+        appBar: _PostPropertyAppBar(
+          step: _step,
+          onBack: () => _goTo(_step - 1),
+          onAbandon: () async {
+            final leave = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                title: const Text('Abandonner la publication ?',
+                    style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+                content: const Text('Votre annonce en cours de création sera perdue.',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Continuer', style: TextStyle(fontFamily: 'Poppins')),
                   ),
-                );
-                if (leave == true && context.mounted) Navigator.of(context).pop();
-              }
-            },
-          ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(50),
-            child: _buildStepIndicator(),
-          ),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Abandonner',
+                        style: TextStyle(fontFamily: 'Poppins', color: Colors.red)),
+                  ),
+                ],
+              ),
+            );
+            if (leave == true && context.mounted) Navigator.of(context).pop();
+          },
+          stepIndicator: _buildStepIndicator(),
         ),
         body: SafeArea(
           top: false,
@@ -3376,7 +3339,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       _buildRechargeTiersBanner(),
 
       // ── ETAPE A : Choisir le pack ─────────────────────────────────────
-      _stepBadge('1', 'Choisissez une recharge de crédits'),
+      _stepBadge('1', 'Choisir un pack de recharge'),
       const SizedBox(height: 10),
       ...packs.map((pack) => _packTile(pack)),
       const SizedBox(height: 20),
@@ -4118,4 +4081,197 @@ class _ConfirmStep extends StatelessWidget {
       ])),
     ]);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// _PostPropertyAppBar — AppBar blanc style ImmoZone pour le flux de publication
+//
+// • Fond blanc, titre centré en noir
+// • Gauche : ← retour étape précédente (masqué à l'étape 0)
+//            + ✕ abandon définitif (visible partout)
+// • Droite : avatar utilisateur avec popup menu (identique ImmoZoneAppBar)
+// • Bas : indicateur d'étapes (bande colorée configurable)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _PostPropertyAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final int step;
+  final VoidCallback onBack;
+  final VoidCallback onAbandon;
+  final Widget stepIndicator;
+
+  const _PostPropertyAppBar({
+    required this.step,
+    required this.onBack,
+    required this.onAbandon,
+    required this.stepIndicator,
+  });
+
+  @override
+  // AppBar normal (56) + bande indicateur d'étapes (50) + séparateur (1)
+  Size get preferredSize => const Size.fromHeight(56 + 50 + 1);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.textPrimary,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+
+          // ── Gauche : ← retour (si étape > 0) + ✕ abandon ─────────────────
+          leading: step > 0
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.primaryColor),
+                  tooltip: 'Étape précédente',
+                  onPressed: onBack,
+                )
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, color: AppTheme.errorColor),
+                  tooltip: 'Abandonner',
+                  onPressed: onAbandon,
+                ),
+
+          title: const Text(
+            'Publier une annonce',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+
+          // ── Droite : ✕ abandon (quand retour visible) + avatar popup ───────
+          actions: [
+            // ✕ abandon visible uniquement quand la flèche ← est à gauche
+            if (step > 0)
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: AppTheme.errorColor),
+                tooltip: 'Abandonner la publication',
+                onPressed: onAbandon,
+              ),
+            // Avatar avec popup menu (identique à ImmoZoneAppBar)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Builder(builder: (ctx) {
+                final auth = ctx.watch<AuthProvider>();
+                if (!auth.isLoggedIn) return const SizedBox.shrink();
+                return _PostPropertyAvatarMenu(user: auth.currentUser);
+              }),
+            ),
+          ],
+        ),
+
+        // ── Séparateur ──────────────────────────────────────────────────────
+        Container(height: 1, color: const Color(0xFFE4E8F0)),
+
+        // ── Indicateur d'étapes (1→5) ───────────────────────────────────────
+        stepIndicator,
+      ],
+    );
+  }
+}
+
+// ── Avatar + popup identique à ImmoZoneAppBar mais sans navigation externe ────
+class _PostPropertyAvatarMenu extends StatelessWidget {
+  final dynamic user; // UserModel
+  const _PostPropertyAvatarMenu({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      offset: const Offset(0, 50),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      elevation: 8,
+      onSelected: (val) async {
+        await handleImmoZoneAvatarNav(context, val);
+      },
+      itemBuilder: (_) => [
+        _item('dashboard', Icons.dashboard_rounded,
+            'Mon tableau de bord', AppTheme.primaryColor),
+        _item('recharger', Icons.add_circle_outline_rounded,
+            'Recharger', AppTheme.accentColor),
+        _item('reglages', Icons.settings_rounded,
+            'Réglages', Colors.blueGrey),
+        const PopupMenuDivider(height: 1),
+        _itemRed('logout', Icons.logout_rounded, 'Déconnexion'),
+      ],
+      child: _buildAvatar(),
+    );
+  }
+
+  Widget _buildAvatar() {
+    final data = user?.avatar as String?;
+    Widget inner;
+    if (data != null && data.isNotEmpty) {
+      try {
+        final b64 = data.contains(',') ? data.split(',').last : data;
+        final bytes = base64Decode(b64);
+        inner = Image.memory(bytes, width: 36, height: 36, fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _initials());
+      } catch (_) {
+        inner = _initials();
+      }
+    } else {
+      inner = _initials();
+    }
+    return Container(
+      width: 38, height: 38,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppTheme.accentColor, width: 2.0),
+      ),
+      child: ClipOval(child: Container(
+        color: const Color(0xFFD8E0EE),
+        child: inner,
+      )),
+    );
+  }
+
+  Widget _initials() {
+    final name = user?.name as String? ?? '';
+    final letters = name.length >= 2
+        ? name.substring(0, 2).toUpperCase()
+        : name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    return Center(child: Text(letters,
+        style: const TextStyle(fontFamily: 'Poppins',
+            fontWeight: FontWeight.w700, fontSize: 13,
+            color: AppTheme.textPrimary)));
+  }
+
+  PopupMenuItem<String> _item(String val, IconData icon, String label, Color color) =>
+    PopupMenuItem(
+      value: val,
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(icon, size: 18, color: color),
+        ),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600, fontSize: 13)),
+      ]),
+    );
+
+  PopupMenuItem<String> _itemRed(String val, IconData icon, String label) =>
+    PopupMenuItem(
+      value: val,
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(icon, size: 18, color: Colors.red),
+        ),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600, fontSize: 13, color: Colors.red)),
+      ]),
+    );
 }
