@@ -79,11 +79,7 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
 
                     // ── PACKS PUBLICATIONS ──────────────────────────────────
                     if (pubs.isNotEmpty) ...[
-                      _sectionHeader('Packs de Publications'),
-                      const SizedBox(height: 4),
-                      const Text('Achetez des publications à l\'unité ou en lot',
-                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                              color: AppTheme.textSecondary)),
+                      _sectionHeader('Packs disponibles'),
                       const SizedBox(height: 14),
                       // Wrap = fixed 160px cards — never stretches on desktop
                       Wrap(
@@ -220,7 +216,6 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
   }
 
   Widget _pubPackCard(Map<String, dynamic> pack) {
-    final qty      = pack['qty'] as int? ?? 1;
     final price    = (pack['price'] as num).toDouble();
     final currency = pack['currency'] ?? 'USD';
 
@@ -253,9 +248,6 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
           Text('$price $currency',
               style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
                   fontSize: 15, color: AppTheme.accentColor)),
-          Text('$qty publication${qty > 1 ? 's' : ''}',
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                  color: AppTheme.textSecondary)),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
