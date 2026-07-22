@@ -102,6 +102,8 @@ class _AvatarPopupMenu extends StatelessWidget {
             'Mon tableau de bord', AppTheme.primaryColor),
         _item('recharger', Icons.add_circle_outline_rounded,
             'Recharger', AppTheme.accentColor),
+        _item('parrainage', Icons.card_giftcard_rounded,
+            'Parrainage', AppTheme.orangeColor),
         _item('reglages', Icons.settings_rounded,
             'Réglages', Colors.blueGrey),
         const PopupMenuDivider(height: 1),

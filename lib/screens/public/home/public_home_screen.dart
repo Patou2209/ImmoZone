@@ -32,6 +32,7 @@ import '../packs/public_packs_screen.dart';
 import '../search/search_screen.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
+import '../parrainage/user_parrainage_screen.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -1312,6 +1313,9 @@ class _HomeTabState extends State<_HomeTab>
                   } else if (val == 'recharger') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const PublicPacksScreen()));
+                  } else if (val == 'parrainage') {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const UserParrainageScreen()));
                   } else if (val == 'reglages') {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const UserReglagesScreen()));
@@ -1354,6 +1358,24 @@ class _HomeTabState extends State<_HomeTab>
                       ),
                       const SizedBox(width: 12),
                       const Text('Recharger',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                    ]),
+                  ),
+                  PopupMenuItem(
+                    value: 'parrainage',
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.orangeColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.card_giftcard_rounded,
+                            size: 18, color: AppTheme.orangeColor),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Parrainage',
                           style: TextStyle(fontFamily: 'Poppins',
                               fontWeight: FontWeight.w600, fontSize: 13)),
                     ]),
