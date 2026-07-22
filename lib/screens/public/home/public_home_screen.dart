@@ -1330,13 +1330,13 @@ class _HomeTabState extends State<_HomeTab>
                     value: 'dashboard',
                     child: Row(children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.dashboard_rounded,
-                            size: 18, color: AppTheme.primaryColor),
+                            size: 20, color: AppTheme.primaryColor),
                       ),
                       const SizedBox(width: 12),
                       const Text('Mon tableau de bord',
@@ -1348,13 +1348,13 @@ class _HomeTabState extends State<_HomeTab>
                     value: 'recharger',
                     child: Row(children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.1),
+                          color: AppTheme.accentColor.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.add_circle_outline_rounded,
-                            size: 18, color: AppTheme.accentColor),
+                            size: 20, color: AppTheme.accentColor),
                       ),
                       const SizedBox(width: 12),
                       const Text('Recharger',
@@ -1366,13 +1366,13 @@ class _HomeTabState extends State<_HomeTab>
                     value: 'parrainage',
                     child: Row(children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: AppTheme.orangeColor.withValues(alpha: 0.1),
+                          color: AppTheme.orangeColor.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.card_giftcard_rounded,
-                            size: 18, color: AppTheme.orangeColor),
+                            size: 20, color: AppTheme.orangeColor),
                       ),
                       const SizedBox(width: 12),
                       const Text('Parrainage',
@@ -1384,13 +1384,13 @@ class _HomeTabState extends State<_HomeTab>
                     value: 'reglages',
                     child: Row(children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: Colors.blueGrey.withValues(alpha: 0.1),
+                          color: Colors.blueGrey.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.settings_rounded,
-                            size: 18, color: Colors.blueGrey),
+                            size: 20, color: Colors.blueGrey),
                       ),
                       const SizedBox(width: 12),
                       const Text('Réglages',
@@ -1403,9 +1403,9 @@ class _HomeTabState extends State<_HomeTab>
                     value: 'logout',
                     child: Row(children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
+                          color: Colors.red.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.logout_rounded,

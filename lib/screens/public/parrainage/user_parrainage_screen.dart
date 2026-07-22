@@ -207,11 +207,11 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
+                  color: Colors.white.withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.people_alt_rounded,
-                    color: Colors.white, size: 22),
+                    color: AppTheme.primaryColor, size: 22),
               ),
               const SizedBox(width: 10),
               const Text(

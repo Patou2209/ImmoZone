@@ -158,10 +158,10 @@ class _AvatarPopupMenu extends StatelessWidget {
       value: val,
       child: Row(children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, size: 18, color: color),
+              color: color.withValues(alpha: 0.18), shape: BoxShape.circle),
+          child: Icon(icon, size: 20, color: color),
         ),
         const SizedBox(width: 12),
         Text(label, style: const TextStyle(fontFamily: 'Poppins',
@@ -175,10 +175,10 @@ class _AvatarPopupMenu extends StatelessWidget {
       value: val,
       child: Row(children: [
         Container(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: Icon(icon, size: 18, color: Colors.red),
+              color: Colors.red.withValues(alpha: 0.18), shape: BoxShape.circle),
+          child: Icon(icon, size: 20, color: Colors.red),
         ),
         const SizedBox(width: 12),
         Text(label, style: const TextStyle(fontFamily: 'Poppins',
