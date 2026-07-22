@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/immozone_app_bar.dart';
+import '../../../core/widgets/immozone_nav_helper.dart';
 import '../../../models/user_model.dart';
 import '../../../models/payment_model.dart';
 import '../../../providers/auth_provider.dart';
@@ -129,20 +131,12 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Mon Parrainage',
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
-              fontSize: 17),
-        ),
-        actions: [
+      appBar: ImmoZoneAppBar(
+        title: 'Mes Parrainages',
+        onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
+        extraActions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
             tooltip: 'Actualiser',
             onPressed: _load,
           ),
@@ -211,13 +205,13 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.card_giftcard_rounded,
-                    color: Colors.white, size: 20),
+                child: const Icon(Icons.people_alt_rounded,
+                    color: Colors.white, size: 22),
               ),
               const SizedBox(width: 10),
               const Text(
@@ -227,6 +221,27 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                    SizedBox(width: 4),
+                    Text('Parrain actif',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -256,13 +271,25 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
                 GestureDetector(
                   onTap: _copyCode,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                     ),
-                    child: const Icon(Icons.copy_rounded,
-                        color: Colors.white, size: 18),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.copy_rounded, color: Colors.white, size: 16),
+                        SizedBox(width: 6),
+                        Text('Copier',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
+                      ],
+                    ),
                   ),
                 ),
               ],

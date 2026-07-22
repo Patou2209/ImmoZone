@@ -881,8 +881,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       padding: const EdgeInsets.only(top: 14),
       children: [
         // ── Parrainage ─────────────────────────────────────────────────────
-        _settingsTile(
+        _settingsTileColored(
           Icons.card_giftcard_rounded,
+          AppTheme.orangeColor,
           'Parrainage',
           () => Navigator.of(context).push(
             MaterialPageRoute(
@@ -993,6 +994,25 @@ class _ProfileScreenState extends State<ProfileScreen>
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: AppTheme.accentColor, size: 18),
+      ),
+      title: Text(label, style: const TextStyle(
+          fontSize: 14, fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
+      trailing: trailing ?? const Icon(Icons.chevron_right, color: AppTheme.textHint),
+      onTap: onTap,
+    );
+  }
+
+  /// Variante avec couleur personnalisée pour l'icône (ex: Parrainage en orange)
+  Widget _settingsTileColored(IconData icon, Color color, String label,
+      VoidCallback onTap, {Widget? trailing}) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 20),
       ),
       title: Text(label, style: const TextStyle(
           fontSize: 14, fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
