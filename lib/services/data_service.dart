@@ -482,6 +482,9 @@ class DataService {
       // non-bloquant si le refresh échoue
     }
 
+    // Générer le code parrain personnel de ce nouvel utilisateur
+    final myReferralCode = generateUserReferralCode(name);
+
     final newUser = UserModel(
       id: userId,
       name: name,
@@ -493,6 +496,7 @@ class DataService {
       createdAt: DateTime.now(),
       isVerified: isVerified, // transmis depuis le flux d'inscription
       sponsorCode: sponsorCode,
+      myReferralCode: myReferralCode,
       province: province,
       city: city,
       commune: commune,
@@ -505,10 +509,11 @@ class DataService {
     if (password.isNotEmpty) {
       firestoreData['password'] = password;
     }
-    // Stocker le code parrainage si fourni
+    // Stocker le code parrainage reçu + le code parrain personnel généré
     if (sponsorCode != null && sponsorCode.isNotEmpty) {
       firestoreData['sponsorCode'] = sponsorCode;
     }
+    firestoreData['myReferralCode'] = myReferralCode;
     await _usersCol.doc(userId).set(firestoreData);
     await _saveSession(newUser);
 
@@ -1489,6 +1494,24 @@ class DataService {
       'confirmedAt': DateTime.now().toIso8601String(),
       'isConfirmed': true,
     });
+    // Appliquer la commission de parrainage user (1ère recharge seulement)
+    try {
+      final payDoc = await _paymentsCol.doc(paymentId).get();
+      if (payDoc.exists) {
+        final data = payDoc.data() as Map<String, dynamic>;
+        final filleulId = data['userId'] as String?;
+        final creditsQty = data['creditsQty'] as int? ?? 0;
+        if (filleulId != null && creditsQty > 0) {
+          await applyUserReferralCommission(
+            filleulId: filleulId,
+            creditsQty: creditsQty,
+            paymentId: paymentId,
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[confirmPayment] parrainage check error: $e');
+    }
   }
 
   Future<void> rejectPayment(String paymentId) async {
@@ -2461,6 +2484,166 @@ class DataService {
     } catch (e) {
       if (kDebugMode) debugPrint('[DataService.getContactLogs] error: $e');
       return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PARRAINAGE UTILISATEUR (user referral — distinct des parrains marketing)
+  // Chaque user a son propre code parrain (myReferralCode).
+  // Quand un filleul fait sa 1ère recharge, le parrain reçoit le même nombre
+  // de crédits (commission = 100% de la 1ère recharge, une seule fois).
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Génère un code parrain pour un utilisateur (ex: JEAN-A3F2).
+  String generateUserReferralCode(String name) {
+    final base = name.trim().toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
+        .substring(0, name.length.clamp(0, 5));
+    final suffix = (DateTime.now().millisecondsSinceEpoch % 100000)
+        .toString()
+        .padLeft(5, '0');
+    return '$base-$suffix';
+  }
+
+  /// Assigne un myReferralCode à l'utilisateur s'il n'en a pas encore.
+  Future<String> ensureUserReferralCode(UserModel user) async {
+    if (user.myReferralCode != null && user.myReferralCode!.isNotEmpty) {
+      return user.myReferralCode!;
+    }
+    final code = generateUserReferralCode(user.name);
+    await _usersCol.doc(user.id).update({'myReferralCode': code});
+    return code;
+  }
+
+  /// Retourne tous les filleuls d'un parrain (users qui ont saisi son myReferralCode).
+  /// Le champ sponsorCode de l'utilisateur contient le myReferralCode du parrain.
+  Future<List<UserModel>> getUserFilleuls(String myReferralCode) async {
+    try {
+      final snap = await _usersCol
+          .where('sponsorCode', isEqualTo: myReferralCode)
+          .get();
+      return snap.docs
+          .map((d) => UserModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getUserFilleuls] $e');
+      return [];
+    }
+  }
+
+  /// Pour chaque filleul, vérifie s'il a déjà effectué une recharge confirmée.
+  /// Retourne la liste des paiements confirmés triés par date.
+  Future<List<PaymentModel>> getFilleulFirstRecharge(String filleulId) async {
+    try {
+      final snap = await _paymentsCol
+          .where('userId', isEqualTo: filleulId)
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+      final payments = snap.docs
+          .map((d) => PaymentModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return payments;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Calcule les crédits totaux reçus via parrainage user (source = 'parrainage_user').
+  Future<int> getUserParrainageCreditsTotal(String userId) async {
+    try {
+      final snap = await _creditsCol
+          .where('userId', isEqualTo: userId)
+          .where('source', isEqualTo: 'parrainage_user')
+          .get();
+      final credits = snap.docs
+          .map((d) => CreditModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList();
+      return credits.fold<int>(0, (sum, c) => sum + c.quantity);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Calcule les crédits de parrainage reçus pour un mois donné.
+  Future<int> getUserParrainageCreditsByMonth(
+      String userId, int year, int month) async {
+    try {
+      final snap = await _creditsCol
+          .where('userId', isEqualTo: userId)
+          .where('source', isEqualTo: 'parrainage_user')
+          .get();
+      final credits = snap.docs
+          .map((d) => CreditModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList();
+      return credits
+          .where((c) =>
+              c.createdAt.year == year && c.createdAt.month == month)
+          .fold<int>(0, (sum, c) => sum + c.quantity);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Attribue la commission de parrainage au parrain quand son filleul
+  /// effectue sa 1ère recharge confirmée.
+  /// Doit être appelé depuis confirmPayment / validation de paiement.
+  Future<void> applyUserReferralCommission({
+    required String filleulId,
+    required int creditsQty,
+    required String paymentId,
+  }) async {
+    try {
+      // 1. Récupérer le filleul pour connaître le code de son parrain
+      final filleulDoc = await _usersCol.doc(filleulId).get();
+      if (!filleulDoc.exists) return;
+      final filleulData = filleulDoc.data() as Map<String, dynamic>;
+      final sponsorCode = filleulData['sponsorCode'] as String?;
+      if (sponsorCode == null || sponsorCode.isEmpty) return;
+
+      // 2. Vérifier que c'est bien la 1ère recharge du filleul
+      final existingPayments = await _paymentsCol
+          .where('userId', isEqualTo: filleulId)
+          .where('status', isEqualTo: 'confirmed')
+          .get();
+      // Si plus d'un paiement confirmé → ce n'est plus la 1ère recharge
+      if (existingPayments.docs.length > 1) return;
+
+      // 3. Trouver le parrain via son myReferralCode
+      final parrainSnap = await _usersCol
+          .where('myReferralCode', isEqualTo: sponsorCode)
+          .limit(1)
+          .get();
+      if (parrainSnap.docs.isEmpty) return;
+      final parrainData = parrainSnap.docs.first.data() as Map<String, dynamic>;
+      final parrainId = parrainData['id'] as String? ?? parrainSnap.docs.first.id;
+
+      // 4. Vérifier qu'on n'a pas déjà attribué la commission pour ce paiement
+      final alreadyGiven = await _creditsCol
+          .where('userId', isEqualTo: parrainId)
+          .where('source', isEqualTo: 'parrainage_user')
+          .where('orderId', isEqualTo: 'ref_$paymentId')
+          .get();
+      if (alreadyGiven.docs.isNotEmpty) return;
+
+      // 5. Créer le CreditModel de commission pour le parrain
+      final commissionCredit = CreditModel(
+        id: 'ref_${parrainId}_$paymentId',
+        userId: parrainId,
+        source: 'parrainage_user',
+        orderId: 'ref_$paymentId',
+        quantity: creditsQty,
+        remaining: creditsQty,
+        createdAt: DateTime.now(),
+      );
+      await _creditsCol.doc(commissionCredit.id).set(commissionCredit.toMap());
+
+      if (kDebugMode) {
+        debugPrint('[Parrainage] Commission $creditsQty crédits attribuée à $parrainId pour filleul $filleulId');
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.applyUserReferralCommission] $e');
     }
   }
 }

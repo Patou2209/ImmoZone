@@ -31,6 +31,7 @@ class CreditModel {
       case 'pack': return 'Pack bulk';
       case 'admin_manuel': return 'Crédit admin';
       case 'promo_admin': return 'Promotion admin';
+      case 'parrainage_user': return 'Commission parrainage';
       default: return source;
     }
   }

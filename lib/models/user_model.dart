@@ -16,9 +16,10 @@ class UserModel {
   final int totalProperties;
   final String? description;
   final String? whatsApp;
-  final String? sponsorCode;   // code parrainage saisi à l'inscription
-  final String? country;       // pays de l'utilisateur
-  final String? province;      // province
+  final String? sponsorCode;      // code parrainage SAISI à l'inscription (code du parrain qui l'a recruté)
+  final String? myReferralCode;   // son PROPRE code parrain (généré à la création du compte)
+  final String? country;          // pays de l'utilisateur
+  final String? province;         // province
 
   UserModel({
     required this.id,
@@ -39,6 +40,7 @@ class UserModel {
     this.description,
     this.whatsApp,
     this.sponsorCode,
+    this.myReferralCode,
     this.country,
     this.province,
   });
@@ -62,6 +64,7 @@ class UserModel {
     String? description,
     String? whatsApp,
     String? sponsorCode,
+    String? myReferralCode,
     String? country,
     String? province,
   }) {
@@ -84,6 +87,7 @@ class UserModel {
       description: description ?? this.description,
       whatsApp: whatsApp ?? this.whatsApp,
       sponsorCode: sponsorCode ?? this.sponsorCode,
+      myReferralCode: myReferralCode ?? this.myReferralCode,
       country: country ?? this.country,
       province: province ?? this.province,
     );
@@ -109,6 +113,7 @@ class UserModel {
       'description': description,
       'whatsApp': whatsApp,
       'sponsorCode': sponsorCode,
+      'myReferralCode': myReferralCode,
       'country': country,
       'province': province,
     };
@@ -156,6 +161,7 @@ class UserModel {
       description: map['description'],
       whatsApp: map['whatsApp'],
       sponsorCode: map['sponsorCode'],
+      myReferralCode: map['myReferralCode'],
       country: map['country'],
       province: map['province'],
     );

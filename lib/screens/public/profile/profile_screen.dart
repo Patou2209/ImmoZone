@@ -17,6 +17,7 @@ import '../../auth/login_screen.dart';
 import '../property_detail/property_detail_screen.dart';
 import '../post_property/edit_property_screen.dart';
 import '../../../services/data_service.dart';
+import '../parrainage/user_parrainage_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -879,6 +880,32 @@ class _ProfileScreenState extends State<ProfileScreen>
     return ListView(
       padding: const EdgeInsets.only(top: 14),
       children: [
+        // ── Parrainage ─────────────────────────────────────────────────────
+        _settingsTile(
+          Icons.card_giftcard_rounded,
+          'Parrainage',
+          () => Navigator.of(context).push(
+            MaterialPageRoute(
+                builder: (_) => const UserParrainageScreen()),
+          ),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppTheme.orangeColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'Gagner des crédits',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.orangeColor,
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 1, indent: 16, endIndent: 16),
         _settingsTile(Icons.notifications_outlined, 'Notifications', () {}),
         _settingsTile(Icons.security_outlined, 'Sécurité & Confidentialité', () {}),
         _settingsTile(Icons.help_outline, 'Aide & Support', () {}),
@@ -956,7 +983,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _settingsTile(IconData icon, String label, VoidCallback onTap) {
+  Widget _settingsTile(IconData icon, String label, VoidCallback onTap,
+      {Widget? trailing}) {
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
@@ -968,7 +996,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
       title: Text(label, style: const TextStyle(
           fontSize: 14, fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
-      trailing: const Icon(Icons.chevron_right, color: AppTheme.textHint),
+      trailing: trailing ?? const Icon(Icons.chevron_right, color: AppTheme.textHint),
       onTap: onTap,
     );
   }
