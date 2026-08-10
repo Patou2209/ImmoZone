@@ -19,6 +19,10 @@ const ORANGE_CONFIG = {
   currency: 'XOF',                     // À confirmer: CDF ou USD pour la DRC
   sandboxMode: true,                    // ← passer à false lors du go-live
 
+  // ⚠️ URL de callback: Orange appellera cette URL après confirmation USSD du client
+  // C'est cette URL qu'on doit communiquer à Orange lors de la réunion
+  callbackUrl: 'https://us-central1-immozone-d9a68.cloudfunctions.net/orangeMoneyWebhook',
+
   // Endpoints
   servicesPath: '/orange-money-webpay/dev/v1/webpayment',
   formsPath: '/orange-money-webpay/dev/v1/webpayment',
@@ -212,7 +216,13 @@ exports.initiateOrangePayment = onRequest(
         amount: parseFloat(amount),
         currency: currency || ORANGE_CONFIG.currency,
         posId: ORANGE_CONFIG.posId,
-        transactionId: paymentId, // UUID unique ImmoZone
+        transactionId: paymentId,          // UUID unique ImmoZone
+        // ⚡ CALLBACK: Orange appellera cette URL après confirmation USSD
+        // Sans ce paramètre, Orange ne sait pas où envoyer la notification de paiement !
+        callbackUrl: ORANGE_CONFIG.callbackUrl,
+        // Champs optionnels mais utiles pour le récapitulatif Orange
+        description: `ImmoZone — ${productType || 'credits'} — ${orderId || paymentId}`,
+        contractId: ORANGE_CONFIG.contractId,
       };
 
       const omResp = await orangeApiCall({
@@ -281,12 +291,33 @@ exports.orangeMoneyWebhook = onRequest(
     res.status(200).json({ received: true });
 
     try {
-      const { transactionStatus, transactionId, omTransactionId, peerId } = req.body;
+      // Orange peut envoyer le payload sous différents formats selon la version API
+      // On accepte tous les noms possibles pour l'ID de transaction
+      const body = req.body || {};
 
-      console.log(`[orangeWebhook] transactionId=${transactionId} status=${transactionStatus}`);
+      // Log brut du payload pour diagnostic lors des premiers tests
+      console.log('[orangeWebhook] RAW payload:', JSON.stringify(body));
+
+      const transactionStatus = body.transactionStatus || body.status || body.paymentStatus;
+      const transactionId =
+        body.transactionId ||      // notre ID envoyé dans cashinBody.transactionId
+        body.externalId ||         // alias possible Orange
+        body.orderId ||            // autre alias possible
+        body.merchantTransactionId; // encore un autre alias
+
+      const omTransactionId =
+        body.omTransactionId ||
+        body.orangeTransactionId ||
+        body.rrn ||                // Reference Retrieval Number (format B2B)
+        body.payToken;
+
+      const peerId = body.peerId || body.msisdn || body.phoneNumber;
+      const failureReason = body.failureReason || body.errorDescription || body.message || '';
+
+      console.log(`[orangeWebhook] transactionId=${transactionId} status=${transactionStatus} omId=${omTransactionId}`);
 
       if (!transactionId) {
-        console.warn('[orangeWebhook] No transactionId in payload');
+        console.warn('[orangeWebhook] No transactionId in payload — dumping full body:', JSON.stringify(body));
         return;
       }
 
@@ -342,13 +373,13 @@ exports.orangeMoneyWebhook = onRequest(
 
         console.log(`[orangeWebhook] ✅ Payment ${transactionId} CONFIRMED — ${payment.creditsQty} crédits attribués`);
 
-      } else if (transactionStatus === 'FAILED' || transactionStatus === 'CANCELLED') {
+      } else if (transactionStatus === 'FAILED' || transactionStatus === 'CANCELLED' || transactionStatus === 'EXPIRED') {
         // ── ÉCHEC ─────────────────────────────────────────────────────────────
         await payRef.update({
           status: 'failed',
           failedAt: new Date().toISOString(),
           omFinalStatus: transactionStatus,
-          failureReason: `Orange: ${transactionStatus}`,
+          failureReason: failureReason || `Orange: ${transactionStatus}`,
         });
 
         // Notification push échec
