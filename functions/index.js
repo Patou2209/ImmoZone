@@ -210,18 +210,15 @@ exports.initiateOrangePayment = onRequest(
       const msisdn = phoneNumber.replace(/\s/g, '').replace(/^\+/, '');
 
       // 3. Appel Cashin Orange API
+      // ⚠️ NOTE: callbackUrl N'est PAS dans le body — il est configuré UNE SEULE FOIS
+      // lors du provisioning sur le portail Orange Developer (pas dans chaque requête)
       const cashinBody = {
         peerId: msisdn,
         peerIdType: 'msisdn',
         amount: parseFloat(amount),
         currency: currency || ORANGE_CONFIG.currency,
         posId: ORANGE_CONFIG.posId,
-        transactionId: paymentId,          // UUID unique ImmoZone
-        // ⚡ CALLBACK: Orange appellera cette URL après confirmation USSD
-        // Sans ce paramètre, Orange ne sait pas où envoyer la notification de paiement !
-        callbackUrl: ORANGE_CONFIG.callbackUrl,
-        // Champs optionnels mais utiles pour le récapitulatif Orange
-        description: `ImmoZone — ${productType || 'credits'} — ${orderId || paymentId}`,
+        transactionId: paymentId,   // Notre UUID unique — Orange le retourne comme externalTxnId
         contractId: ORANGE_CONFIG.contractId,
       };
 
@@ -298,26 +295,34 @@ exports.orangeMoneyWebhook = onRequest(
       // Log brut du payload pour diagnostic lors des premiers tests
       console.log('[orangeWebhook] RAW payload:', JSON.stringify(body));
 
-      const transactionStatus = body.transactionStatus || body.status || body.paymentStatus;
+      // Format exact Orange B2B API (source: documentation officielle) :
+      // { "status": "SUCCESSFUL", "type": "CASHIN", "txnid": "OM210705.1052.C00010",
+      //   "externalTxnId": "76HEUUFs5dmi28Cr", "peerId": "22500000001",
+      //   "amount": 10.0, "currency": "XOF" }
+
+      const transactionStatus = body.status || body.transactionStatus;  // "SUCCESSFUL" / "FAILED"
+      const transactionType   = body.type;                              // "CASHIN" / "CASHOUT"
+
+      // externalTxnId = notre transactionId qu'on a envoyé dans cashinBody
       const transactionId =
-        body.transactionId ||      // notre ID envoyé dans cashinBody.transactionId
-        body.externalId ||         // alias possible Orange
-        body.orderId ||            // autre alias possible
-        body.merchantTransactionId; // encore un autre alias
+        body.externalTxnId ||      // ← champ officiel Orange (notre UUID)
+        body.transactionId ||      // alias possible
+        body.orderId;
 
+      // txnid = ID interne Orange Money (ex: OM210705.1052.C00010)
       const omTransactionId =
-        body.omTransactionId ||
-        body.orangeTransactionId ||
-        body.rrn ||                // Reference Retrieval Number (format B2B)
-        body.payToken;
+        body.txnid ||              // ← champ officiel Orange
+        body.omTransactionId;
 
-      const peerId = body.peerId || body.msisdn || body.phoneNumber;
-      const failureReason = body.failureReason || body.errorDescription || body.message || '';
+      const peerId          = body.peerId;
+      const amount          = body.amount;
+      const currency        = body.currency;
+      const failureReason   = body.failureReason || body.errorDescription || body.message || '';
 
-      console.log(`[orangeWebhook] transactionId=${transactionId} status=${transactionStatus} omId=${omTransactionId}`);
+      console.log(`[orangeWebhook] externalTxnId=${transactionId} status=${transactionStatus} type=${transactionType} txnid=${omTransactionId}`);
 
       if (!transactionId) {
-        console.warn('[orangeWebhook] No transactionId in payload — dumping full body:', JSON.stringify(body));
+        console.warn('[orangeWebhook] No externalTxnId/transactionId in payload — dumping full body:', JSON.stringify(body));
         return;
       }
 
@@ -343,7 +348,10 @@ exports.orangeMoneyWebhook = onRequest(
           status: 'confirmed',
           confirmedAt: new Date().toISOString(),
           isConfirmed: true,
-          omTransactionId: omTransactionId || payment.omTransactionId || '',
+          omTxnId: omTransactionId || '',        // txnid Orange ex: OM210705.1052.C00010
+          omPeerId: peerId || '',                // numéro msisdn du client
+          omAmount: amount || 0,                 // montant confirmé par Orange
+          omCurrency: currency || '',            // devise confirmée par Orange
           omFinalStatus: 'SUCCESSFUL',
         });
 
