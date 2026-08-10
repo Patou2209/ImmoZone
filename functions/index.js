@@ -26,10 +26,13 @@ const ORANGE_CONFIG = {
   callbackUrl: 'https://us-central1-immozone-d9a68.cloudfunctions.net/orangeMoneyWebhook',
 
   // 🔒 Sécurité callback (doc: partnerCallbackAuthorization)
-  // Valeur "Basic XXXX" que NOUS définissons lors du provisioning et que
-  // Orange renverra dans le header Authorization de chaque notification.
-  // Laisser vide en sandbox → la vérification est ignorée tant que c'est vide.
-  partnerCallbackAuthorization: '',
+  // Valeur "Basic XXXX" que NOUS avons définie (générée le 10/08/2026) et qu'il faut
+  // COMMUNIQUER À ORANGE lors du provisioning (champ "authorization" du partner profile).
+  // Orange renverra ce header Authorization dans chaque notification → le webhook le vérifie.
+  // Correspond à: immozone-callback:e3agfy8PCKJAjXunbGno0RO48n4dSr
+  // ⚠️ En sandbox on laisse la vérification désactivée (voir sandboxMode ci-dessous) ;
+  // elle s'active automatiquement au go-live puisque la valeur est non-vide.
+  partnerCallbackAuthorization: 'Basic aW1tb3pvbmUtY2FsbGJhY2s6ZTNhZ2Z5OFBDS0pBalh1bmJHbm8wUk80OG40ZFNy',
 
   // Endpoints B2B (doc: /services → /forms/cashin → /transactions/cashin)
   // ⚠️ Les préfixes exacts seront confirmés par Orange lors de la réunion technique.
@@ -324,8 +327,9 @@ exports.orangeMoneyWebhook = onRequest(
   async (req, res) => {
     // 🔒 Vérification du header Authorization envoyé par Orange
     // (doc: partnerCallbackAuthorization défini lors du provisioning).
-    // Ignorée tant que ORANGE_CONFIG.partnerCallbackAuthorization est vide (sandbox).
-    if (ORANGE_CONFIG.partnerCallbackAuthorization) {
+    // Désactivée en sandbox (tests manuels sans header possible) ;
+    // active automatiquement dès que sandboxMode = false au go-live.
+    if (!ORANGE_CONFIG.sandboxMode && ORANGE_CONFIG.partnerCallbackAuthorization) {
       const authHeader = req.headers['authorization'] || '';
       if (authHeader !== ORANGE_CONFIG.partnerCallbackAuthorization) {
         console.warn('[orangeWebhook] ⛔ Authorization header invalide — notification rejetée');
