@@ -1,8 +1,484 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
+const https = require('https');
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORANGE MONEY B2B API — Configuration
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ces valeurs seront fournies par Orange lors de la réunion technique.
+// En attendant, elles sont en mode SIMULATION (sandbox).
+const ORANGE_CONFIG = {
+  // À récupérer sur https://developer.orange.com/ après souscription
+  baseUrl: 'api.orange.com',           // URL de base Orange API (à confirmer pour DRC)
+  basicAuth: '',                        // Authorization: Basic XXXX (fourni par Orange)
+  contractId: '',                       // contractId (fourni lors de la signature)
+  posId: '',                            // Point of Sale ID (fourni par Orange)
+  currency: 'XOF',                     // À confirmer: CDF ou USD pour la DRC
+  sandboxMode: true,                    // ← passer à false lors du go-live
+
+  // ⚠️ URL de callback: Orange appellera cette URL après confirmation USSD du client
+  // C'est cette URL qu'on doit communiquer à Orange lors de la réunion
+  callbackUrl: 'https://us-central1-immozone-d9a68.cloudfunctions.net/orangeMoneyWebhook',
+
+  // Endpoints
+  servicesPath: '/orange-money-webpay/dev/v1/webpayment',
+  formsPath: '/orange-money-webpay/dev/v1/webpayment',
+  cashinPath: '/orange-money-b2b/v1/transactions/cashin',
+  cashoutPath: '/orange-money-b2b/v1/transactions/cashout',
+  statusPath: '/orange-money-b2b/v1/transactions',
+};
+
+// Cache du x-omr-forms-token (valide 24h = 86400 secondes)
+let _omrToken = null;
+let _omrTokenExpiry = 0;
+
+// ─── Helper: appel HTTPS vers Orange API ───────────────────────────────────────
+async function orangeApiCall({ method, path, body, extraHeaders = {} }) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = body ? JSON.stringify(body) : '';
+    const options = {
+      hostname: ORANGE_CONFIG.baseUrl,
+      path,
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${ORANGE_CONFIG.basicAuth}`,
+        'Accept': 'application/json',
+        ...extraHeaders,
+      },
+    };
+    if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, body: JSON.parse(data) });
+        } catch {
+          resolve({ status: res.statusCode, body: data });
+        }
+      });
+    });
+    req.on('error', reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+// ─── Récupérer ou renouveler le x-omr-forms-token (cache 24h) ─────────────────
+async function getOmrToken() {
+  const now = Date.now();
+  // Si token valide en mémoire, le retourner
+  if (_omrToken && now < _omrTokenExpiry) return _omrToken;
+
+  // Vérifier dans Firestore (survit aux redémarrages de fonction)
+  const configRef = db.collection('config').doc('orange_money_token');
+  const configDoc = await configRef.get();
+  if (configDoc.exists) {
+    const { token, expiry } = configDoc.data();
+    if (token && expiry && now < expiry) {
+      _omrToken = token;
+      _omrTokenExpiry = expiry;
+      return token;
+    }
+  }
+
+  // En mode sandbox: retourner un token fictif pour les tests
+  if (ORANGE_CONFIG.sandboxMode) {
+    console.log('[Orange] SANDBOX MODE — token simulé');
+    _omrToken = 'SANDBOX_TOKEN_' + Date.now();
+    _omrTokenExpiry = now + 86400000; // 24h
+    return _omrToken;
+  }
+
+  // Appel réel: GET /forms pour obtenir le token
+  const resp = await orangeApiCall({
+    method: 'GET',
+    path: ORANGE_CONFIG.formsPath,
+  });
+
+  if (resp.status !== 200 || !resp.body?.token?.value) {
+    throw new Error(`Orange /forms failed: ${resp.status} — ${JSON.stringify(resp.body)}`);
+  }
+
+  const token = resp.body.token.value;
+  const expiresInMs = (parseInt(resp.body.token.expiresIn) || 86400) * 1000;
+  const expiry = now + expiresInMs - 60000; // -1min de marge
+
+  // Persister dans Firestore
+  await configRef.set({ token, expiry, updatedAt: new Date().toISOString() });
+  _omrToken = token;
+  _omrTokenExpiry = expiry;
+  return token;
+}
+
+// ─── Créditer l'utilisateur dans Firestore après paiement confirmé ────────────
+async function creditUserAfterPayment(paymentId) {
+  const payDoc = await db.collection('payments').doc(paymentId).get();
+  if (!payDoc.exists) {
+    console.warn(`[creditUser] Payment ${paymentId} not found`);
+    return;
+  }
+  const payment = payDoc.data();
+  if (payment.status !== 'confirmed') return; // déjà traité
+
+  const creditsQty = payment.creditsQty || 0;
+  if (creditsQty <= 0) {
+    console.warn(`[creditUser] Payment ${paymentId} has no creditsQty`);
+    return;
+  }
+
+  const creditId = `credit_${paymentId}`;
+  const creditRef = db.collection('credits').doc(creditId);
+  const existing = await creditRef.get();
+  if (existing.exists) {
+    console.log(`[creditUser] Credit ${creditId} already exists, skipping`);
+    return; // idempotent
+  }
+
+  await creditRef.set({
+    id: creditId,
+    userId: payment.userId,
+    total: creditsQty,
+    remaining: creditsQty,
+    source: 'paiement_orange_money',
+    sourceLabel: 'Orange Money',
+    orderId: payment.orderId,
+    createdAt: new Date().toISOString(),
+    expiresAt: null,
+  });
+
+  console.log(`[creditUser] ✅ ${creditsQty} crédits attribués à ${payment.userId}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION 1: initiateOrangePayment
+// Appelée par l'app Flutter quand le client clique "Payer avec Orange Money"
+// URL: https://us-central1-immozone-d9a68.cloudfunctions.net/initiateOrangePayment
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.initiateOrangePayment = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+
+    try {
+      const { paymentId, phoneNumber, amount, currency, creditsQty, userId, productType, orderId } = req.body;
+
+      // Validation basique
+      if (!paymentId || !phoneNumber || !amount || !userId) {
+        res.status(400).json({ error: 'Paramètres manquants: paymentId, phoneNumber, amount, userId requis' });
+        return;
+      }
+
+      console.log(`[initiateOrangePayment] paymentId=${paymentId} msisdn=${phoneNumber} amount=${amount}`);
+
+      // ── MODE SANDBOX ──────────────────────────────────────────────────────────
+      if (ORANGE_CONFIG.sandboxMode) {
+        console.log('[initiateOrangePayment] SANDBOX — simulation PENDING');
+
+        // Mettre à jour le doc Firestore avec le statut pending
+        await db.collection('payments').doc(paymentId).update({
+          status: 'pending',
+          operator: 'orange_money',
+          omTransactionId: `SANDBOX_${Date.now()}`,
+          omInitiatedAt: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+          success: true,
+          transactionStatus: 'PENDING',
+          transactionId: paymentId,
+          omTransactionId: `SANDBOX_OM_${Date.now()}`,
+          message: 'SANDBOX: Confirmez via USSD sur votre téléphone',
+          sandboxMode: true,
+        });
+        return;
+      }
+
+      // ── MODE PRODUCTION ───────────────────────────────────────────────────────
+      // 1. Obtenir le token OMR
+      const omrToken = await getOmrToken();
+
+      // 2. Normaliser le numéro (s'assurer du format msisdn)
+      const msisdn = phoneNumber.replace(/\s/g, '').replace(/^\+/, '');
+
+      // 3. Appel Cashin Orange API
+      const cashinBody = {
+        peerId: msisdn,
+        peerIdType: 'msisdn',
+        amount: parseFloat(amount),
+        currency: currency || ORANGE_CONFIG.currency,
+        posId: ORANGE_CONFIG.posId,
+        transactionId: paymentId,          // UUID unique ImmoZone
+        // ⚡ CALLBACK: Orange appellera cette URL après confirmation USSD
+        // Sans ce paramètre, Orange ne sait pas où envoyer la notification de paiement !
+        callbackUrl: ORANGE_CONFIG.callbackUrl,
+        // Champs optionnels mais utiles pour le récapitulatif Orange
+        description: `ImmoZone — ${productType || 'credits'} — ${orderId || paymentId}`,
+        contractId: ORANGE_CONFIG.contractId,
+      };
+
+      const omResp = await orangeApiCall({
+        method: 'POST',
+        path: ORANGE_CONFIG.cashinPath,
+        body: cashinBody,
+        extraHeaders: { 'x-omr-forms-token': omrToken },
+      });
+
+      console.log(`[initiateOrangePayment] Orange response: ${omResp.status}`, omResp.body);
+
+      if (omResp.status === 201 || omResp.status === 200) {
+        const { transactionStatus, omTransactionId } = omResp.body;
+
+        // Mettre à jour Firestore
+        await db.collection('payments').doc(paymentId).update({
+          status: 'pending',
+          operator: 'orange_money',
+          omTransactionId: omTransactionId || '',
+          omInitiatedAt: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+          success: true,
+          transactionStatus,
+          transactionId: paymentId,
+          omTransactionId,
+          message: 'Veuillez confirmer le paiement sur votre téléphone via USSD',
+        });
+      } else {
+        // Erreur Orange
+        const errorMsg = omResp.body?.message || `Erreur Orange: ${omResp.status}`;
+        console.error('[initiateOrangePayment] Orange error:', omResp.body);
+
+        await db.collection('payments').doc(paymentId).update({
+          status: 'failed',
+          failureReason: errorMsg,
+          failedAt: new Date().toISOString(),
+        });
+
+        res.status(200).json({
+          success: false,
+          transactionStatus: 'FAILED',
+          error: errorMsg,
+        });
+      }
+
+    } catch (err) {
+      console.error('[initiateOrangePayment] Exception:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION 2: orangeMoneyWebhook
+// Appelée par Orange après confirmation USSD du client
+// ⚠️ DOIT répondre HTTP 200 en moins de 5 secondes
+// URL: https://us-central1-immozone-d9a68.cloudfunctions.net/orangeMoneyWebhook
+// ← C'est cette URL à donner à Orange comme callbackURL
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.orangeMoneyWebhook = onRequest(
+  { region: 'us-central1', cors: false },
+  async (req, res) => {
+    // Répondre 200 immédiatement pour éviter le timeout Orange (< 5s obligatoire)
+    res.status(200).json({ received: true });
+
+    try {
+      // Orange peut envoyer le payload sous différents formats selon la version API
+      // On accepte tous les noms possibles pour l'ID de transaction
+      const body = req.body || {};
+
+      // Log brut du payload pour diagnostic lors des premiers tests
+      console.log('[orangeWebhook] RAW payload:', JSON.stringify(body));
+
+      const transactionStatus = body.transactionStatus || body.status || body.paymentStatus;
+      const transactionId =
+        body.transactionId ||      // notre ID envoyé dans cashinBody.transactionId
+        body.externalId ||         // alias possible Orange
+        body.orderId ||            // autre alias possible
+        body.merchantTransactionId; // encore un autre alias
+
+      const omTransactionId =
+        body.omTransactionId ||
+        body.orangeTransactionId ||
+        body.rrn ||                // Reference Retrieval Number (format B2B)
+        body.payToken;
+
+      const peerId = body.peerId || body.msisdn || body.phoneNumber;
+      const failureReason = body.failureReason || body.errorDescription || body.message || '';
+
+      console.log(`[orangeWebhook] transactionId=${transactionId} status=${transactionStatus} omId=${omTransactionId}`);
+
+      if (!transactionId) {
+        console.warn('[orangeWebhook] No transactionId in payload — dumping full body:', JSON.stringify(body));
+        return;
+      }
+
+      const payRef = db.collection('payments').doc(transactionId);
+      const payDoc = await payRef.get();
+
+      if (!payDoc.exists) {
+        console.warn(`[orangeWebhook] Payment ${transactionId} not found in Firestore`);
+        return;
+      }
+
+      const payment = payDoc.data();
+
+      // Éviter le double-traitement
+      if (payment.status === 'confirmed' || payment.status === 'failed') {
+        console.log(`[orangeWebhook] Payment ${transactionId} already processed (${payment.status})`);
+        return;
+      }
+
+      if (transactionStatus === 'SUCCESSFUL') {
+        // ── SUCCÈS ────────────────────────────────────────────────────────────
+        await payRef.update({
+          status: 'confirmed',
+          confirmedAt: new Date().toISOString(),
+          isConfirmed: true,
+          omTransactionId: omTransactionId || payment.omTransactionId || '',
+          omFinalStatus: 'SUCCESSFUL',
+        });
+
+        // Créditer l'utilisateur
+        await creditUserAfterPayment(transactionId);
+
+        // Notification push (optionnel — si FCM configuré)
+        try {
+          const userDoc = await db.collection('users').doc(payment.userId).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            const fcmToken = userData.fcmToken;
+            if (fcmToken) {
+              await admin.messaging().send({
+                token: fcmToken,
+                notification: {
+                  title: '✅ Paiement confirmé — ImmoZone',
+                  body: `${payment.creditsQty} crédit(s) ajouté(s) à votre compte`,
+                },
+                data: { paymentId: transactionId, status: 'confirmed' },
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.warn('[orangeWebhook] FCM notification failed:', notifErr.message);
+        }
+
+        console.log(`[orangeWebhook] ✅ Payment ${transactionId} CONFIRMED — ${payment.creditsQty} crédits attribués`);
+
+      } else if (transactionStatus === 'FAILED' || transactionStatus === 'CANCELLED' || transactionStatus === 'EXPIRED') {
+        // ── ÉCHEC ─────────────────────────────────────────────────────────────
+        await payRef.update({
+          status: 'failed',
+          failedAt: new Date().toISOString(),
+          omFinalStatus: transactionStatus,
+          failureReason: failureReason || `Orange: ${transactionStatus}`,
+        });
+
+        // Notification push échec
+        try {
+          const userDoc = await db.collection('users').doc(payment.userId).get();
+          if (userDoc.exists) {
+            const fcmToken = userDoc.data().fcmToken;
+            if (fcmToken) {
+              await admin.messaging().send({
+                token: fcmToken,
+                notification: {
+                  title: '❌ Paiement échoué — ImmoZone',
+                  body: 'Votre paiement Orange Money n\'a pas abouti. Réessayez.',
+                },
+                data: { paymentId: transactionId, status: 'failed' },
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.warn('[orangeWebhook] FCM failed notification error:', notifErr.message);
+        }
+
+        console.log(`[orangeWebhook] ❌ Payment ${transactionId} FAILED`);
+      } else {
+        console.log(`[orangeWebhook] Status inconnu: ${transactionStatus} — ignoré`);
+      }
+
+    } catch (err) {
+      // Ne jamais crasher — Orange attend HTTP 200
+      console.error('[orangeWebhook] Exception (after 200 sent):', err);
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION 3: checkOrangePaymentStatus
+// Polling manuel du statut (fallback si callback non reçu)
+// Appelée par Flutter toutes les 10s pendant l'attente USSD
+// URL: https://us-central1-immozone-d9a68.cloudfunctions.net/checkOrangePaymentStatus
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.checkOrangePaymentStatus = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    const { paymentId } = req.query;
+
+    if (!paymentId) {
+      res.status(400).json({ error: 'paymentId requis' });
+      return;
+    }
+
+    try {
+      // 1. Vérifier d'abord dans Firestore (le webhook a peut-être déjà mis à jour)
+      const payDoc = await db.collection('payments').doc(paymentId).get();
+      if (!payDoc.exists) {
+        res.status(404).json({ error: 'Payment not found' });
+        return;
+      }
+
+      const payment = payDoc.data();
+
+      // Si déjà traité par le webhook → retourner directement
+      if (payment.status === 'confirmed') {
+        res.status(200).json({ transactionStatus: 'SUCCESSFUL', source: 'firestore' });
+        return;
+      }
+      if (payment.status === 'failed') {
+        res.status(200).json({ transactionStatus: 'FAILED', source: 'firestore' });
+        return;
+      }
+
+      // 2. En mode sandbox → simuler selon un paramètre de test
+      if (ORANGE_CONFIG.sandboxMode) {
+        res.status(200).json({ transactionStatus: 'PENDING', source: 'sandbox' });
+        return;
+      }
+
+      // 3. En production → interroger Orange API
+      const omrToken = await getOmrToken();
+      const omTransactionId = payment.omTransactionId;
+      if (!omTransactionId) {
+        res.status(200).json({ transactionStatus: 'PENDING', source: 'no_om_id' });
+        return;
+      }
+
+      const statusResp = await orangeApiCall({
+        method: 'GET',
+        path: `${ORANGE_CONFIG.statusPath}/${omTransactionId}`,
+        extraHeaders: { 'x-omr-forms-token': omrToken },
+      });
+
+      const omStatus = statusResp.body?.transactionStatus || 'PENDING';
+      res.status(200).json({ transactionStatus: omStatus, source: 'orange_api' });
+
+    } catch (err) {
+      console.error('[checkOrangePaymentStatus] Error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
 
 const APP_NAME = 'ImmoZone';
 const BASE_URL = 'https://www.immozone.pro';
