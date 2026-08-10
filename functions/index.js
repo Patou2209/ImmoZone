@@ -16,7 +16,7 @@ const ORANGE_CONFIG = {
   basicAuth: '',                        // Authorization: Basic XXXX (fourni par Orange)
   contractId: '',                       // contractId (fourni lors de la signature)
   posId: '',                            // Point of Sale ID (fourni par Orange)
-  currency: 'XOF',                     // À confirmer: CDF ou USD pour la DRC
+  currency: 'USD',                     // DRC — à ajuster si Orange confirme autre devise
   sandboxMode: true,                    // ← passer à false lors du go-live
 
   // ⚠️ URL de callback: Orange appellera cette URL après confirmation USSD du client
