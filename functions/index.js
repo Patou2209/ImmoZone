@@ -20,15 +20,24 @@ const ORANGE_CONFIG = {
   sandboxMode: true,                    // ← passer à false lors du go-live
 
   // ⚠️ URL de callback: Orange appellera cette URL après confirmation USSD du client
-  // C'est cette URL qu'on doit communiquer à Orange lors de la réunion
+  // C'est cette URL qu'on doit communiquer à Orange lors de la réunion.
+  // Doc B2B: le callbackURL est configuré UNE FOIS lors du provisioning
+  // (champ "callbackURL" + "authorization" du partner profile), PAS dans chaque requête.
   callbackUrl: 'https://us-central1-immozone-d9a68.cloudfunctions.net/orangeMoneyWebhook',
 
-  // Endpoints
-  servicesPath: '/orange-money-webpay/dev/v1/webpayment',
-  formsPath: '/orange-money-webpay/dev/v1/webpayment',
+  // 🔒 Sécurité callback (doc: partnerCallbackAuthorization)
+  // Valeur "Basic XXXX" que NOUS définissons lors du provisioning et que
+  // Orange renverra dans le header Authorization de chaque notification.
+  // Laisser vide en sandbox → la vérification est ignorée tant que c'est vide.
+  partnerCallbackAuthorization: '',
+
+  // Endpoints B2B (doc: /services → /forms/cashin → /transactions/cashin)
+  // ⚠️ Les préfixes exacts seront confirmés par Orange lors de la réunion technique.
+  servicesPath: '/orange-money-b2b/v1/services',
+  formsPath: '/orange-money-b2b/v1/forms/cashin',   // retourne le x-omr-forms-token
   cashinPath: '/orange-money-b2b/v1/transactions/cashin',
   cashoutPath: '/orange-money-b2b/v1/transactions/cashout',
-  statusPath: '/orange-money-b2b/v1/transactions',
+  statusPath: '/orange-money-b2b/v1/transactions',   // GET /transactions/{transactionId} (ID PARTENAIRE)
 };
 
 // Cache du x-omr-forms-token (valide 24h = 86400 secondes)
@@ -212,14 +221,15 @@ exports.initiateOrangePayment = onRequest(
       // 3. Appel Cashin Orange API
       // ⚠️ NOTE: callbackUrl N'est PAS dans le body — il est configuré UNE SEULE FOIS
       // lors du provisioning sur le portail Orange Developer (pas dans chaque requête)
+      // Body EXACT selon la doc B2B (6 champs, PAS de contractId ici — il appartient
+      // au provisioning du profil partenaire, pas aux transactions) :
       const cashinBody = {
         peerId: msisdn,
         peerIdType: 'msisdn',
         amount: parseFloat(amount),
         currency: currency || ORANGE_CONFIG.currency,
         posId: ORANGE_CONFIG.posId,
-        transactionId: paymentId,   // Notre UUID unique — Orange le retourne comme externalTxnId
-        contractId: ORANGE_CONFIG.contractId,
+        transactionId: paymentId,   // Notre ID unique (max 36 car.) — Orange le renvoie dans la notification
       };
 
       const omResp = await orangeApiCall({
@@ -232,21 +242,49 @@ exports.initiateOrangePayment = onRequest(
       console.log(`[initiateOrangePayment] Orange response: ${omResp.status}`, omResp.body);
 
       if (omResp.status === 201 || omResp.status === 200) {
-        const { transactionStatus, omTransactionId } = omResp.body;
+        // Doc B2B — réponse: { transactionId, status, peerId, ..., reference }
+        // "reference" = ID interne Orange (ex: MP211208.1349.A00129)
+        const respBody = omResp.body || {};
+        const transactionStatus = respBody.status || respBody.transactionStatus || 'PENDING';
+        const omReference = respBody.reference || respBody.omTransactionId || '';
 
-        // Mettre à jour Firestore
+        // Cas nominal doc: le cashin peut répondre SUCCESS de façon synchrone
+        if (transactionStatus === 'SUCCESS' || transactionStatus === 'SUCCESSFUL') {
+          await db.collection('payments').doc(paymentId).update({
+            status: 'confirmed',
+            confirmedAt: new Date().toISOString(),
+            isConfirmed: true,
+            operator: 'orange_money',
+            omTransactionId: omReference,
+            omTxnId: omReference,
+            omFinalStatus: 'SUCCESSFUL',
+            omInitiatedAt: new Date().toISOString(),
+          });
+          await creditUserAfterPayment(paymentId);
+
+          res.status(200).json({
+            success: true,
+            transactionStatus: 'SUCCESSFUL',
+            transactionId: paymentId,
+            omTransactionId: omReference,
+            message: 'Paiement confirmé',
+          });
+          return;
+        }
+
+        // Sinon: PENDING → attendre confirmation USSD + notification callback
         await db.collection('payments').doc(paymentId).update({
           status: 'pending',
           operator: 'orange_money',
-          omTransactionId: omTransactionId || '',
+          omTransactionId: omReference,
           omInitiatedAt: new Date().toISOString(),
         });
 
         res.status(200).json({
           success: true,
-          transactionStatus,
+          transactionStatus: 'PENDING',
           transactionId: paymentId,
-          omTransactionId,
+          omTransactionId: omReference,
           message: 'Veuillez confirmer le paiement sur votre téléphone via USSD',
         });
       } else {
@@ -284,6 +322,18 @@ exports.initiateOrangePayment = onRequest(
 exports.orangeMoneyWebhook = onRequest(
   { region: 'us-central1', cors: false },
   async (req, res) => {
+    // 🔒 Vérification du header Authorization envoyé par Orange
+    // (doc: partnerCallbackAuthorization défini lors du provisioning).
+    // Ignorée tant que ORANGE_CONFIG.partnerCallbackAuthorization est vide (sandbox).
+    if (ORANGE_CONFIG.partnerCallbackAuthorization) {
+      const authHeader = req.headers['authorization'] || '';
+      if (authHeader !== ORANGE_CONFIG.partnerCallbackAuthorization) {
+        console.warn('[orangeWebhook] ⛔ Authorization header invalide — notification rejetée');
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+    }
+
     // Répondre 200 immédiatement pour éviter le timeout Orange (< 5s obligatoire)
     res.status(200).json({ received: true });
 
@@ -295,23 +345,25 @@ exports.orangeMoneyWebhook = onRequest(
       // Log brut du payload pour diagnostic lors des premiers tests
       console.log('[orangeWebhook] RAW payload:', JSON.stringify(body));
 
-      // Format exact Orange B2B API (source: documentation officielle) :
-      // { "status": "SUCCESSFUL", "type": "CASHIN", "txnid": "OM210705.1052.C00010",
-      //   "externalTxnId": "76HEUUFs5dmi28Cr", "peerId": "22500000001",
-      //   "amount": 10.0, "currency": "XOF" }
+      // Format officiel doc B2B (section "Transaction notification") :
+      // { "transactionId": "53186253-...", "status": "SUCCESS", "peerId": "770000000",
+      //   "peerIdType": "msisdn", "amount": 100, "currency": "XOF",
+      //   "reference": "MP211208.1349.A00129" }
+      // On accepte aussi les variantes d'autres versions d'API (SUCCESSFUL, externalTxnId, txnid).
 
-      const transactionStatus = body.status || body.transactionStatus;  // "SUCCESSFUL" / "FAILED"
-      const transactionType   = body.type;                              // "CASHIN" / "CASHOUT"
+      const transactionStatus = body.status || body.transactionStatus;  // "SUCCESS" / "FAILED"
+      const transactionType   = body.type;                              // "CASHIN" / "CASHOUT" (optionnel)
 
-      // externalTxnId = notre transactionId qu'on a envoyé dans cashinBody
+      // transactionId = NOTRE ID envoyé dans cashinBody (champ officiel doc)
       const transactionId =
-        body.externalTxnId ||      // ← champ officiel Orange (notre UUID)
-        body.transactionId ||      // alias possible
+        body.transactionId ||      // ← champ officiel doc B2B (notre ID)
+        body.externalTxnId ||      // variante autres versions API
         body.orderId;
 
-      // txnid = ID interne Orange Money (ex: OM210705.1052.C00010)
+      // reference = ID interne Orange Money (ex: MP211208.1349.A00129)
       const omTransactionId =
-        body.txnid ||              // ← champ officiel Orange
+        body.reference ||          // ← champ officiel doc B2B
+        body.txnid ||              // variante autres versions API
         body.omTransactionId;
 
       const peerId          = body.peerId;
@@ -342,13 +394,13 @@ exports.orangeMoneyWebhook = onRequest(
         return;
       }
 
-      if (transactionStatus === 'SUCCESSFUL') {
+      if (transactionStatus === 'SUCCESS' || transactionStatus === 'SUCCESSFUL') {
         // ── SUCCÈS ────────────────────────────────────────────────────────────
         await payRef.update({
           status: 'confirmed',
           confirmedAt: new Date().toISOString(),
           isConfirmed: true,
-          omTxnId: omTransactionId || '',        // txnid Orange ex: OM210705.1052.C00010
+          omTxnId: omTransactionId || '',        // reference Orange ex: MP211208.1349.A00129
           omPeerId: peerId || '',                // numéro msisdn du client
           omAmount: amount || 0,                 // montant confirmé par Orange
           omCurrency: currency || '',            // devise confirmée par Orange
@@ -381,7 +433,7 @@ exports.orangeMoneyWebhook = onRequest(
 
         console.log(`[orangeWebhook] ✅ Payment ${transactionId} CONFIRMED — ${payment.creditsQty} crédits attribués`);
 
-      } else if (transactionStatus === 'FAILED' || transactionStatus === 'CANCELLED' || transactionStatus === 'EXPIRED') {
+      } else if (transactionStatus === 'FAILED' || transactionStatus === 'FAILURE' || transactionStatus === 'CANCELLED' || transactionStatus === 'EXPIRED' || transactionStatus === 'REJECTED') {
         // ── ÉCHEC ─────────────────────────────────────────────────────────────
         await payRef.update({
           status: 'failed',
@@ -465,20 +517,41 @@ exports.checkOrangePaymentStatus = onRequest(
       }
 
       // 3. En production → interroger Orange API
+      // Doc B2B: GET /transactions/{transactionId} où {transactionId} est
+      // l'ID de la transaction CÔTÉ PARTENAIRE (= notre paymentId), pas l'ID Orange.
       const omrToken = await getOmrToken();
-      const omTransactionId = payment.omTransactionId;
-      if (!omTransactionId) {
-        res.status(200).json({ transactionStatus: 'PENDING', source: 'no_om_id' });
-        return;
-      }
 
       const statusResp = await orangeApiCall({
         method: 'GET',
-        path: `${ORANGE_CONFIG.statusPath}/${omTransactionId}`,
+        path: `${ORANGE_CONFIG.statusPath}/${encodeURIComponent(paymentId)}`,
         extraHeaders: { 'x-omr-forms-token': omrToken },
       });
 
-      const omStatus = statusResp.body?.transactionStatus || 'PENDING';
+      // Normaliser le statut Orange (SUCCESS → SUCCESSFUL) pour l'app Flutter
+      const rawStatus = statusResp.body?.status || statusResp.body?.transactionStatus || 'PENDING';
+      let omStatus = 'PENDING';
+      if (rawStatus === 'SUCCESS' || rawStatus === 'SUCCESSFUL') omStatus = 'SUCCESSFUL';
+      else if (['FAILED', 'FAILURE', 'CANCELLED', 'EXPIRED', 'REJECTED'].includes(rawStatus)) omStatus = 'FAILED';
+
+      // Si Orange confirme le succès mais que le webhook n'est pas encore passé → créditer
+      if (omStatus === 'SUCCESSFUL' && payment.status !== 'confirmed') {
+        await db.collection('payments').doc(paymentId).update({
+          status: 'confirmed',
+          confirmedAt: new Date().toISOString(),
+          isConfirmed: true,
+          omTxnId: statusResp.body?.reference || payment.omTransactionId || '',
+          omFinalStatus: 'SUCCESSFUL',
+        });
+        await creditUserAfterPayment(paymentId);
+      } else if (omStatus === 'FAILED' && payment.status !== 'failed') {
+        await db.collection('payments').doc(paymentId).update({
+          status: 'failed',
+          failedAt: new Date().toISOString(),
+          omFinalStatus: rawStatus,
+          failureReason: `Orange: ${rawStatus}`,
+        });
+      }
+
       res.status(200).json({ transactionStatus: omStatus, source: 'orange_api' });
 
     } catch (err) {
