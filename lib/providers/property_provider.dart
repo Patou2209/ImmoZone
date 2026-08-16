@@ -44,9 +44,10 @@ class PropertyProvider extends ChangeNotifier {
     String? propertyType,
   }) {
     final now = DateTime.now();
-    // Pool source : toutes les annonces actives (non sellées)
+    // Pool source : toutes les annonces actives (non vendues, non expirées)
     final pool = _properties.where((p) =>
-        p.isBoostActive && p.status == 'Actif' && !p.isSold && !p.isRented).toList();
+        p.isBoostActive && p.status == 'Actif' && !p.isExpired &&
+        !p.isSold && !p.isRented).toList();
 
     final result = pool.where((p) {
       // VIP → toujours visible

@@ -359,6 +359,37 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
             // ----------------------------------------------------------------
+            // BANDEAU ANNONCE EXPIRÉE — affiché si expiresAt dépassé ou
+            // status 'Expire'. Ferme le trou du lien direct (partage WhatsApp
+            // d'une annonce périmée) : le visiteur est prévenu clairement.
+            // ----------------------------------------------------------------
+            if (p.isExpired || p.status == 'Expire')
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: const Color(0xFFFFEBEE),
+                child: Row(
+                  children: [
+                    const Icon(Icons.timer_off_rounded,
+                        color: Color(0xFFC62828), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        isOwner
+                            ? 'Votre annonce a expiré. Renouvelez-la depuis votre profil pour la republier.'
+                            : 'Cette annonce a expiré et n\'est plus disponible.',
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFC62828),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // ----------------------------------------------------------------
             // PHOTO GALLERY — responsive:
             //   mobile (<768px)  : slideshow pleine largeur h=280
             //   desktop (≥768px) : grille centrée max 900px (1 grande + 2 petites)
@@ -1165,8 +1196,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     ),
                 ]),
 
-                // WhatsApp + Call buttons (non-owner only)
-                if (!isOwner) ...[
+                // WhatsApp + Call buttons (non-owner only, annonce NON expirée)
+                // ⚠️ Annonce expirée → contacts masqués : le visiteur ne doit
+                // plus pouvoir contacter l'annonceur pour une offre périmée.
+                if (!isOwner && !p.isExpired && p.status != 'Expire') ...[
                   const SizedBox(height: 16),
                   const Divider(height: 1, color: AppTheme.dividerColor),
                   const SizedBox(height: 14),

@@ -752,10 +752,12 @@ class DataService {
           .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
 
+      // ⚠️ FIX expiration : les annonces dont expiresAt est dépassé (isExpired)
+      // ne doivent JAMAIS apparaître dans les listes publiques.
       final boosted = all.where((p) =>
-          p.status == 'Actif' && p.isBoostActive && !p.isSold && !p.isRented).toList();
+          p.status == 'Actif' && !p.isExpired && p.isBoostActive && !p.isSold && !p.isRented).toList();
       final normal = all.where((p) =>
-          p.status == 'Actif' && !p.isBoostActive && !p.isSold && !p.isRented).toList();
+          p.status == 'Actif' && !p.isExpired && !p.isBoostActive && !p.isSold && !p.isRented).toList();
       final soldOccupied = all.where((p) {
         if (!(p.isSold || p.isRented)) return false;
         if (p.updatedAt == null) return false;
@@ -901,21 +903,42 @@ class DataService {
     } catch (_) {}
   }
 
+  /// ⚠️ CHEMIN D'ACTIVATION UNIQUE — toute activation d'annonce DOIT passer ici.
+  /// Quand status = 'Actif', expiresAt est TOUJOURS défini/réparé dans la MÊME
+  /// écriture Firestore (atomique — plus de race condition, plus d'annonce
+  /// "immortelle" sans date d'expiration).
   Future<void> updatePropertyStatus(String id, String status) async {
-    await _propertiesCol.doc(id).update({
+    final now = DateTime.now();
+    final update = <String, dynamic>{
       'status': status,
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-    // Notifier l'annonceur si l'annonce vient d'être approuvée
+      'updatedAt': now.toIso8601String(),
+    };
+
+    PropertyModel? prop;
+    try {
+      final snap = await _propertiesCol.doc(id).get();
+      if (snap.exists) {
+        prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+      }
+    } catch (_) {}
+
     if (status == 'Actif') {
+      final days =
+          (systemSettings['announcement_validity_days'] as num?)?.toInt() ?? 30;
+      final existing = prop?.expiresAt;
+      // expiresAt absent OU déjà dépassé → (re)démarrer la validité de [days] jours
+      if (existing == null || existing.isBefore(now)) {
+        update['expiresAt'] = now.add(Duration(days: days)).toIso8601String();
+      }
+    }
+
+    // Écriture UNIQUE et atomique : statut + date d'expiration ensemble
+    await _propertiesCol.doc(id).update(update);
+
+    // Notifier l'annonceur si l'annonce vient d'être approuvée
+    if (status == 'Actif' && prop != null && prop.ownerId.isNotEmpty) {
       try {
-        final snap = await _propertiesCol.doc(id).get();
-        if (snap.exists) {
-          final prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
-          if (prop.ownerId.isNotEmpty) {
-            await notifyPropertyApproved(prop);
-          }
-        }
+        await notifyPropertyApproved(prop);
       } catch (_) {}
     }
   }

@@ -1,4 +1,5 @@
 const { onRequest } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const https = require('https');
 
@@ -561,6 +562,112 @@ exports.checkOrangePaymentStatus = onRequest(
     } catch (err) {
       console.error('[checkOrangePaymentStatus] Error:', err);
       res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION PLANIFIÉE: expireProperties
+// S'exécute toutes les heures. Passe status 'Actif' → 'Expire' pour toute
+// annonce dont expiresAt est dépassé, et notifie l'annonceur.
+// C'est LA source de vérité serveur du cycle de vie des annonces (30 jours) :
+// même si le client n'ouvre jamais l'app, l'annonce expire quand même.
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.expireProperties = onSchedule(
+  { schedule: 'every 60 minutes', region: 'us-central1', timeZone: 'Africa/Kinshasa' },
+  async () => {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    try {
+      // Les dates sont stockées en chaînes ISO-8601 → comparaison lexicale valide
+      const snap = await db.collection('properties')
+        .where('status', '==', 'Actif')
+        .get();
+
+      let expiredCount = 0;
+      const batch = db.batch();
+      const notifications = [];
+
+      snap.forEach((doc) => {
+        const data = doc.data();
+        const expiresAt = data.expiresAt; // chaîne ISO ou null
+
+        // ── Cas 1: annonce active SANS date d'expiration (donnée legacy) ──
+        // On la répare : expiresAt = createdAt + 30 jours (ou now + 30 j si pas de createdAt)
+        if (!expiresAt) {
+          const created = data.createdAt ? new Date(data.createdAt) : now;
+          const repaired = new Date(created.getTime() + 30 * 24 * 3600 * 1000);
+          if (repaired <= now) {
+            // Déjà au-delà des 30 jours depuis création → expirer immédiatement
+            batch.update(doc.ref, {
+              status: 'Expire',
+              expiresAt: repaired.toISOString(),
+              updatedAt: nowIso,
+            });
+            expiredCount++;
+            notifications.push({ doc, data });
+          } else {
+            // Encore dans la fenêtre → juste réparer la date manquante
+            batch.update(doc.ref, { expiresAt: repaired.toISOString() });
+          }
+          return;
+        }
+
+        // ── Cas 2: date d'expiration dépassée → expirer ──
+        if (expiresAt <= nowIso) {
+          batch.update(doc.ref, {
+            status: 'Expire',
+            updatedAt: nowIso,
+          });
+          expiredCount++;
+          notifications.push({ doc, data });
+        }
+      });
+
+      if (expiredCount > 0 || notifications.length > 0) {
+        await batch.commit();
+      }
+
+      // Notifications in-app aux annonceurs (hors batch — non bloquant)
+      for (const { doc, data } of notifications) {
+        try {
+          if (!data.ownerId) continue;
+          const notifId = `notif_exp_${doc.id}_${Date.now()}`;
+          await db.collection('notifications').doc(notifId).set({
+            id: notifId,
+            userId: data.ownerId,
+            type: 'info',
+            title: 'Annonce expirée',
+            body: `Votre annonce "${data.title || ''}" a expiré après sa période de validité. ` +
+                  `Vous pouvez la renouveler depuis votre profil pour la republier.`,
+            propertyId: doc.id,
+            propertyTitle: data.title || '',
+            isRead: false,
+            createdAt: nowIso,
+          });
+
+          // Notification push FCM (si token disponible)
+          const userDoc = await db.collection('users').doc(data.ownerId).get();
+          const fcmToken = userDoc.exists ? userDoc.data().fcmToken : null;
+          if (fcmToken) {
+            await admin.messaging().send({
+              token: fcmToken,
+              notification: {
+                title: '⏰ Annonce expirée — ImmoZone',
+                body: `"${data.title || 'Votre annonce'}" a expiré. Renouvelez-la depuis votre profil.`,
+              },
+              data: { propertyId: doc.id, type: 'expired' },
+            });
+          }
+        } catch (notifErr) {
+          console.warn(`[expireProperties] Notification failed for ${doc.id}:`, notifErr.message);
+        }
+      }
+
+      console.log(`[expireProperties] ✅ Scan terminé — ${expiredCount} annonce(s) expirée(s) sur ${snap.size} active(s)`);
+    } catch (err) {
+      console.error('[expireProperties] Exception:', err);
     }
   }
 );

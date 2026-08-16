@@ -51,18 +51,11 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
   Future<void> _approve(PropertyModel p) async {
     final settings = _ds.systemSettings;
     final days = (settings['announcement_validity_days'] ?? 30) as int;
+    // ✅ CHEMIN D'ACTIVATION UNIQUE : updatePropertyStatus définit désormais
+    // status + expiresAt dans UNE SEULE écriture Firestore atomique.
+    // (Ancien code : 2 écritures séparées → race condition → annonces sans
+    // date d'expiration si la 2e écriture échouait.)
     await _ds.updatePropertyStatus(p.id, 'Actif');
-    // Mettre à jour expiresAt
-    final props = await _ds.getProperties();
-    final idx = props.indexWhere((x) => x.id == p.id);
-    if (idx != -1) {
-      final updated = props[idx].copyWith(
-        status: 'Actif',
-        expiresAt: DateTime.now().add(Duration(days: days)),
-        updatedAt: DateTime.now(),
-      );
-      await _ds.updateProperty(updated);
-    }
     _snackOk('✅ Annonce approuvée et publiée pour $days jours');
     _load();
   }
