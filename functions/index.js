@@ -669,6 +669,73 @@ exports.expireProperties = onSchedule(
     } catch (err) {
       console.error('[expireProperties] Exception:', err);
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // PURGE 72h : suppression DÉFINITIVE des biens marqués vendus/occupés
+    // depuis plus de 72 heures (3 jours). Pendant les 72h le bien reste visible
+    // (badge "Vendu"/"Occupé" + tableau Historique), puis il est totalement
+    // retiré du système.
+    // ═════════════════════════════════════════════════════════════════════════
+    try {
+      const cutoffIso = new Date(now.getTime() - 72 * 3600 * 1000).toISOString();
+
+      const [soldSnap, rentedSnap] = await Promise.all([
+        db.collection('properties').where('isSold', '==', true).get(),
+        db.collection('properties').where('isRented', '==', true).get(),
+      ]);
+
+      // Fusion + déduplication (un doc peut matcher les deux requêtes)
+      const toCheck = new Map();
+      soldSnap.forEach((d) => toCheck.set(d.id, d));
+      rentedSnap.forEach((d) => toCheck.set(d.id, d));
+
+      const delBatch = db.batch();
+      const deleted = [];
+
+      toCheck.forEach((doc) => {
+        const data = doc.data();
+        // Dates stockées en ISO-8601 → comparaison lexicale valide.
+        // Si updatedAt absent, on utilise createdAt ; si aucune date, on ignore
+        // (sera réparé au prochain marquage/màj).
+        const ref = data.updatedAt || data.createdAt;
+        if (!ref) return;
+        if (ref <= cutoffIso) {
+          delBatch.delete(doc.ref);
+          deleted.push({ id: doc.id, data });
+        }
+      });
+
+      if (deleted.length > 0) {
+        await delBatch.commit();
+
+        // Notifier chaque annonceur que son annonce vendue/occupée a été retirée
+        for (const { id, data } of deleted) {
+          try {
+            if (!data.ownerId) continue;
+            const label = data.isSold ? 'vendue' : 'occupée';
+            const notifId = `notif_purge_${id}_${Date.now()}`;
+            await db.collection('notifications').doc(notifId).set({
+              id: notifId,
+              userId: data.ownerId,
+              type: 'info',
+              title: 'Annonce retirée',
+              body: `Votre annonce "${data.title || ''}" marquée ${label} a été retirée du système ` +
+                    `après le délai de 72 heures, conformément aux règles de la plateforme.`,
+              propertyId: id,
+              propertyTitle: data.title || '',
+              isRead: false,
+              createdAt: nowIso,
+            });
+          } catch (nErr) {
+            console.warn(`[expireProperties] Purge notification failed for ${id}:`, nErr.message);
+          }
+        }
+      }
+
+      console.log(`[expireProperties] 🗑️ Purge 72h — ${deleted.length} bien(s) vendu(s)/occupé(s) supprimé(s) définitivement (${toCheck.size} vérifié(s))`);
+    } catch (purgeErr) {
+      console.error('[expireProperties] Purge 72h exception:', purgeErr);
+    }
   }
 );
 

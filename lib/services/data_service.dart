@@ -1438,9 +1438,14 @@ class DataService {
   // ─── STATS PUBLIQUES ────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getPublicStats() async {
-    final props = await getActiveProperties();
-    final all   = await getProperties();
-    final now   = DateTime.now();
+    final active = await getActiveProperties();
+    final all    = await getProperties();
+    final now    = DateTime.now();
+
+    // ⚠️ getActiveProperties() inclut volontairement les biens vendus/occupés
+    // < 72h (pour affichage avec badge). Pour les DISPONIBILITÉS, on doit les
+    // exclure strictement : un bien marqué vendu/loué n'est PLUS disponible.
+    final props = active.where((p) => !p.isSold && !p.isRented).toList();
 
     // Annonces fermées dans les 3 derniers jours (72h) — vendues ou louées/occupées
     final recentes = all.where((p) {
@@ -1450,32 +1455,39 @@ class DataService {
     }).toList();
 
     return {
-      // ── Disponibilités (annonces actives) — toutes catégories ──────────────
+      // ── Disponibilités (annonces actives NON vendues/occupées) ─────────────
       'maisonVente':       props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
       'maisonLocation':    props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
       'appartVente':       props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
       'appartLocation':    props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
       'bureauLocation':    props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
       'bureauVente':       props.where((p) => p.type == 'Bureau' && p.transactionType == 'Vente').length,
-      'propCommerciale':   props.where((p) => p.type.contains('Commerciale')).length,
-      'propIndustrielle':  props.where((p) => p.type.contains('Industrielle')).length,
+      'propCommerciale':   props.where((p) => p.type.toLowerCase().contains('commerciale')).length,
+      'propIndustrielle':  props.where((p) => p.type.toLowerCase().contains('industrielle')).length,
       'terrainDispo':      props.where((p) => p.type.contains('Terrain')).length,
       'concessionDispo':   props.where((p) => p.type == 'Concession').length,
       'chambreHotel':      props.where((p) => p.type.contains('h\u00f4tel') || p.type.contains('hotel')).length,
-      'salleFetes':        props.where((p) => p.type == 'Salle de F\u00eates').length,
+      'salleFetes':        props.where((p) => p.type.toLowerCase().contains('salle de f')).length,
       'sallePolyvalente':  props.where((p) => p.type == 'Salle polyvalente').length,
       'espaceFuneraire':   props.where((p) => p.type.contains('Fun\u00e9r') || p.type.contains('Funer')).length,
       'totalActif':        props.length,
 
-      // ── Historique 3 jours (72h) — vendus / occup\u00e9s r\u00e9cemment ──────────────
-      'hist72_maisonVendue':   recentes.where((p) => p.type == 'Maison' && p.isSold).length,
-      'hist72_maisonOccupee':  recentes.where((p) => p.type == 'Maison' && p.isRented).length,
-      'hist72_terrainVendu':   recentes.where((p) => p.type.contains('Terrain') && p.isSold).length,
-      'hist72_appartVendu':    recentes.where((p) => p.type.contains('Appartement') && p.isSold).length,
-      'hist72_appartOccupe':   recentes.where((p) => p.type.contains('Appartement') && p.isRented).length,
-      'hist72_bureauOccupe':   recentes.where((p) => p.type == 'Bureau' && p.isRented).length,
-      'hist72_salleOccupee':   recentes.where((p) => p.type.contains('Salle') && p.isRented).length,
-      'hist72_total':          recentes.length,
+      // ── Historique 3 jours (72h) — miroir COMPLET des cat\u00e9gories actives ───
+      'hist72_maisonVendue':        recentes.where((p) => p.type == 'Maison' && p.isSold).length,
+      'hist72_maisonOccupee':       recentes.where((p) => p.type == 'Maison' && p.isRented).length,
+      'hist72_appartVendu':         recentes.where((p) => p.type.contains('Appartement') && p.isSold).length,
+      'hist72_appartOccupe':        recentes.where((p) => p.type.contains('Appartement') && p.isRented).length,
+      'hist72_bureauVendu':         recentes.where((p) => p.type == 'Bureau' && p.isSold).length,
+      'hist72_bureauOccupe':        recentes.where((p) => p.type == 'Bureau' && p.isRented).length,
+      'hist72_propCommerciale':     recentes.where((p) => p.type.toLowerCase().contains('commerciale')).length,
+      'hist72_propIndustrielle':    recentes.where((p) => p.type.toLowerCase().contains('industrielle')).length,
+      'hist72_terrainVendu':        recentes.where((p) => p.type.contains('Terrain')).length,
+      'hist72_concessionVendue':    recentes.where((p) => p.type == 'Concession').length,
+      'hist72_chambreHotel':        recentes.where((p) => p.type.contains('h\u00f4tel') || p.type.contains('hotel')).length,
+      'hist72_salleFetes':          recentes.where((p) => p.type.toLowerCase().contains('salle de f')).length,
+      'hist72_sallePolyvalente':    recentes.where((p) => p.type == 'Salle polyvalente').length,
+      'hist72_espaceFuneraire':     recentes.where((p) => p.type.contains('Fun\u00e9r') || p.type.contains('Funer')).length,
+      'hist72_total':               recentes.length,
     };
   }
 
