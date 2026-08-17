@@ -14,8 +14,9 @@ const _kInitiateUrl =
 const _kStatusUrl =
     'https://us-central1-immozone-d9a68.cloudfunctions.net/checkOrangePaymentStatus';
 
-// ── Timeout USSD : 3 minutes max avant d'afficher l'échec ─────────────────────
-const _kUssdTimeoutSeconds = 180;
+// ── Timeout d'attente PIN : Orange laisse 5 min (serviceTimeout 300 s) au client
+// pour valider — on attend 320 s (300 s + marge) avant d'afficher l'échec ──────
+const _kUssdTimeoutSeconds = 320;
 // ── Polling toutes les 10 secondes ────────────────────────────────────────────
 const _kPollingIntervalSeconds = 10;
 
