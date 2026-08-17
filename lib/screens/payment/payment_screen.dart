@@ -806,10 +806,36 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // WIDGETS HELPERS
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// Logo Orange Money (2 flèches croisées)
+  /// Logo Orange Money officiel (asset). `whiteArrow` = affichage sur fond
+  /// coloré (bouton orange) → pastille blanche pour garder le logo lisible.
   Widget _buildOrangeMoneyLogo({double size = 32, bool whiteArrow = false}) {
+    final logo = Image.asset(
+      'assets/images/orange_money_logo.png',
+      height: size,
+      width: size * 1.4,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => _drawnOrangeLogo(size, whiteArrow),
+    );
+    if (whiteArrow) {
+      // Sur le bouton orange, le logo (flèche orange) serait invisible :
+      // on l'encapsule dans une pastille blanche arrondie.
+      return Container(
+        padding: EdgeInsets.symmetric(
+            horizontal: size * 0.18, vertical: size * 0.12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(size * 0.25),
+        ),
+        child: logo,
+      );
+    }
+    return logo;
+  }
+
+  /// Fallback dessiné (2 flèches croisées) si l'asset est indisponible
+  Widget _drawnOrangeLogo(double size, bool whiteArrow) {
     final orangeColor = const Color(0xFFFF7900);
-    final blackColor = whiteArrow ? Colors.white : Colors.black87;
+    final blackColor = whiteArrow ? Colors.black87 : Colors.black87;
     return SizedBox(
       width: size * 1.4,
       height: size,
