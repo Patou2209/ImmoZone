@@ -291,7 +291,9 @@ exports.initiateOrangePayment = onRequest(
         const txData = respBody.transactionData || {};
 
         // Cas nominal: PENDING → le client valide par PIN → callback /notifications
-        await db.collection('payments').doc(paymentId).update({
+        // set+merge: robuste même si le doc n'existe pas encore (tests curl), et
+        // préserve les champs créés côté Flutter en usage réel
+        await db.collection('payments').doc(paymentId).set({
           status: 'pending',
           operator: 'orange_money',
           omCountry: env.country,
@@ -299,7 +301,7 @@ exports.initiateOrangePayment = onRequest(
           omAmount: txAmount,
           omServiceTimeout: txData.serviceTimeout || 300000,
           omInitiatedAt: new Date().toISOString(),
-        });
+        }, { merge: true });
 
         res.status(200).json({
           success: true,
@@ -317,12 +319,12 @@ exports.initiateOrangePayment = onRequest(
       const errorMsg = orangeErrorMessage(omResp.body, omResp.status);
       console.error('[initiateOrangePayment] Orange error:', omResp.status, JSON.stringify(omResp.body));
 
-      await db.collection('payments').doc(paymentId).update({
+      await db.collection('payments').doc(paymentId).set({
         status: 'failed',
         failureReason: errorMsg,
         failedAt: new Date().toISOString(),
         omHttpStatus: omResp.status,
-      });
+      }, { merge: true });
 
       res.status(200).json({
         success: false,
