@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/orange_money_logo.dart';
 import '../../../models/payment_model.dart';
 import '../../../services/data_service.dart';
 
@@ -46,6 +47,33 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
       _allPayments.where((p) => p.isFailed).toList();
 
   double get _totalRevenue => _confirmed.fold(0, (s, p) => s + p.amount);
+
+  // ── Callback de remboursement Orange Money — appelé depuis _PaymentTile ────
+  Future<void> _onRefund(String paymentId, String? reason) async {
+    String message;
+    bool success = true;
+    try {
+      message = await _ds.refundOrangePayment(
+        paymentId,
+        adminId: _ds.currentUserId,
+        adminName: _ds.currentUserName,
+        reason: reason,
+      );
+    } catch (e) {
+      success = false;
+      message = e.toString().replaceFirst('Exception: ', '');
+    }
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(fontFamily: 'Poppins')),
+      backgroundColor:
+          success ? AppTheme.successColor : AppTheme.errorColor,
+      behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
 
   // ── Callback de validation — appelé depuis _PaymentTile ──────────────────
   Future<void> _onValidate(String paymentId, bool approve, String? note) async {
@@ -168,6 +196,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
             onValidate: showActions
                 ? (approve, note) => _onValidate(payment.id, approve, note)
                 : null,
+            onRefund: (reason) => _onRefund(payment.id, reason),
+            onReload: _load,
           );
         },
       ),
@@ -182,12 +212,16 @@ class _PaymentTile extends StatefulWidget {
   final PaymentModel payment;
   final bool showActions;
   final Future<void> Function(bool approve, String? note)? onValidate;
+  final Future<void> Function(String? reason)? onRefund;
+  final Future<void> Function()? onReload;
 
   const _PaymentTile({
     super.key,
     required this.payment,
     this.showActions = false,
     this.onValidate,
+    this.onRefund,
+    this.onReload,
   });
 
   @override
@@ -196,6 +230,7 @@ class _PaymentTile extends StatefulWidget {
 
 class _PaymentTileState extends State<_PaymentTile> {
   bool _processing = false;
+  bool _refunding = false;
 
   Color _statusColor() {
     switch (widget.payment.status) {
@@ -349,6 +384,141 @@ class _PaymentTileState extends State<_PaymentTile> {
     );
   }
 
+  // ── Dialog de confirmation du remboursement Orange Money ───────────────
+  void _showRefundDialog(BuildContext context) {
+    final reasonCtrl = TextEditingController();
+    final payment = widget.payment;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          OrangeMoneyLogo(size: 22),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text('Rembourser le paiement',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 15,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF7900).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: const Color(0xFFFF7900).withValues(alpha: 0.25)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.person_outline, size: 13,
+                      color: AppTheme.textSecondary),
+                  const SizedBox(width: 6),
+                  Text(payment.userName.isNotEmpty
+                      ? payment.userName : 'Utilisateur',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary)),
+                ]),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.phone, size: 13,
+                      color: AppTheme.textSecondary),
+                  const SizedBox(width: 6),
+                  Text(payment.phoneNumber,
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontSize: 12, color: AppTheme.textSecondary)),
+                ]),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.undo_rounded, size: 13,
+                      color: Color(0xFFE65C00)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '\$${payment.amount.toStringAsFixed(2)} à rembourser sur son compte Orange Money',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        color: Color(0xFFE65C00)),
+                  ),
+                ]),
+                if (payment.creditsQty > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.warning_amber_rounded, size: 13,
+                        color: AppTheme.errorColor),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Les ${payment.creditsQty} crédit(s) attribué(s) seront révoqués',
+                        style: const TextStyle(fontFamily: 'Poppins',
+                            fontSize: 11, color: AppTheme.errorColor),
+                      ),
+                    ),
+                  ]),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: reasonCtrl,
+            maxLines: 2,
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Motif du remboursement...',
+              hintStyle: const TextStyle(fontFamily: 'Poppins',
+                  color: AppTheme.textHint),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: () {
+              reasonCtrl.dispose();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Annuler',
+                style: TextStyle(fontFamily: 'Poppins',
+                    color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim().isEmpty
+                  ? null
+                  : reasonCtrl.text.trim();
+              Navigator.pop(ctx);
+              reasonCtrl.dispose();
+              if (!mounted) return;
+              setState(() => _refunding = true);
+              try {
+                await widget.onRefund?.call(reason);
+              } finally {
+                if (mounted) setState(() => _refunding = false);
+              }
+            },
+            icon: const Icon(Icons.undo_rounded, size: 16),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7900),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            label: const Text('Rembourser',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final payment = widget.payment;
@@ -369,14 +539,28 @@ class _PaymentTileState extends State<_PaymentTile> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // ── Header : icône + titre + montant ──────────────────────────────
           Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _statusColor().withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.payment, color: _statusColor(), size: 18),
-            ),
+            // Orange Money → logo officiel, autres → icône générique
+            payment.operator == 'orange_money'
+                ? Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: const Color(0xFFFF7900)
+                              .withValues(alpha: 0.35)),
+                    ),
+                    child: const OrangeMoneyLogo(size: 18),
+                  )
+                : Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _statusColor().withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.payment,
+                        color: _statusColor(), size: 18),
+                  ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -439,6 +623,52 @@ class _PaymentTileState extends State<_PaymentTile> {
                 '${payment.confirmedAt!.month.toString().padLeft(2, '0')}/'
                 '${payment.confirmedAt!.year}',
                 color: AppTheme.successColor),
+          if (payment.refundStatus != null)
+            _infoRow(Icons.undo_rounded,
+                '${payment.refundStatusLabel}'
+                '${payment.refundAmount != null ? ' — \$${payment.refundAmount!.toStringAsFixed(2)}' : ''}',
+                color: payment.isRefunded
+                    ? const Color(0xFFE65C00)
+                    : payment.refundStatus == 'failed'
+                        ? AppTheme.errorColor
+                        : Colors.orange),
+
+          // ── Bouton Rembourser (Orange Money confirmé, non remboursé) ───
+          if (payment.isConfirmed &&
+              payment.operator == 'orange_money' &&
+              !payment.isRefunded &&
+              !payment.isRefundPending &&
+              widget.onRefund != null) ...[
+            const Divider(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed:
+                    _refunding ? null : () => _showRefundDialog(context),
+                icon: _refunding
+                    ? const SizedBox(
+                        width: 14, height: 14,
+                        child: CircularProgressIndicator(
+                            color: Color(0xFFFF7900), strokeWidth: 2))
+                    : const Icon(Icons.undo_rounded, size: 16),
+                label: Text(
+                  _refunding
+                      ? 'Remboursement en cours...'
+                      : 'Rembourser via Orange Money',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins', fontSize: 12,
+                      fontWeight: FontWeight.w600),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFF7900),
+                  side: const BorderSide(color: Color(0xFFFF7900)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
+          ],
 
           // ── Boutons Rejeter / Valider ──────────────────────────────────
           if (widget.showActions && widget.onValidate != null) ...[

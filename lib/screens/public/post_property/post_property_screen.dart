@@ -3607,6 +3607,23 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     };
     final url   = logos[type];
     final color = colors[type] ?? AppTheme.accentColor;
+
+    // Orange Money → logo officiel embarqué (asset local)
+    if (type == 'orange') {
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 6)],
+        ),
+        padding: const EdgeInsets.all(5),
+        child: Image.asset('assets/images/orange_money_logo.png', fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(Icons.payment, color: color, size: size * 0.5)),
+      );
+    }
+
     if (url != null) {
       return Container(
         width: size, height: size,

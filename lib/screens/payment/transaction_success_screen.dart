@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/orange_money_logo.dart';
 
 /// Écran affiché après confirmation SUCCESSFUL d'un paiement Orange Money
 class TransactionSuccessScreen extends StatefulWidget {
@@ -238,13 +239,13 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFFF7900).withValues(alpha: 0.4)),
       ),
-      child: Row(
+      child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Flèches Orange Money (logo simplifié)
-          _orangeArrowIcon(),
-          const SizedBox(width: 8),
-          const Text(
+          // Logo officiel Orange Money
+          OrangeMoneyLogo(size: 22),
+          SizedBox(width: 8),
+          Text(
             'Orange Money',
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -252,29 +253,6 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
               fontWeight: FontWeight.w700,
               color: Color(0xFFFF7900),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _orangeArrowIcon() {
-    return SizedBox(
-      width: 28,
-      height: 20,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            child: Icon(Icons.north_east_rounded,
-                color: Colors.black87, size: 14),
-          ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Icon(Icons.south_west_rounded,
-                color: const Color(0xFFFF7900), size: 14),
           ),
         ],
       ),

@@ -16,6 +16,9 @@ class PaymentModel {
   final String productType; // 'publication_unitaire' | 'souscription_mensuelle' | 'souscription_annuelle' | 'pack_3' | 'pack_5' | 'pack_10' | 'pack_50' | 'boost'
   final int creditsQty;     // nombre exact de crédits à attribuer lors de l'approbation
   final String? propertyId; // si boost d'annonce
+  final String? refundStatus; // null | 'pending' | 'refunded' | 'failed' (remboursement Orange Money)
+  final String? refundId;     // transactionId Orange du remboursement
+  final double? refundAmount; // montant remboursé
 
   PaymentModel({
     required this.id,
@@ -35,11 +38,25 @@ class PaymentModel {
     required this.productType,
     this.creditsQty = 0,
     this.propertyId,
+    this.refundStatus,
+    this.refundId,
+    this.refundAmount,
   });
 
   bool get isPending => status == 'pending' || status == 'awaiting_manual';
   bool get isConfirmed => status == 'confirmed';
   bool get isFailed => status == 'failed' || status == 'cancelled';
+  bool get isRefunded => refundStatus == 'refunded';
+  bool get isRefundPending => refundStatus == 'pending';
+
+  String get refundStatusLabel {
+    switch (refundStatus) {
+      case 'pending':  return 'Remboursement en cours';
+      case 'refunded': return 'Remboursé';
+      case 'failed':   return 'Remboursement échoué';
+      default:         return '';
+    }
+  }
 
   String get operatorLabel {
     switch (operator) {
@@ -83,6 +100,7 @@ class PaymentModel {
     String? transactionReference, String? manualNote, String? validatedBy,
     DateTime? createdAt, DateTime? confirmedAt, String? productType,
     int? creditsQty, String? propertyId,
+    String? refundStatus, String? refundId, double? refundAmount,
   }) => PaymentModel(
     id: id ?? this.id, userId: userId ?? this.userId,
     userName: userName ?? this.userName,
@@ -98,6 +116,9 @@ class PaymentModel {
     productType: productType ?? this.productType,
     creditsQty: creditsQty ?? this.creditsQty,
     propertyId: propertyId ?? this.propertyId,
+    refundStatus: refundStatus ?? this.refundStatus,
+    refundId: refundId ?? this.refundId,
+    refundAmount: refundAmount ?? this.refundAmount,
   );
 
   Map<String, dynamic> toMap() => {
@@ -108,6 +129,7 @@ class PaymentModel {
     'createdAt': createdAt.toIso8601String(),
     'confirmedAt': confirmedAt?.toIso8601String(),
     'productType': productType, 'creditsQty': creditsQty, 'propertyId': propertyId,
+    'refundStatus': refundStatus, 'refundId': refundId, 'refundAmount': refundAmount,
   };
 
   factory PaymentModel.fromMap(Map<String, dynamic> m) => PaymentModel(
@@ -126,5 +148,8 @@ class PaymentModel {
     productType: m['productType'] ?? 'publication_unitaire',
     creditsQty: (m['creditsQty'] as num?)?.toInt() ?? 0,
     propertyId: m['propertyId'],
+    refundStatus: m['refundStatus'],
+    refundId: m['refundId'],
+    refundAmount: (m['refundAmount'] as num?)?.toDouble(),
   );
 }

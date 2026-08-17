@@ -68,8 +68,9 @@ function omOauthCredentials() {
   return (process.env.ORANGE_OAUTH_BASIC || '').trim();
 }
 function omDebitPath()  { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/debit`; }
-function omStatusPath(transactionId) {
-  return `${ORANGE_CONFIG.basePath}/${omEnv().country}/debit/transactions/${encodeURIComponent(transactionId)}`;
+function omCreditPath() { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/credit`; }
+function omStatusPath(transactionId, type = 'debit') {
+  return `${ORANGE_CONFIG.basePath}/${omEnv().country}/${type}/transactions/${encodeURIComponent(transactionId)}`;
 }
 
 // Cache du Bearer token OAuth (valide 1h = 3600 s)
@@ -408,6 +409,15 @@ exports.orangeMoneyWebhook = onRequest(
         return;
       }
 
+      // ── Notification de REMBOURSEMENT (credit) ? ─────────────────────────────
+      // Nos refundIds sont préfixés 'refund_' → routage vers le traitement dédié
+      if (transactionId.startsWith('refund_')) {
+        await processRefundNotification(transactionId, transactionStatus, {
+          omTransactionId, executionDate, failureReason,
+        });
+        return;
+      }
+
       const payRef = db.collection('payments').doc(transactionId);
       const payDoc = await payRef.get();
 
@@ -598,6 +608,239 @@ exports.checkOrangePaymentStatus = onRequest(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION 4: refundOrangePayment
+// Remboursement d'un paiement confirmé — service CREDIT Orange Money
+// (POST /{country}/credit — ImmoZone → portefeuille du client)
+// Appelée par l'admin depuis l'écran Gestion des Paiements
+// URL: https://us-central1-immozone-d9a68.cloudfunctions.net/refundOrangePayment
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.refundOrangePayment = onRequest(
+  { region: 'us-central1', cors: true, secrets: ['ORANGE_OAUTH_BASIC'] },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'POST requis' });
+      return;
+    }
+
+    try {
+      const { paymentId, adminId, adminName, reason } = req.body || {};
+
+      if (!paymentId || !adminId) {
+        res.status(400).json({ error: 'Paramètres manquants: paymentId, adminId requis' });
+        return;
+      }
+
+      // 🔒 Garde-fou: vérifier que l'appelant est bien un admin
+      const adminDoc = await db.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+        res.status(403).json({ error: 'Accès refusé — réservé aux administrateurs' });
+        return;
+      }
+
+      // 1. Charger et valider le paiement d'origine
+      const payRef = db.collection('payments').doc(paymentId);
+      const payDoc = await payRef.get();
+      if (!payDoc.exists) {
+        res.status(404).json({ error: 'Paiement introuvable' });
+        return;
+      }
+      const payment = payDoc.data();
+
+      if (payment.status !== 'confirmed') {
+        res.status(400).json({ error: 'Seul un paiement confirmé peut être remboursé' });
+        return;
+      }
+      if (payment.operator !== 'orange_money') {
+        res.status(400).json({ error: 'Remboursement automatique disponible uniquement pour Orange Money' });
+        return;
+      }
+      if (payment.refundStatus === 'pending' || payment.refundStatus === 'refunded') {
+        res.status(400).json({ error: `Remboursement déjà ${payment.refundStatus === 'pending' ? 'en cours' : 'effectué'}` });
+        return;
+      }
+
+      const env = omEnv();
+
+      // 2. Destinataire: le msisdn confirmé par Orange, sinon le numéro saisi
+      const msisdn = String(payment.omPeerId || payment.phoneNumber || '')
+        .replace(/[\s\-]/g, '').replace(/^\+/, '');
+      if (!msisdn) {
+        res.status(400).json({ error: 'Numéro Orange Money du client introuvable sur ce paiement' });
+        return;
+      }
+
+      // 3. Montant: celui débité par Orange (omAmount) sinon le montant commande
+      let refundAmount = parseFloat(payment.omAmount || payment.amount || 0);
+      if (env.integerAmountsOnly) refundAmount = Math.round(refundAmount);
+      if (!refundAmount || refundAmount <= 0) {
+        res.status(400).json({ error: 'Montant de remboursement invalide' });
+        return;
+      }
+
+      // 4. transactionId de remboursement: NOUVEAU, unique, jamais réutilisé
+      const refundId = `refund_${paymentId}_${Date.now()}`;
+
+      const creditBody = {
+        peerId: msisdn,
+        peerIdType: 'msisdn',
+        amount: refundAmount,
+        currency: payment.omCurrency || env.currency,
+        transactionId: refundId,
+      };
+
+      console.log(`[refundOrangePayment] paymentId=${paymentId} refundId=${refundId} msisdn=${msisdn} amount=${refundAmount}`);
+
+      // 5. POST /{country}/credit — même flux que debit (202 = accepté)
+      const omResp = await orangeApiCall({
+        method: 'POST',
+        path: omCreditPath(),
+        body: creditBody,
+      });
+
+      console.log(`[refundOrangePayment] Orange HTTP ${omResp.status}:`, JSON.stringify(omResp.body));
+
+      if (omResp.status === 202) {
+        const respBody = omResp.body || {};
+        const isImmediate = respBody.status === 'SUCCESS';
+
+        // Doc de suivi du remboursement (le webhook le retrouvera par refundId)
+        await db.collection('refunds').doc(refundId).set({
+          id: refundId,
+          paymentId,
+          userId: payment.userId,
+          msisdn,
+          amount: refundAmount,
+          currency: creditBody.currency,
+          status: isImmediate ? 'confirmed' : 'pending',
+          reason: reason || null,
+          adminId,
+          adminName: adminName || '',
+          createdAt: new Date().toISOString(),
+          ...(isImmediate ? { confirmedAt: new Date().toISOString() } : {}),
+        });
+
+        await payRef.update({
+          refundStatus: isImmediate ? 'refunded' : 'pending',
+          refundId,
+          refundAmount,
+          refundReason: reason || null,
+          refundRequestedAt: new Date().toISOString(),
+          refundRequestedBy: adminName || adminId,
+          ...(isImmediate ? { refundedAt: new Date().toISOString() } : {}),
+        });
+
+        if (isImmediate) await revokeCreditsAfterRefund(paymentId);
+
+        res.status(200).json({
+          success: true,
+          refundId,
+          refundStatus: isImmediate ? 'refunded' : 'pending',
+          amount: refundAmount,
+          currency: creditBody.currency,
+          message: isImmediate
+            ? 'Remboursement effectué avec succès'
+            : 'Remboursement initié — confirmation Orange en attente',
+        });
+        return;
+      }
+
+      // Échec (dont code 70 tant que le service CREDIT n'est pas activé au contrat)
+      const errorMsg = orangeErrorMessage(omResp.body, omResp.status);
+      console.error('[refundOrangePayment] Orange error:', omResp.status, JSON.stringify(omResp.body));
+      res.status(200).json({
+        success: false,
+        retryable: omResp.status === 429,
+        error: errorMsg,
+      });
+
+    } catch (err) {
+      console.error('[refundOrangePayment] Exception:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
+// ─── Révoquer les crédits associés à un paiement remboursé ─────────────────────
+async function revokeCreditsAfterRefund(paymentId) {
+  try {
+    const creditRef = db.collection('credits').doc(`credit_${paymentId}`);
+    const creditDoc = await creditRef.get();
+    if (creditDoc.exists && !creditDoc.data().revoked) {
+      await creditRef.update({
+        remaining: 0,
+        revoked: true,
+        revokedAt: new Date().toISOString(),
+        revokedReason: 'remboursement_orange_money',
+      });
+      console.log(`[revokeCredits] Crédits ${paymentId} révoqués (remboursement)`);
+    }
+  } catch (e) {
+    console.warn('[revokeCredits] Échec révocation:', e.message);
+  }
+}
+
+// ─── Traiter la notification callback d'un remboursement (credit) ──────────────
+async function processRefundNotification(refundId, transactionStatus, { omTransactionId, executionDate, failureReason }) {
+  const refundRef = db.collection('refunds').doc(refundId);
+  const refundDoc = await refundRef.get();
+  if (!refundDoc.exists) {
+    console.warn(`[refundWebhook] Refund ${refundId} introuvable dans Firestore`);
+    return;
+  }
+  const refund = refundDoc.data();
+  if (refund.status === 'confirmed' || refund.status === 'failed') {
+    console.log(`[refundWebhook] Refund ${refundId} déjà traité (${refund.status})`);
+    return;
+  }
+
+  const payRef = db.collection('payments').doc(refund.paymentId);
+
+  if (transactionStatus === 'SUCCESS') {
+    await refundRef.update({
+      status: 'confirmed',
+      confirmedAt: new Date().toISOString(),
+      omTxnId: omTransactionId || '',
+      omExecutionDate: executionDate || '',
+    });
+    await payRef.update({
+      refundStatus: 'refunded',
+      refundedAt: new Date().toISOString(),
+    });
+    await revokeCreditsAfterRefund(refund.paymentId);
+
+    // Notifier le client remboursé (FCM, best-effort)
+    try {
+      const userDoc = await db.collection('users').doc(refund.userId).get();
+      const fcmToken = userDoc.exists ? userDoc.data().fcmToken : null;
+      if (fcmToken) {
+        await admin.messaging().send({
+          token: fcmToken,
+          notification: {
+            title: '💸 Remboursement effectué — ImmoZone',
+            body: `${refund.amount} ${refund.currency} remboursé(s) sur votre compte Orange Money`,
+          },
+          data: { refundId, paymentId: refund.paymentId, status: 'refunded' },
+        });
+      }
+    } catch (e) {
+      console.warn('[refundWebhook] FCM notification failed:', e.message);
+    }
+    console.log(`[refundWebhook] ✅ Refund ${refundId} CONFIRMED`);
+
+  } else if (transactionStatus === 'FAILED') {
+    await refundRef.update({
+      status: 'failed',
+      failedAt: new Date().toISOString(),
+      failureReason: failureReason || 'Remboursement Orange Money échoué',
+    });
+    await payRef.update({ refundStatus: 'failed' });
+    console.log(`[refundWebhook] ❌ Refund ${refundId} FAILED: ${failureReason}`);
+  } else {
+    console.log(`[refundWebhook] Status inconnu pour ${refundId}: ${transactionStatus} — ignoré`);
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION PLANIFIÉE: expireProperties

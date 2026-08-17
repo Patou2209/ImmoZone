@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1957,6 +1958,37 @@ class DataService {
       debugPrint('[validatePaymentManually] ERROR: $e\n$st');
       rethrow; // remonte l'erreur pour que l'admin voit un message d'échec
     }
+  }
+
+  /// Remboursement Orange Money (service CREDIT) d'un paiement confirmé.
+  /// Appelle la Cloud Function refundOrangePayment qui déclenche
+  /// POST /{country}/credit côté Orange. Retourne le message de résultat.
+  /// Lève une exception avec le message d'erreur en cas d'échec.
+  Future<String> refundOrangePayment(
+    String paymentId, {
+    required String adminId,
+    required String adminName,
+    String? reason,
+  }) async {
+    final resp = await http
+        .post(
+          Uri.parse(
+              'https://us-central1-immozone-d9a68.cloudfunctions.net/refundOrangePayment'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'paymentId': paymentId,
+            'adminId': adminId,
+            'adminName': adminName,
+            'reason': reason,
+          }),
+        )
+        .timeout(const Duration(seconds: 45));
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    if (resp.statusCode == 200 && data['success'] == true) {
+      return data['message'] as String? ?? 'Remboursement initié';
+    }
+    throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');
   }
 
   int _creditsForProduct(String productType) {

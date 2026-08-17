@@ -1457,6 +1457,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     final url = logos[type];
     final color = colors[type] ?? AppTheme.accentColor;
 
+    // Orange Money → logo officiel embarqué (asset local)
+    if (type == 'orange') {
+      return Container(
+        width: size, height: size,
+        decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 6)],
+        ),
+        padding: const EdgeInsets.all(4),
+        child: Image.asset('assets/images/orange_money_logo.png', fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(Icons.payment, color: color, size: size * 0.55)),
+      );
+    }
+
     if (url != null) {
       return Container(
         width: size, height: size,

@@ -640,8 +640,114 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   fontSize: 14,
                   color: AppTheme.textPrimary)),
           const SizedBox(height: 12),
+
+          // ══ ORANGE MONEY — en haut, à part : paiement 100% AUTOMATIQUE ══
+          GestureDetector(
+            onTap: () => setState(() => _selectedOperator = 'orange_money'),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _selectedOperator == 'orange_money'
+                    ? const Color(0xFFFFF3E0)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _selectedOperator == 'orange_money'
+                      ? const Color(0xFFFF7900)
+                      : AppTheme.dividerColor,
+                  width: _selectedOperator == 'orange_money' ? 2 : 1,
+                ),
+                boxShadow: _selectedOperator == 'orange_money'
+                    ? [BoxShadow(
+                        color: const Color(0xFFFF7900).withValues(alpha: 0.15),
+                        blurRadius: 10, offset: const Offset(0, 3))]
+                    : null,
+              ),
+              child: Row(children: [
+                _buildOrangeMoneyLogo(size: 34),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Text('Orange Money',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.textPrimary)),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.successColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min,
+                              children: [
+                            Icon(Icons.bolt, color: Colors.white, size: 10),
+                            SizedBox(width: 2),
+                            Text('AUTOMATIQUE',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3)),
+                          ]),
+                        ),
+                      ]),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Paiement instantané — confirmez avec votre code PIN, '
+                        'vos crédits sont ajoutés automatiquement. '
+                        'Aucune référence à envoyer.',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 10.5,
+                            color: AppTheme.textSecondary,
+                            height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _selectedOperator == 'orange_money'
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  color: _selectedOperator == 'orange_money'
+                      ? const Color(0xFFFF7900)
+                      : AppTheme.textHint,
+                  size: 22,
+                ),
+              ]),
+            ),
+          ),
+
+          // ── Séparateur "ou validation manuelle" ──────────────────────────
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: Divider(color: AppTheme.dividerColor)),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Text('ou avec validation manuelle',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      color: AppTheme.textHint)),
+            ),
+            Expanded(child: Divider(color: AppTheme.dividerColor)),
+          ]),
+          const SizedBox(height: 14),
+
+          // ══ M-PESA / AIRTEL — en dessous : validation manuelle (référence) ══
           Row(
-            children: _operators.map((op) {
+            children: _operators
+                .where((op) => op['id'] != 'orange_money')
+                .map((op) {
               final id = op['id'] as String;
               final selected = _selectedOperator == id;
               final color = op['color'] as Color;
@@ -663,12 +769,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Orange Money → logo custom, autres → icône
-                        if (id == 'orange_money')
-                          _buildOrangeMoneyLogo(size: 22)
-                        else
-                          Icon(op['icon'] as IconData,
-                              color: color, size: 24),
+                        Icon(op['icon'] as IconData,
+                            color: color, size: 24),
                         const SizedBox(height: 4),
                         Text(op['name'] as String,
                             style: TextStyle(
@@ -676,6 +778,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                 fontSize: 9,
                                 fontWeight: FontWeight.w600,
                                 color: selected ? color : AppTheme.textSecondary),
+                            textAlign: TextAlign.center),
+                        const SizedBox(height: 2),
+                        Text('Réf. requise',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 8,
+                                color: AppTheme.textHint),
                             textAlign: TextAlign.center),
                       ],
                     ),
