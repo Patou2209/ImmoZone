@@ -56,29 +56,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String? _currentPaymentId;
   String? _omTransactionId;
 
-  final _operators = [
-    {
-      'id': 'orange_money',
-      'name': 'Orange Money',
-      'color': const Color(0xFFFF7900),
-      'bg': const Color(0xFFFFF3E0),
-      'icon': null, // utilise le widget logo custom
-    },
-    {
-      'id': 'mpesa',
-      'name': 'M-Pesa',
-      'color': const Color(0xFF00B140),
-      'bg': const Color(0xFFE8F5E9),
-      'icon': Icons.phone_android,
-    },
-    {
-      'id': 'airtel_money',
-      'name': 'Airtel Money',
-      'color': const Color(0xFFE40000),
-      'bg': const Color(0xFFFFEBEE),
-      'icon': Icons.payment,
-    },
-  ];
+  // NOTE: cet écran est dédié au flux automatique Orange Money.
+  // M-Pesa / Airtel (validation manuelle) passent par le dialog de recharge.
 
   @override
   void dispose() {
@@ -633,7 +612,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
         // ── Sélection opérateur ────────────────────────────────────────────
         if (!_useManualValidation) ...[
-          const Text('Choisissez votre opérateur',
+          const Text('Votre opérateur',
               style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w600,
@@ -727,72 +706,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
 
-          // ── Séparateur "ou validation manuelle" ──────────────────────────
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: Divider(color: AppTheme.dividerColor)),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text('ou avec validation manuelle',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 10,
-                      color: AppTheme.textHint)),
-            ),
-            Expanded(child: Divider(color: AppTheme.dividerColor)),
-          ]),
-          const SizedBox(height: 14),
-
-          // ══ M-PESA / AIRTEL — en dessous : validation manuelle (référence) ══
-          Row(
-            children: _operators
-                .where((op) => op['id'] != 'orange_money')
-                .map((op) {
-              final id = op['id'] as String;
-              final selected = _selectedOperator == id;
-              final color = op['color'] as Color;
-              final bg = op['bg'] as Color;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedOperator = id),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected ? bg : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: selected ? color : AppTheme.dividerColor,
-                        width: selected ? 2 : 1,
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(op['icon'] as IconData,
-                            color: color, size: 24),
-                        const SizedBox(height: 4),
-                        Text(op['name'] as String,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: selected ? color : AppTheme.textSecondary),
-                            textAlign: TextAlign.center),
-                        const SizedBox(height: 2),
-                        Text('Réf. requise',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 8,
-                                color: AppTheme.textHint),
-                            textAlign: TextAlign.center),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+          // NOTE: M-Pesa / Airtel retirés — cet écran est dédié au paiement
+          // automatique Orange Money. Le flux manuel (référence) reste
+          // disponible via l'onglet "Déjà payé (réf.)" ou le dialog de recharge.
           const SizedBox(height: 20),
         ],
 
