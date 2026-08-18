@@ -28,6 +28,7 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
   late AnimationController _ctrl;
   late Animation<double> _scaleAnim;
   late Animation<double> _fadeAnim;
+  final _scrollCtrl = ScrollController();
 
   @override
   void initState() {
@@ -41,6 +42,7 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
   @override
   void dispose() {
     _ctrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -53,12 +55,17 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
         body: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnim,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Spacer(flex: 1),
+            // Scrollbar toujours visible + contenu défilable (petits écrans / web)
+            child: Scrollbar(
+              controller: _scrollCtrl,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 12),
 
                   // ── Icône succès animée ────────────────────────────────────
                   ScaleTransition(
@@ -194,7 +201,7 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
                     ),
                   ),
 
-                  const Spacer(flex: 2),
+                  const SizedBox(height: 28),
 
                   // ── Bouton retour ──────────────────────────────────────────
                   SizedBox(
@@ -222,7 +229,8 @@ class _TransactionSuccessScreenState extends State<TransactionSuccessScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

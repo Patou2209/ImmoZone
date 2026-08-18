@@ -44,6 +44,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   final _ds = DataService();
   final _phoneCtrl = TextEditingController();
   final _refCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
 
   String _selectedOperator = 'orange_money';
   bool _isLoading = false;
@@ -63,6 +64,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void dispose() {
     _phoneCtrl.dispose();
     _refCtrl.dispose();
+    _scrollCtrl.dispose();
     _pollingTimer?.cancel();
     super.dispose();
   }
@@ -380,9 +382,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
         top: false,
         child: _orangeWaitingUssd
             ? _buildUssdWaitingScreen()
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: _buildPaymentForm(),
+            // Scrollbar toujours visible pour défiler jusqu'en bas
+            : Scrollbar(
+                controller: _scrollCtrl,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.all(20),
+                  child: _buildPaymentForm(),
+                ),
               ),
       ),
     );
