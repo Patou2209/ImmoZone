@@ -798,7 +798,7 @@ exports.refundOrangePayment = onRequest(
         await db.collection('refunds').doc(refundId).set({
           id: refundId,
           paymentId,
-          userId: payment.userId,
+          userId: payment.userId ?? null,   // robustesse: doc de test sans userId
           msisdn,
           amount: refundAmount,
           currency: creditBody.currency,
