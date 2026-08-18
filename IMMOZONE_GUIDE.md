@@ -422,6 +422,8 @@ npm install -g firebase-tools  // pour installer le Firebase CLI (si pas deja fa
 Si npm n'est pas reconnu non plus, installez d'abord Node.js : https://nodejs.org (version LTS) puis relancez PowerShell.
 firebase login  // pour se connecter a firebase qui contient votre project; Un navigateur va s'ouvrir → connectez-vous avec le compte Google lié à votre projet Firebase (immozone-d9a68).
 firebase deploy --only hosting  // pour le deployement.
+firebase deploy --only functions
+
 
 
 
