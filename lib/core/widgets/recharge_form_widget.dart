@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/payment_model.dart';
 import '../../services/data_service.dart';
+import '../../screens/payment/payment_screen.dart';
 
 // ─── Widget Dialog public ────────────────────────────────────────────────────
 class RechargeDialog extends StatelessWidget {
@@ -105,7 +106,13 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
           .toList();
       _methods = widget.ds.paymentMethods
           .where((m) => m['active'] == true)
-          .toList();
+          .toList()
+        // Orange Money (paiement automatique) toujours en premier
+        ..sort((a, b) {
+          final ao = (a['icon'] == 'orange') ? 0 : 1;
+          final bo = (b['icon'] == 'orange') ? 0 : 1;
+          return ao.compareTo(bo);
+        });
       _loading = false;
     });
   }
@@ -116,7 +123,32 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
     super.dispose();
   }
 
-  // ── Soumission ─────────────────────────────────────────────────────────────
+  bool _isOrange(Map<String, dynamic>? m) => (m?['icon'] ?? '') == 'orange';
+
+  // ── Paiement automatique Orange Money ─────────────────────────────────────
+  // Ferme le dialog et ouvre PaymentScreen (flux automatique : USSD + PIN,
+  // crédits ajoutés automatiquement — aucune référence manuelle).
+  void _payWithOrange() {
+    if (_selectedPack == null) {
+      _snack('Veuillez choisir un pack de recharge.'); return;
+    }
+    final pack  = _selectedPack!;
+    final price = (pack['price'] as num?)?.toDouble() ?? 0.0;
+    final qty   = (pack['qty'] as num?)?.toInt() ?? 0;
+    final productType = pack['productType'] as String? ?? 'souscription_credits_10';
+    final nav = Navigator.of(context);
+    nav.pop(); // ferme le dialog de recharge
+    nav.push(MaterialPageRoute(
+      builder: (_) => PaymentScreen(
+        productType: productType,
+        amount: price,
+        productLabel: pack['name'] as String? ?? 'Recharge de crédits',
+        creditsQty: qty,
+      ),
+    ));
+  }
+
+  // ── Soumission (flux manuel : M-Pesa / Airtel) ─────────────────────────────
   Future<void> _submit() async {
     if (_selectedPack == null) {
       _snack('Veuillez choisir un pack de recharge.'); return;
@@ -124,6 +156,8 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
     if (_selectedMethod == null) {
       _snack('Veuillez choisir un moyen de paiement.'); return;
     }
+    // Orange Money → jamais de flux manuel : redirige vers le flux automatique
+    if (_isOrange(_selectedMethod)) { _payWithOrange(); return; }
     if (_refCtrl.text.trim().isEmpty) {
       _snack('Veuillez saisir la référence de votre paiement.'); return;
     }
@@ -223,22 +257,30 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // ── ÉTAPE 1 : Choisir le pack ──────────────────────────────────────
-        _stepBadge('1', 'Choisissez une recharge de crédits'),
-        const SizedBox(height: 10),
-        if (_packs.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text('Aucun pack disponible pour le moment.',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
-                    color: AppTheme.textSecondary)),
-          )
-        else
-          ..._packs.map((pack) => _packTile(pack)),
+        // ── ÉTAPE 1 : Pack ────────────────────────────────────────────────
+        // Si un pack a été pré-sélectionné (ex: depuis l'écran des packs),
+        // on affiche UNIQUEMENT ce pack (verrouillé) — pas de redondance.
+        if (widget.preselectedPack != null) ...[
+          _stepBadge('1', 'Votre pack sélectionné'),
+          const SizedBox(height: 10),
+          _packTile(_selectedPack!, locked: true),
+        ] else ...[
+          _stepBadge('1', 'Choisissez une recharge de crédits'),
+          const SizedBox(height: 10),
+          if (_packs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text('Aucun pack disponible pour le moment.',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                      color: AppTheme.textSecondary)),
+            )
+          else
+            ..._packs.map((pack) => _packTile(pack)),
+        ],
         const SizedBox(height: 20),
 
         // ── ÉTAPE 2 : Choisir le moyen de paiement ─────────────────────────
-        _stepBadge('2', 'Effectuez le paiement Mobile Money'),
+        _stepBadge('2', 'Choisissez votre moyen de paiement'),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.all(12),
@@ -247,10 +289,13 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
           ),
-          child: const Text(
-            'Envoyez le montant au numéro correspondant, '
-            'puis saisissez votre référence de transaction ci-dessous.',
-            style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
+          child: Text(
+            _isOrange(_selectedMethod)
+                ? 'Orange Money : paiement automatique — vous recevrez une '
+                  'demande de confirmation sur votre téléphone (code PIN).'
+                : 'M-Pesa / Airtel : envoyez le montant au numéro correspondant, '
+                  'puis saisissez votre référence de transaction ci-dessous.',
+            style: const TextStyle(fontSize: 12, fontFamily: 'Poppins',
                 color: AppTheme.textSecondary, height: 1.5),
           ),
         ),
@@ -262,11 +307,84 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
                     color: AppTheme.textSecondary)),
           )
-        else
-          ..._methods.map((m) => _methodTile(m)),
+        else ...[
+          // Orange Money (automatique) d'abord
+          ..._methods.where(_isOrange).map((m) => _methodTile(m)),
+          // Séparateur si les deux familles existent
+          if (_methods.any(_isOrange) &&
+              _methods.any((m) => !_isOrange(m))) ...[
+            const SizedBox(height: 2),
+            Row(children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text('ou avec validation manuelle',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                        color: AppTheme.textHint.withValues(alpha: 0.9))),
+              ),
+              const Expanded(child: Divider()),
+            ]),
+            const SizedBox(height: 8),
+          ],
+          ..._methods.where((m) => !_isOrange(m)).map((m) => _methodTile(m)),
+        ],
         const SizedBox(height: 20),
 
-        // ── ÉTAPE 3 : Référence + Soumettre ────────────────────────────────
+        // ── ÉTAPE 3 : selon le moyen choisi ────────────────────────────────
+        // Orange Money → flux AUTOMATIQUE (PaymentScreen : USSD + PIN + polling)
+        // M-Pesa / Airtel → flux MANUEL (référence + validation admin)
+        if (_isOrange(_selectedMethod)) ...[
+          _stepBadge('3', 'Payez automatiquement avec Orange Money'),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF7900).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: const Color(0xFFFF7900).withValues(alpha: 0.35)),
+            ),
+            child: const Row(children: [
+              Icon(Icons.flash_on_rounded, color: Color(0xFFFF7900), size: 20),
+              SizedBox(width: 8),
+              Expanded(child: Text(
+                'Paiement instantané : confirmez avec votre code PIN, '
+                'vos crédits sont ajoutés automatiquement. '
+                'Aucune référence à envoyer.',
+                style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
+                    color: AppTheme.textSecondary, height: 1.5),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _payWithOrange,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF7900),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.flash_on_rounded, size: 18),
+              label: const Text(
+                'Payer avec Orange Money',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Vous serez redirigé(e) vers l\'écran de paiement Orange Money.',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                color: AppTheme.textHint, height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+        ] else ...[
         _stepBadge('3', 'Saisissez votre référence de paiement'),
         const SizedBox(height: 10),
         TextField(
@@ -319,6 +437,7 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 20),
+        ],
       ]),
     );
   }
@@ -395,16 +514,16 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
   }
 
   // ── Tiles ─────────────────────────────────────────────────────────────────
-  Widget _packTile(Map<String, dynamic> pack) {
-    final isSelected = _selectedPack?['id'] == pack['id'];
+  Widget _packTile(Map<String, dynamic> pack, {bool locked = false}) {
+    final isSelected = locked || _selectedPack?['id'] == pack['id'];
     final qty   = (pack['qty'] as num?)?.toInt() ?? 0;
     final price = (pack['price'] as num?)?.toDouble() ?? 0.0;
     final cur   = pack['currency'] ?? 'USD';
 
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: locked ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () => setState(() => _selectedPack = pack),
+        onTap: locked ? null : () => setState(() => _selectedPack = pack),
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
@@ -467,6 +586,9 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
 
   Widget _methodTile(Map<String, dynamic> m) {
     final isSelected = _selectedMethod?['id'] == m['id'];
+    final isOrange   = _isOrange(m);
+    const orangeColor = Color(0xFFFF7900);
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -476,10 +598,17 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.white,
+                ? (isOrange
+                    ? orangeColor.withValues(alpha: 0.06)
+                    : AppTheme.primaryColor.withValues(alpha: 0.06))
+                : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? AppTheme.accentColor : AppTheme.dividerColor,
+              color: isSelected
+                  ? (isOrange ? orangeColor : AppTheme.accentColor)
+                  : (isOrange
+                      ? orangeColor.withValues(alpha: 0.4)
+                      : AppTheme.dividerColor),
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -487,18 +616,47 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
             _operatorLogo(m['icon'] ?? 'other'),
             const SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(m['name'] ?? '',
-                  style: const TextStyle(fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700, fontSize: 14,
-                      color: AppTheme.textPrimary)),
-              Text(m['number'] ?? '',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 15,
-                      fontWeight: FontWeight.w800, color: AppTheme.accentColor,
-                      letterSpacing: 0.5)),
+              Row(children: [
+                Flexible(child: Text(m['name'] ?? '',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 14,
+                        color: AppTheme.textPrimary))),
+                if (isOrange) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00A651),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.flash_on_rounded,
+                          color: Colors.white, size: 11),
+                      Text('AUTOMATIQUE',
+                          style: TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w800, fontSize: 9,
+                              color: Colors.white)),
+                    ]),
+                  ),
+                ],
+              ]),
+              if (isOrange)
+                const Text('Paiement instantané — aucune référence à envoyer',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                        fontWeight: FontWeight.w600, color: orangeColor))
+              else
+                Text(m['number'] ?? '',
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 15,
+                        fontWeight: FontWeight.w800, color: AppTheme.accentColor,
+                        letterSpacing: 0.5)),
             ])),
             Icon(
               isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: isSelected ? AppTheme.accentColor : AppTheme.textHint, size: 22,
+              color: isSelected
+                  ? (isOrange ? orangeColor : AppTheme.accentColor)
+                  : AppTheme.textHint,
+              size: 22,
             ),
           ]),
         ),

@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
+import '../../payment/payment_screen.dart';
 
 class PostPropertyScreen extends StatefulWidget {
   const PostPropertyScreen({super.key});
@@ -510,9 +511,37 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     return false;
   }
 
+  bool _isOrangeMethod(Map<String, dynamic>? m) => (m?['icon'] ?? '') == 'orange';
+
+  // ── Paiement automatique Orange Money (CAS 4b) ──────────────────────────
+  // Ouvre PaymentScreen (USSD + PIN + polling). Au retour, on re-vérifie le
+  // solde : si le paiement a réussi, les crédits sont déjà ajoutés → CAS 1.
+  Future<void> _payWithOrangeMoney() async {
+    if (_selectedPack == null) { _err('Veuillez choisir un pack de recharge'); return; }
+    final pack  = _selectedPack!;
+    final price = (pack['price'] as num?)?.toDouble() ?? 0.0;
+    final qty   = (pack['qty'] as num?)?.toInt() ?? 0;
+    final productType = pack['productType'] as String? ?? 'souscription_credits_10';
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PaymentScreen(
+        productType: productType,
+        amount: price,
+        productLabel: pack['name'] as String? ?? 'Recharge de crédits',
+        creditsQty: qty,
+      ),
+    ));
+    // Au retour : re-vérifier le solde (crédits ajoutés automatiquement si succès)
+    if (mounted) {
+      setState(() => _creditChecked = false);
+      await _checkUserCredits();
+    }
+  }
+
   Future<void> _submitPaymentRequest() async {
     if (_selectedPack == null)          { _err('Veuillez choisir un pack de recharge'); return; }
     if (_selectedPaymentMethod == null) { _err('Veuillez choisir un moyen de paiement'); return; }
+    // Orange Money → jamais de flux manuel : rediriger vers le flux automatique
+    if (_isOrangeMethod(_selectedPaymentMethod)) { _payWithOrangeMoney(); return; }
     if (_transactionRefCtrl.text.trim().isEmpty) {
       _err('Veuillez saisir la référence de votre paiement'); return;
     }
@@ -3345,7 +3374,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       const SizedBox(height: 20),
 
       // ── ETAPE B : Choisir le moyen de paiement ──────────────────────
-      _stepBadge('2', 'Effectuez le paiement Mobile Money'),
+      _stepBadge('2', 'Choisissez votre moyen de paiement'),
       const SizedBox(height: 6),
       Container(
         padding: const EdgeInsets.all(12),
@@ -3354,17 +3383,64 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
         ),
-        child: const Text(
-          'Envoyez le montant au numéro correspondant, puis saisissez votre référence de transaction ci-dessous.',
-          style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
+        child: Text(
+          _isOrangeMethod(_selectedPaymentMethod)
+              ? 'Orange Money : paiement automatique — confirmez avec votre code PIN, vos crédits sont ajoutés instantanément.'
+              : 'M-Pesa / Airtel : envoyez le montant au numéro correspondant, puis saisissez votre référence de transaction ci-dessous.',
+          style: const TextStyle(fontSize: 12, fontFamily: 'Poppins',
               color: AppTheme.textSecondary, height: 1.5),
         ),
       ),
       const SizedBox(height: 12),
-      ...methods.map((m) => _paymentMethodTile(m)),
+      // Orange Money (automatique) en premier, puis les méthodes manuelles
+      ...methods.where(_isOrangeMethod).map((m) => _paymentMethodTile(m)),
+      if (methods.any(_isOrangeMethod) && methods.any((m) => !_isOrangeMethod(m))) ...[
+        Row(children: [
+          const Expanded(child: Divider()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('ou avec validation manuelle',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: AppTheme.textHint.withValues(alpha: 0.9))),
+          ),
+          const Expanded(child: Divider()),
+        ]),
+        const SizedBox(height: 8),
+      ],
+      ...methods.where((m) => !_isOrangeMethod(m)).map((m) => _paymentMethodTile(m)),
       const SizedBox(height: 20),
 
-      // ── ETAPE C : Référence + Soumettre ────────────────────────────
+      // ── ETAPE C : selon le moyen choisi ────────────────────────────
+      // Orange Money → bouton automatique | M-Pesa/Airtel → référence + soumettre
+      if (_isOrangeMethod(_selectedPaymentMethod)) ...[
+        _stepBadge('3', 'Payez automatiquement avec Orange Money'),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _payWithOrangeMoney,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7900),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.flash_on_rounded, size: 18, color: Colors.white),
+            label: const Text(
+              'Payer avec Orange Money',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                  fontSize: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Paiement instantané : confirmez avec votre code PIN. Vos crédits seront ajoutés automatiquement et le bouton "Continuer" sera débloqué.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+              color: AppTheme.textHint, height: 1.4),
+          textAlign: TextAlign.center,
+        ),
+      ] else ...[
       _stepBadge('3', 'Saisissez votre référence de paiement'),
       const SizedBox(height: 10),
       _field(_transactionRefCtrl, 'Référence / Code de transaction *',
@@ -3398,6 +3474,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             color: AppTheme.textHint, height: 1.4),
         textAlign: TextAlign.center,
       ),
+      ],
     ];
   }
 
@@ -3559,16 +3636,26 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
   Widget _paymentMethodTile(Map<String, dynamic> m) {
     final isSelected = _selectedPaymentMethod?['id'] == m['id'];
+    final isOrange   = _isOrangeMethod(m);
+    const orangeColor = Color(0xFFFF7900);
     return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
       onTap: () => setState(() => _selectedPaymentMethod = m),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.06) : Colors.white,
+          color: isSelected
+              ? (isOrange
+                  ? orangeColor.withValues(alpha: 0.06)
+                  : AppTheme.primaryColor.withValues(alpha: 0.06))
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppTheme.accentColor : AppTheme.dividerColor,
+            color: isSelected
+                ? (isOrange ? orangeColor : AppTheme.accentColor)
+                : (isOrange
+                    ? orangeColor.withValues(alpha: 0.4)
+                    : AppTheme.dividerColor),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -3576,18 +3663,45 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           _operatorLogoWidget(m['icon'] ?? 'other', size: 52),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(m['name'] ?? '', style: const TextStyle(
-              fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 14,
-              color: AppTheme.textPrimary,
-            )),
-            Text(m['number'] ?? '', style: const TextStyle(
-              fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w800,
-              color: AppTheme.accentColor, letterSpacing: 0.5,
-            )),
+            Row(children: [
+              Flexible(child: Text(m['name'] ?? '', style: const TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 14,
+                color: AppTheme.textPrimary,
+              ))),
+              if (isOrange) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00A651),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.flash_on_rounded, color: Colors.white, size: 11),
+                    Text('AUTOMATIQUE',
+                        style: TextStyle(fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w800, fontSize: 9,
+                            color: Colors.white)),
+                  ]),
+                ),
+              ],
+            ]),
+            if (isOrange)
+              const Text('Paiement instantané — aucune référence à envoyer',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                      fontWeight: FontWeight.w600, color: orangeColor))
+            else
+              Text(m['number'] ?? '', style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w800,
+                color: AppTheme.accentColor, letterSpacing: 0.5,
+              )),
           ])),
           Icon(
             isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: isSelected ? AppTheme.accentColor : AppTheme.textHint, size: 22,
+            color: isSelected
+                ? (isOrange ? orangeColor : AppTheme.accentColor)
+                : AppTheme.textHint,
+            size: 22,
           ),
         ]),
       ),
