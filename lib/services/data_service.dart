@@ -830,6 +830,14 @@ class DataService {
       final snap = await _propertiesCol.doc(id).get();
       if (snap.exists) {
         final prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+        // Annonce jamais publiée (En attente/Rejetée) supprimée par l'admin →
+        // restituer les crédits prélevés (le service n'a pas été rendu).
+        // Une annonce Active/Vendue a consommé son service → pas de refund.
+        if (prop.status == 'En attente' || prop.status == 'Rejeté') {
+          try {
+            await refundPublicationCredits(id);
+          } catch (_) {}
+        }
         if (prop.ownerId.isNotEmpty) {
           await notifyPropertyDeleted(prop);
         }
@@ -942,6 +950,35 @@ class DataService {
       try {
         await notifyPropertyApproved(prop);
       } catch (_) {}
+
+      // ── RÉAPPROBATION après rejet remboursé → RE-PRÉLEVER ──────────────
+      // Sinon l'annonceur garderait les crédits restitués ET l'annonce en ligne.
+      try {
+        final freshSnap = await _propertiesCol.doc(id).get();
+        final fresh = freshSnap.data() as Map<String, dynamic>? ?? {};
+        if (fresh['creditsRefunded'] == true) {
+          final charge = await consumePublicationRight(prop.ownerId,
+              commune: prop.commune, transactionType: prop.transactionType);
+          await _propertiesCol.doc(id).update({
+            'creditsRefunded': false,
+            'chargeType': charge['type'],
+            'chargeCredits': charge['credits'] ?? 0,
+            if (charge['quotaId'] != null) 'chargeQuotaId': charge['quotaId'],
+          });
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('re-charge on reapprove error: $e');
+      }
+    }
+
+    // ── REJET → restituer les crédits prélevés à la publication ────────────
+    // (idempotent — flag creditsRefunded, jamais de double restitution)
+    if (status == 'Rejeté') {
+      try {
+        await refundPublicationCredits(id);
+      } catch (e) {
+        if (kDebugMode) debugPrint('refund on reject error: $e');
+      }
     }
   }
 
@@ -2167,16 +2204,20 @@ class DataService {
     return total;
   }
 
-  Future<void> consumePublicationRight(String userId,
+  /// Prélève le droit de publication et RETOURNE le détail du prélèvement
+  /// (pour traçage sur l'annonce → remboursement possible en cas de rejet).
+  /// Retour: {type: free_trial|free_quota|promo_quota|paid_credit,
+  ///          credits: n, quotaId?: id}
+  Future<Map<String, dynamic>> consumePublicationRight(String userId,
       {String commune = '', int days = 30, String transactionType = 'Location'}) async {
     // 1. Free trial : rien à consommer
-    if (isFreeTrial) return;
+    if (isFreeTrial) return {'type': 'free_trial', 'credits': 0};
 
     // 2. Quota bienvenue (year=0)
     final quota = await getCurrentQuota(userId);
     if (quota.usedFreeQuota < quota.freeQuota) {
       await consumeFreeQuota(userId);
-      return;
+      return {'type': 'free_quota', 'credits': 0, 'quotaId': quota.id};
     }
 
     // 2b. Quotas promo (year=8888 push admin, year=9999 recharge tier)
@@ -2185,7 +2226,7 @@ class DataService {
       await _quotasCol.doc(promoQuota.id).update({
         'usedFreeQuota': promoQuota.usedFreeQuota + 1,
       });
-      return;
+      return {'type': 'promo_quota', 'credits': 0, 'quotaId': promoQuota.id};
     }
 
     // 3. Crédits payants
@@ -2193,6 +2234,116 @@ class DataService {
         ? getCreditsForCommune(commune, days: days, transactionType: transactionType)
         : 1;
     await consumeCredits(userId, required);
+    return {'type': 'paid_credit', 'credits': required};
+  }
+
+  /// Enregistre sur l'annonce le détail du prélèvement effectué à la
+  /// publication (appelé juste après addProperty) — utilisé pour restituer
+  /// exactement ce qui a été prélevé en cas de rejet/annulation.
+  Future<void> recordPublicationCharge(
+      String propertyId, Map<String, dynamic> charge) async {
+    try {
+      await _propertiesCol.doc(propertyId).update({
+        'chargeType': charge['type'],
+        'chargeCredits': charge['credits'] ?? 0,
+        if (charge['quotaId'] != null) 'chargeQuotaId': charge['quotaId'],
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('recordPublicationCharge error: $e');
+    }
+  }
+
+  /// ── RESTITUTION des crédits prélevés à la publication ──────────────────
+  /// Appelé quand une annonce est rejetée (ou supprimée avant publication).
+  /// - Crédits payants → nouveau doc credits source 'remboursement_annonce'
+  /// - Quota gratuit/promo → décrémente usedFreeQuota du quota d'origine
+  /// - Idempotent : flag creditsRefunded sur l'annonce (jamais de double refund)
+  /// - Annonces anciennes (sans chargeType) → recalcul du tarif de la commune
+  /// Retourne le nombre de crédits payants restitués (0 si quota/free).
+  Future<int> refundPublicationCredits(String propertyId) async {
+    try {
+      final snap = await _propertiesCol.doc(propertyId).get();
+      if (!snap.exists) return 0;
+      final data = snap.data() as Map<String, dynamic>;
+
+      if (data['creditsRefunded'] == true) return 0; // déjà restitué
+      final ownerId = data['ownerId'] as String? ?? '';
+      if (ownerId.isEmpty) return 0;
+
+      final chargeType = data['chargeType'] as String?;
+      int refunded = 0;
+      String notifBody = '';
+
+      if (chargeType == 'free_trial') {
+        // Rien n'avait été prélevé → rien à restituer
+      } else if (chargeType == 'free_quota' || chargeType == 'promo_quota') {
+        // Restituer l'unité de quota consommée
+        final quotaId = data['chargeQuotaId'] as String?;
+        if (quotaId != null) {
+          final qSnap = await _quotasCol.doc(quotaId).get();
+          if (qSnap.exists) {
+            final used = ((qSnap.data() as Map<String, dynamic>)['usedFreeQuota']
+                        as num?)?.toInt() ?? 0;
+            if (used > 0) {
+              await _quotasCol.doc(quotaId).update({'usedFreeQuota': used - 1});
+              notifBody = 'Votre publication gratuite vous a été restituée.';
+            }
+          }
+        }
+      } else {
+        // Crédits payants (chargeType == 'paid_credit')
+        // ou annonce ancienne sans traçage → recalcul du tarif commune (30 j)
+        int credits = (data['chargeCredits'] as num?)?.toInt() ?? 0;
+        if (chargeType == null && credits == 0 && !isFreeTrial) {
+          final commune = data['commune'] as String? ?? '';
+          final tx = data['transactionType'] as String? ?? 'Location';
+          credits = commune.isNotEmpty
+              ? getCreditsForCommune(commune, days: 30, transactionType: tx)
+              : 1;
+        }
+        if (credits > 0) {
+          await addCredit(CreditModel(
+            id: 'credit_refund_${propertyId}_${DateTime.now().millisecondsSinceEpoch}',
+            userId: ownerId,
+            source: 'remboursement_annonce',
+            orderId: propertyId,
+            quantity: credits,
+            remaining: credits,
+            createdAt: DateTime.now(),
+          ));
+          refunded = credits;
+          notifBody =
+              '$credits crédit${credits > 1 ? 's' : ''} vous ${credits > 1 ? 'ont' : 'a'} été restitué${credits > 1 ? 's' : ''} suite à l\'annulation de votre annonce.';
+        }
+      }
+
+      // Marquer comme restitué (même si 0 — évite tout recalcul futur)
+      await _propertiesCol.doc(propertyId).update({
+        'creditsRefunded': true,
+        'creditsRefundedAt': DateTime.now().toIso8601String(),
+      });
+
+      // Notifier l'annonceur
+      if (notifBody.isNotEmpty) {
+        try {
+          await addNotification(AppNotification(
+            id: 'notif_refund_${propertyId}_${DateTime.now().millisecondsSinceEpoch}',
+            userId: ownerId,
+            type: 'approbation',
+            title: '💰 Crédits restitués',
+            body: notifBody,
+            propertyId: propertyId,
+            propertyTitle: data['title'] as String? ?? '',
+            createdAt: DateTime.now(),
+          ));
+        } catch (_) {}
+      }
+
+      return refunded;
+    } catch (e) {
+      if (kDebugMode) debugPrint('refundPublicationCredits error: $e');
+      return 0;
+    }
   }
 
   // ─── AUDIT LOGS (avec limit optionnel) ──────────────────────────────────────

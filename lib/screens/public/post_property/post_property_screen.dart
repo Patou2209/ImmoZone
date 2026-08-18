@@ -127,6 +127,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   bool _submitted = false;
   // ignore: unused_field
   String? _createdPropertyId;
+  Map<String, dynamic>? _publicationCharge; // détail du prélèvement (traçage refund)
 
   // Devise locale selon pays
   String get _localCurrency {
@@ -696,7 +697,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           _err('Solde insuffisant : $availableNow crédit${availableNow != 1 ? 's' : ''} disponible${availableNow != 1 ? 's' : ''}, $requiredNow requis. Veuillez recharger.');
           return;
         }
-        await ds.consumePublicationRight(user.id,
+        _publicationCharge = await ds.consumePublicationRight(user.id,
             commune: _selectedCommune, days: _selectedDuration,
             transactionType: _selectedTransaction);
       }
@@ -826,6 +827,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
       await context.read<PropertyProvider>().addProperty(property);
       _createdPropertyId = property.id;
+
+      // Tracer le prélèvement sur l'annonce → restitution exacte si rejet
+      if (_publicationCharge != null) {
+        await DataService().recordPublicationCharge(property.id, _publicationCharge!);
+        _publicationCharge = null;
+      }
 
       if (!mounted) return;
       setState(() { _submitting = false; _submitted = true; });

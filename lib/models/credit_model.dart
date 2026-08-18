@@ -32,6 +32,7 @@ class CreditModel {
       case 'admin_manuel': return 'Crédit admin';
       case 'promo_admin': return 'Promotion admin';
       case 'parrainage_user': return 'Commission parrainage';
+      case 'remboursement_annonce': return 'Restitution annonce annulée';
       default: return source;
     }
   }
