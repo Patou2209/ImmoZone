@@ -1442,23 +1442,22 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     );
   }
 
-  // ── Logo opérateur (SVG/Image réseau avec fallback) ───────────────────────
+  // ── Logo opérateur (assets locaux officiels avec fallback) ─────────────────
   Widget _operatorLogo(String type, {double size = 40}) {
-    final logos = <String, String>{
-      'mpesa':  'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/M-PESA_LOGO-01.svg/320px-M-PESA_LOGO-01.svg.png',
-      'orange': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Orange_logo.svg/240px-Orange_logo.svg.png',
-      'airtel': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Airtel_Africa_logo.svg/320px-Airtel_Africa_logo.svg.png',
+    const assets = <String, String>{
+      'mpesa':  'assets/images/mpesa_logo.png',
+      'orange': 'assets/images/orange_money_logo.png',
+      'airtel': 'assets/images/airtel_money_logo.png',
     };
     final colors = <String, Color>{
       'mpesa':  const Color(0xFF00A651),
       'orange': const Color(0xFFFF7900),
       'airtel': const Color(0xFFE40000),
     };
-    final url = logos[type];
+    final asset = assets[type];
     final color = colors[type] ?? AppTheme.accentColor;
 
-    // Orange Money → logo officiel embarqué (asset local)
-    if (type == 'orange') {
+    if (asset != null) {
       return Container(
         width: size, height: size,
         decoration: BoxDecoration(
@@ -1467,22 +1466,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
           boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 6)],
         ),
         padding: const EdgeInsets.all(4),
-        child: Image.asset('assets/images/orange_money_logo.png', fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Icon(Icons.payment, color: color, size: size * 0.55)),
-      );
-    }
-
-    if (url != null) {
-      return Container(
-        width: size, height: size,
-        decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 6)],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.asset(asset, fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(Icons.payment, color: color, size: size * 0.55)),
         ),
-        padding: const EdgeInsets.all(4),
-        child: Image.network(url, fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Icon(Icons.payment, color: color, size: size * 0.55)),
       );
     }
     return Container(
