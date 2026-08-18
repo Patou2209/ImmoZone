@@ -1,0 +1,236 @@
+{
+  "info": {
+    "name": "ImmoZone — Orange Money Sandbox (sx)",
+    "description": "Tests de l'API Orange Money Business (om_partner_api/v1) — sandbox 'sx', devise OUV, montants ENTIERS.\n\nORDRE D'EXÉCUTION:\n1. OAuth — Obtenir le token (auto-sauvegardé 1h)\n2. WITHDRAW — Initier un encaissement (202 PENDING attendu)\n3. WITHDRAW — Vérifier le statut (reste PENDING en sandbox: pas de PIN client)\n4. CREDIT — Initier un remboursement (202 → SUCCESS immédiat)\n5. CREDIT — Vérifier le statut (SUCCESS + txnId Orange)\n6. (Optionnel) Cloud Function — initiateOrangePayment\n7. (Optionnel) Cloud Function — checkOrangePaymentStatus\n8. (Optionnel) Simuler le callback Orange sur notre webhook\n\n⚠️ RÈGLES ORANGE:\n- transactionId: JAMAIS de underscore '_' (erreur 24), tirets '-' OK, jamais réutilisable\n- Devise sandbox: OUV obligatoire, montants entiers\n- MSISDN de test: 7704100021 (email d'activation du 18/08/2026)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "om_host", "value": "https://api.orange.com" },
+    { "key": "om_base", "value": "{{om_host}}/om_partner_api/v1" },
+    { "key": "country", "value": "sx" },
+    { "key": "currency", "value": "OUV" },
+    { "key": "test_msisdn", "value": "7704100021" },
+    { "key": "oauth_basic", "value": "COLLER_ICI_LA_CHAINE_BASE64_SANS_LE_PREFIXE_Basic" },
+    { "key": "om_token", "value": "" },
+    { "key": "tx_id", "value": "" },
+    { "key": "refund_id", "value": "" },
+    { "key": "cf_base", "value": "https://us-central1-immozone-d9a68.cloudfunctions.net" },
+    { "key": "webhook_auth", "value": "Basic aW1tb3pvbmUtY2FsbGJhY2s6ZTNhZ2Z5OFBDS0pBalh1bmJHbm8wUk80OG40ZFNy" }
+  ],
+  "item": [
+    {
+      "name": "1. OAuth — Obtenir le token (1h)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('access_token présent', () => pm.expect(json.access_token).to.be.a('string'));",
+              "pm.collectionVariables.set('om_token', json.access_token);",
+              "console.log('Token sauvegardé, expire dans ' + json.expires_in + 's');"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Basic {{oauth_basic}}" },
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [ { "key": "grant_type", "value": "client_credentials" } ]
+        },
+        "url": { "raw": "{{om_host}}/oauth/v3/token", "host": ["{{om_host}}"], "path": ["oauth", "v3", "token"] }
+      }
+    },
+    {
+      "name": "2. WITHDRAW — Initier encaissement (client → marchand)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// transactionId unique à chaque exécution — tirets OK, underscores INTERDITS",
+              "pm.collectionVariables.set('tx_id', 'pay-pm-' + Date.now());"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 202 Accepted', () => pm.response.to.have.status(202));",
+              "const json = pm.response.json();",
+              "pm.test('status PENDING', () => pm.expect(json.status).to.eql('PENDING'));",
+              "pm.test('type withdraw', () => pm.expect(json.transactionData.type).to.eql('withdraw'));",
+              "console.log('Transaction créée: ' + pm.collectionVariables.get('tx_id'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{om_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"peerId\": \"{{test_msisdn}}\",\n  \"peerIdType\": \"msisdn\",\n  \"amount\": 5,\n  \"currency\": \"{{currency}}\",\n  \"transactionId\": \"{{tx_id}}\"\n}"
+        },
+        "url": { "raw": "{{om_base}}/{{country}}/withdraw", "host": ["{{om_base}}"], "path": ["{{country}}", "withdraw"] }
+      }
+    },
+    {
+      "name": "3. WITHDRAW — Vérifier le statut",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "console.log('Statut: ' + json.status + ' | txnId Orange: ' + (json.transactionData ? json.transactionData.txnId : 'n/a'));",
+              "// En sandbox: reste PENDING (personne ne saisit le PIN sur le MSISDN fictif).",
+              "// SUCCESS/FAILED n'arrivera qu'en production avec un vrai téléphone."
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{om_token}}" } ],
+        "url": { "raw": "{{om_base}}/{{country}}/withdraw/transactions/{{tx_id}}", "host": ["{{om_base}}"], "path": ["{{country}}", "withdraw", "transactions", "{{tx_id}}"] }
+      }
+    },
+    {
+      "name": "4. CREDIT — Initier remboursement (marchand → client)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [ "pm.collectionVariables.set('refund_id', 'refund-pm-' + Date.now());" ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 202 Accepted', () => pm.response.to.have.status(202));",
+              "const json = pm.response.json();",
+              "pm.test('type credit', () => pm.expect(json.transactionData.type).to.eql('credit'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{om_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"peerId\": \"{{test_msisdn}}\",\n  \"peerIdType\": \"msisdn\",\n  \"amount\": 1,\n  \"currency\": \"{{currency}}\",\n  \"transactionId\": \"{{refund_id}}\"\n}"
+        },
+        "url": { "raw": "{{om_base}}/{{country}}/credit", "host": ["{{om_base}}"], "path": ["{{country}}", "credit"] }
+      }
+    },
+    {
+      "name": "5. CREDIT — Vérifier le statut (SUCCESS immédiat attendu)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('status SUCCESS', () => pm.expect(json.status).to.eql('SUCCESS'));",
+              "console.log('txnId Orange: ' + json.transactionData.txnId);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{om_token}}" } ],
+        "url": { "raw": "{{om_base}}/{{country}}/credit/transactions/{{refund_id}}", "host": ["{{om_base}}"], "path": ["{{country}}", "credit", "transactions", "{{refund_id}}"] }
+      }
+    },
+    {
+      "name": "6. (CF) initiateOrangePayment — test e2e via notre backend",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [ "pm.collectionVariables.set('tx_id', 'pay-' + Date.now());" ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.test('transactionStatus PENDING', () => pm.expect(json.transactionStatus).to.eql('PENDING'));",
+              "console.log('paymentId: ' + pm.collectionVariables.get('tx_id'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"{{tx_id}}\",\n  \"phoneNumber\": \"{{test_msisdn}}\",\n  \"amount\": 5,\n  \"userId\": \"postman-test-user\"\n}"
+        },
+        "url": { "raw": "{{cf_base}}/initiateOrangePayment", "host": ["{{cf_base}}"], "path": ["initiateOrangePayment"] },
+        "description": "⚠️ Nécessite que les Cloud Functions soient DÉPLOYÉES avec le code withdraw (commit e871f1b). Sinon: erreur [Orange 70] (ancien code /debit encore en ligne)."
+      }
+    },
+    {
+      "name": "7. (CF) checkOrangePaymentStatus — polling",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"paymentId\": \"{{tx_id}}\"\n}"
+        },
+        "url": { "raw": "{{cf_base}}/checkOrangePaymentStatus", "host": ["{{cf_base}}"], "path": ["checkOrangePaymentStatus"] },
+        "description": "Retourne PENDING | SUCCESSFUL | FAILED. En sandbox: reste PENDING (pas de PIN saisi) puis FAILED après le serviceTimeout (~5 min)."
+      }
+    },
+    {
+      "name": "8. (CF) Simuler le callback Orange → webhook SUCCESS",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "{{webhook_auth}}", "description": "Doit correspondre à partnerCallbackAuthorization dans functions/index.js" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"SUCCESS\",\n  \"message\": \"Transaction completed\",\n  \"transactionData\": {\n    \"transactionId\": \"{{tx_id}}\",\n    \"txnId\": \"CO260818.TEST.POSTMAN\",\n    \"type\": \"withdraw\",\n    \"peerId\": \"{{test_msisdn}}\",\n    \"amount\": 5,\n    \"currency\": \"OUV\",\n    \"executionDate\": \"2026-08-18T16:00:00.000Z\",\n    \"country\": \"SX\"\n  }\n}"
+        },
+        "url": { "raw": "{{cf_base}}/orangeWebhook", "host": ["{{cf_base}}"], "path": ["orangeWebhook"] },
+        "description": "Simule la notification qu'Orange enverrait après confirmation PIN du client. Permet de tester le chemin SUCCESS complet en sandbox (crédit des points, notification FCM) sans attendre la production. ⚠️ Utiliser un tx_id correspondant à un doc Firestore 'payments' existant (créé par la requête 6)."
+      }
+    }
+  ]
+}
