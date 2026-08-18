@@ -1991,6 +1991,38 @@ class DataService {
     throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');
   }
 
+  /// Remboursement LIBRE Orange Money (dashboard admin) : envoie [amount]
+  /// au numéro [phoneNumber] via la Cloud Function directOrangeCredit
+  /// (POST /{country}/credit). Retourne le message de résultat.
+  Future<String> directOrangeCredit({
+    required String phoneNumber,
+    required double amount,
+    required String adminId,
+    required String adminName,
+    String? reason,
+  }) async {
+    final resp = await http
+        .post(
+          Uri.parse(
+              'https://us-central1-immozone-d9a68.cloudfunctions.net/directOrangeCredit'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'phoneNumber': phoneNumber,
+            'amount': amount,
+            'adminId': adminId,
+            'adminName': adminName,
+            'reason': reason,
+          }),
+        )
+        .timeout(const Duration(seconds: 45));
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    if (resp.statusCode == 200 && data['success'] == true) {
+      return data['message'] as String? ?? 'Remboursement envoyé';
+    }
+    throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');
+  }
+
   int _creditsForProduct(String productType) {
     switch (productType) {
       case 'publication_unitaire': return 1;

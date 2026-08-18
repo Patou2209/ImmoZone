@@ -28,6 +28,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _isLoading = true;
   bool _isFreeTrial = false;
   bool _isTogglingTrial = false;
+  bool _refundingDirect = false; // remboursement Orange Money direct en cours
   // ── KPI Performance du Marché & Monétisation ──────────────────────
   List<PaymentModel> _confirmedPayments = [];
   String _kpiPeriod = 'mois'; // jour | semaine | mois | annee
@@ -153,6 +154,177 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   // ── Réinitialiser le chiffre d'affaire ────────────────────────────────────
+  Future<void> _showDirectRefundDialog() async {
+    final phoneCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.currency_exchange_rounded, color: Color(0xFFFF6600), size: 26),
+          SizedBox(width: 10),
+          Expanded(child: Text('Remboursement Orange Money',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700))),
+        ]),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'L\'argent sera envoyé immédiatement sur le compte Orange Money du client (service CREDIT — sans confirmation du client).',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: AppTheme.textSecondary, height: 1.4),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Numéro Orange Money du client',
+                  hintText: 'Ex: 0894779652',
+                  prefixIcon: const Icon(Icons.phone_android_rounded, color: Color(0xFFFF6600)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (v) {
+                  final cleaned = (v ?? '').replaceAll(RegExp(r'[\s\-]'), '').replaceAll('+', '');
+                  if (cleaned.isEmpty) return 'Numéro requis';
+                  if (!RegExp(r'^\d{7,15}$').hasMatch(cleaned)) return 'Numéro invalide (7 à 15 chiffres)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Montant à rembourser (USD)',
+                  hintText: 'Ex: 3',
+                  prefixIcon: const Icon(Icons.attach_money_rounded, color: Color(0xFFFF6600)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (v) {
+                  final amount = double.tryParse((v ?? '').replaceAll(',', '.'));
+                  if (amount == null || amount <= 0) return 'Montant invalide';
+                  if (amount > 500) return 'Maximum 500 USD par remboursement';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonCtrl,
+                maxLines: 2,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Motif (optionnel)',
+                  hintText: 'Motif du remboursement...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins')),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) Navigator.pop(ctx, true);
+            },
+            icon: const Icon(Icons.send_rounded, size: 18),
+            label: const Text('Rembourser',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6600),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // Double confirmation — opération financière irréversible
+    final phone = phoneCtrl.text.replaceAll(RegExp(r'[\s\-]'), '').replaceAll('+', '');
+    final amount = double.parse(amountCtrl.text.replaceAll(',', '.'));
+    final doubleCheck = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: AppTheme.warningColor, size: 26),
+          SizedBox(width: 10),
+          Expanded(child: Text('Confirmer l\'envoi',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700))),
+        ]),
+        content: Text(
+          'Envoyer ${amount.toStringAsFixed(2)} USD au numéro $phone ?\n\n⚠️ Cette opération est IRRÉVERSIBLE — l\'argent part immédiatement sur le compte du client.',
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+              color: AppTheme.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningColor, foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Confirmer l\'envoi',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (doubleCheck != true || !mounted) return;
+
+    setState(() => _refundingDirect = true);
+    try {
+      final auth = context.read<immo_auth.AuthProvider>();
+      final message = await _ds.directOrangeCredit(
+        phoneNumber: phone,
+        amount: amount,
+        adminId: auth.currentUser?.id ?? '',
+        adminName: auth.currentUser?.name ?? 'Admin',
+        reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ $message', style: const TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.successColor,
+          duration: const Duration(seconds: 5),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ ${e.toString().replaceFirst('Exception: ', '')}',
+              style: const TextStyle(fontFamily: 'Poppins')),
+          backgroundColor: AppTheme.errorColor,
+          duration: const Duration(seconds: 6),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _refundingDirect = false);
+    }
+  }
+
   Future<void> _resetRevenue() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -656,6 +828,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               child: const Text('Remettre à 0',
                                   style: TextStyle(fontFamily: 'Poppins',
                                       fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── REMBOURSEMENT ORANGE MONEY (CREDIT direct) ─────
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white, borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: const Color(0xFFFF6600).withValues(alpha: 0.3)),
+                            boxShadow: [BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+                          ),
+                          child: Row(children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF6600).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.currency_exchange_rounded,
+                                  color: Color(0xFFFF6600), size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start, children: const [
+                              Text('Remboursement Orange Money',
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
+                              Text(
+                                'Envoyer un montant sur le compte OM d\'un client',
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                                    color: AppTheme.textSecondary),
+                              ),
+                            ])),
+                            ElevatedButton(
+                              onPressed: _refundingDirect ? null : _showDirectRefundDialog,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF6600),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: _refundingDirect
+                                  ? const SizedBox(width: 16, height: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: Colors.white))
+                                  : const Text('Rembourser',
+                                      style: TextStyle(fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w700, fontSize: 12)),
                             ),
                           ]),
                         ),
