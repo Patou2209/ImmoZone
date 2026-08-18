@@ -24,8 +24,8 @@ const ORANGE_CONFIG = {
     country: 'sx',
     currency: 'OUV',
     integerAmountsOnly: true,           // sandbox: pas de décimales
-    // MSISDN de test auto-accepté (PIN 1357) — doc section 8
-    testMsisdn: '7704100023',
+    // MSISDN de test du souscripteur (email d'activation Orange du 18/08/2026)
+    testMsisdn: '7704100021',
   },
   production: {
     country: 'cd',                      // RDC — alpha-2 (doc section 10)
@@ -268,12 +268,15 @@ exports.initiateOrangePayment = onRequest(
 
       // 3. Body DEBIT exact (doc 4.1 — 5 champs, transactionId = idempotency key)
       // ⚠️ transactionId JAMAIS réutilisable, même après échec (doc section 6/7)
+      // ⚠️ Pattern Orange: underscores '_' REJETÉS (erreur 24) → sanitisation
+      // ⚠️ Sandbox: devise OUV OBLIGATOIRE — on force env.currency en sandbox
+      const txId = String(paymentId).replace(/_/g, '-');
       const debitBody = {
         peerId: msisdn,
         peerIdType: 'msisdn',
         amount: txAmount,
-        currency: currency || env.currency,
-        transactionId: paymentId,
+        currency: ORANGE_CONFIG.sandboxMode ? env.currency : (currency || env.currency),
+        transactionId: txId,
       };
 
       // 4. POST /{country}/debit — OAuth Bearer géré/rafraîchi automatiquement
@@ -410,16 +413,27 @@ exports.orangeMoneyWebhook = onRequest(
       }
 
       // ── Notification de REMBOURSEMENT (credit) ? ─────────────────────────────
-      // Nos refundIds sont préfixés 'refund_' → routage vers le traitement dédié
-      if (transactionId.startsWith('refund_')) {
+      // Nos refundIds sont préfixés 'refund-' (tirets — pattern Orange) →
+      // routage vers le traitement dédié ('refund_' gardé pour compatibilité)
+      if (transactionId.startsWith('refund-') || transactionId.startsWith('refund_')) {
         await processRefundNotification(transactionId, transactionStatus, {
           omTransactionId, executionDate, failureReason,
         });
         return;
       }
 
-      const payRef = db.collection('payments').doc(transactionId);
-      const payDoc = await payRef.get();
+      // Le transactionId envoyé à Orange est sanitisé (underscores → tirets).
+      // Si le doc Firestore n'existe pas sous l'id reçu, on tente la variante
+      // avec underscores (anciens ids 'pay_...' créés côté Flutter).
+      let payRef = db.collection('payments').doc(transactionId);
+      let payDoc = await payRef.get();
+
+      if (!payDoc.exists && transactionId.startsWith('pay-')) {
+        const legacyId = 'pay_' + transactionId.slice(4);
+        const legacyRef = db.collection('payments').doc(legacyId);
+        const legacyDoc = await legacyRef.get();
+        if (legacyDoc.exists) { payRef = legacyRef; payDoc = legacyDoc; }
+      }
 
       if (!payDoc.exists) {
         console.warn(`[orangeWebhook] Payment ${transactionId} not found in Firestore`);
@@ -448,8 +462,9 @@ exports.orangeMoneyWebhook = onRequest(
           omFinalStatus: 'SUCCESSFUL',
         });
 
-        // Créditer l'utilisateur
-        await creditUserAfterPayment(transactionId);
+        // Créditer l'utilisateur (payRef.id = id réel du doc Firestore,
+        // qui peut différer du transactionId sanitisé envoyé à Orange)
+        await creditUserAfterPayment(payRef.id);
 
         // Notification push (optionnel — si FCM configuré)
         try {
@@ -464,7 +479,7 @@ exports.orangeMoneyWebhook = onRequest(
                   title: '✅ Paiement confirmé — ImmoZone',
                   body: `${payment.creditsQty} crédit(s) ajouté(s) à votre compte`,
                 },
-                data: { paymentId: transactionId, status: 'confirmed' },
+                data: { paymentId: payRef.id, status: 'confirmed' },
               });
             }
           }
@@ -496,7 +511,7 @@ exports.orangeMoneyWebhook = onRequest(
                   title: '❌ Paiement échoué — ImmoZone',
                   body: 'Votre paiement Orange Money n\'a pas abouti. Réessayez.',
                 },
-                data: { paymentId: transactionId, status: 'failed' },
+                data: { paymentId: payRef.id, status: 'failed' },
               });
             }
           }
@@ -554,10 +569,10 @@ exports.checkOrangePaymentStatus = onRequest(
 
       // 2. Interroger la Status API Orange (doc 4.7)
       // GET /{country}/debit/transactions/{transactionId} — {transactionId} = NOTRE ID
-      // Fonctionne aussi en sandbox (sx) — le sandbox est pleinement fonctionnel pour debit.
+      // ⚠️ Même sanitisation qu'à l'initiation (underscores → tirets)
       const statusResp = await orangeApiCall({
         method: 'GET',
-        path: omStatusPath(paymentId),
+        path: omStatusPath(String(paymentId).replace(/_/g, '-')),
       });
 
       // ── 404 = transaction inexistante chez Orange (doc: "Do not retry —
@@ -680,7 +695,10 @@ exports.refundOrangePayment = onRequest(
       }
 
       // 4. transactionId de remboursement: NOUVEAU, unique, jamais réutilisé
-      const refundId = `refund_${paymentId}_${Date.now()}`;
+      // ⚠️ Pattern Orange: les underscores '_' sont REJETÉS (erreur 24
+      // "transactionId does not match pattern(s)") — tirets '-' uniquement.
+      // On sanitise aussi le paymentId hérité (anciens ids 'pay_...').
+      const refundId = `refund-${String(paymentId).replace(/_/g, '-')}-${Date.now()}`;
 
       const creditBody = {
         peerId: msisdn,

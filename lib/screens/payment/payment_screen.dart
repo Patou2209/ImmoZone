@@ -86,7 +86,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isLoading = true);
 
     // Créer le document payment dans Firestore
-    final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
+    // ⚠️ Ce paymentId est envoyé à Orange comme transactionId : le pattern
+    // Orange REJETTE les underscores '_' (erreur 24) → tirets '-' uniquement.
+    final paymentId = 'pay-${DateTime.now().millisecondsSinceEpoch}';
     final orderId = 'ord_${DateTime.now().millisecondsSinceEpoch}';
 
     final payment = PaymentModel(
