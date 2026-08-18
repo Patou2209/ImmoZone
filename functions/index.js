@@ -10,10 +10,20 @@ const db = admin.firestore();
 // ORANGE MONEY BUSINESS API (Partner) — Configuration
 // Doc officielle: Base path https://api.orange.com/om_partner_api/v1
 // Auth: OAuth2 client_credentials → Bearer token (1h) via POST /oauth/v3/token
-// Service utilisé: DEBIT (Merchant Payment) — POST /{country}/debit
+// Service d'ENCAISSEMENT (client → marchand): WITHDRAW (Cashout) — POST /{country}/withdraw
+//   Doc 3.3: Customer OM account → Partner OM account. Le client reçoit un push
+//   USSD/SMS, confirme par PIN, puis Orange notifie le callbackUrl (SUCCESS/FAILED).
+//   Flux STRICTEMENT identique au debit — seul l'endpoint diffère.
+//   Contrat ehYUTxuSVUgzesKX: services actifs = Credit + Withdraw (Debit NON souscrit,
+//   erreur 70). collectionService permet de rebasculer sur 'debit' en 1 ligne si besoin.
+// Service de REMBOURSEMENT (marchand → client): CREDIT — POST /{country}/credit
 // ═══════════════════════════════════════════════════════════════════════════════
 const ORANGE_CONFIG = {
   apiHost: 'api.orange.com',
+
+  // ── Service utilisé pour encaisser les paiements clients ───────────────────
+  // 'withdraw' (actif sur notre contrat) | 'debit' (non souscrit — erreur 70)
+  collectionService: 'withdraw',
 
   // ── Bascule sandbox/production ─────────────────────────────────────────────
   // sandboxMode=true  → pays 'sx', devise 'OUV', montants ENTIERS uniquement
@@ -55,7 +65,7 @@ const ORANGE_CONFIG = {
   partnerCallbackAuthorization: 'Basic aW1tb3pvbmUtY2FsbGJhY2s6ZTNhZ2Z5OFBDS0pBalh1bmJHbm8wUk80OG40ZFNy',
 
   // ── Chemins API ─────────────────────────────────────────────────────────────
-  basePath: '/om_partner_api/v1',       // + /{country}/debit, /{country}/debit/transactions/{id}
+  basePath: '/om_partner_api/v1',       // + /{country}/{service}, /{country}/{service}/transactions/{id}
   oauthPath: '/oauth/v3/token',
 };
 
@@ -67,9 +77,10 @@ function omEnv() {
 function omOauthCredentials() {
   return (process.env.ORANGE_OAUTH_BASIC || '').trim();
 }
-function omDebitPath()  { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/debit`; }
-function omCreditPath() { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/credit`; }
-function omStatusPath(transactionId, type = 'debit') {
+// Chemin d'encaissement — piloté par ORANGE_CONFIG.collectionService (withdraw/debit)
+function omCollectPath() { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/${ORANGE_CONFIG.collectionService}`; }
+function omCreditPath()  { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/credit`; }
+function omStatusPath(transactionId, type = ORANGE_CONFIG.collectionService) {
   return `${ORANGE_CONFIG.basePath}/${omEnv().country}/${type}/transactions/${encodeURIComponent(transactionId)}`;
 }
 
@@ -266,12 +277,13 @@ exports.initiateOrangePayment = onRequest(
       let txAmount = parseFloat(amount);
       if (env.integerAmountsOnly) txAmount = Math.round(txAmount);
 
-      // 3. Body DEBIT exact (doc 4.1 — 5 champs, transactionId = idempotency key)
+      // 3. Body d'encaissement (withdraw/debit — même schéma 5 champs,
+      //    transactionId = idempotency key)
       // ⚠️ transactionId JAMAIS réutilisable, même après échec (doc section 6/7)
       // ⚠️ Pattern Orange: underscores '_' REJETÉS (erreur 24) → sanitisation
       // ⚠️ Sandbox: devise OUV OBLIGATOIRE — on force env.currency en sandbox
       const txId = String(paymentId).replace(/_/g, '-');
-      const debitBody = {
+      const collectBody = {
         peerId: msisdn,
         peerIdType: 'msisdn',
         amount: txAmount,
@@ -279,11 +291,12 @@ exports.initiateOrangePayment = onRequest(
         transactionId: txId,
       };
 
-      // 4. POST /{country}/debit — OAuth Bearer géré/rafraîchi automatiquement
+      // 4. POST /{country}/withdraw (doc 3.3 Cashout: client → marchand, confirmation
+      //    PIN client puis callback) — OAuth Bearer géré/rafraîchi automatiquement
       const omResp = await orangeApiCall({
         method: 'POST',
-        path: omDebitPath(),
-        body: debitBody,
+        path: omCollectPath(),
+        body: collectBody,
       });
 
       console.log(`[initiateOrangePayment] Orange HTTP ${omResp.status}:`, JSON.stringify(omResp.body));
@@ -301,8 +314,9 @@ exports.initiateOrangePayment = onRequest(
           status: 'pending',
           operator: 'orange_money',
           omCountry: env.country,
-          omCurrency: debitBody.currency,
+          omCurrency: collectBody.currency,
           omAmount: txAmount,
+          omService: ORANGE_CONFIG.collectionService,   // 'withdraw' (trace du service utilisé)
           omServiceTimeout: txData.serviceTimeout || 300000,
           omInitiatedAt: new Date().toISOString(),
         }, { merge: true });
@@ -393,7 +407,7 @@ exports.orangeMoneyWebhook = onRequest(
       // Format officiel (doc section 5):
       // { "status": "SUCCESS"|"FAILED", "message": "...",
       //   "transactionData": { "transactionId": <NOTRE ID>, "txnId": <ID Orange>,
-      //     "type": "debit", "peerId", "amount", "currency", "executionDate", "country" } }
+      //     "type": "withdraw"|"debit"|"credit", "peerId", "amount", "currency", "executionDate", "country" } }
       const transactionStatus = body.status;
       const txData = body.transactionData || {};
 
@@ -568,7 +582,7 @@ exports.checkOrangePaymentStatus = onRequest(
       }
 
       // 2. Interroger la Status API Orange (doc 4.7)
-      // GET /{country}/debit/transactions/{transactionId} — {transactionId} = NOTRE ID
+      // GET /{country}/{collectionService}/transactions/{transactionId} — {transactionId} = NOTRE ID
       // ⚠️ Même sanitisation qu'à l'initiation (underscores → tirets)
       const statusResp = await orangeApiCall({
         method: 'GET',
