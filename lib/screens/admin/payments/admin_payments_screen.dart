@@ -113,17 +113,33 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text('Gestion des Paiements'),
-        automaticallyImplyLeading: false,
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        surfaceTintColor: AppTheme.primaryColor,
+        elevation: 0,
+        title: const Text('Gestion des Paiements',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                color: Colors.white)),
+        // Flèche retour visible (blanche sur fond bleu)
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          tooltip: 'Retour',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+          IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: _load),
         ],
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: const Color(0xFFFF6600),
+          indicatorWeight: 3,
           labelStyle: const TextStyle(
+              fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(
               fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12),
           tabs: [
             Tab(text: 'À valider (${_pending.length})'),

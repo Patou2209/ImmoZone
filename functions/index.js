@@ -748,10 +748,11 @@ exports.refundOrangePayment = onRequest(
       }
 
       // 4. transactionId de remboursement: NOUVEAU, unique, jamais réutilisé
-      // ⚠️ Pattern Orange: les underscores '_' sont REJETÉS (erreur 24
-      // "transactionId does not match pattern(s)") — tirets '-' uniquement.
-      // On sanitise aussi le paymentId hérité (anciens ids 'pay_...').
-      const refundId = `refund-${String(paymentId).replace(/_/g, '-')}-${Date.now()}`;
+      // ⚠️ Pattern Orange: underscores REJETÉS (erreur 24) — tirets uniquement.
+      // ⚠️ LONGUEUR: l'ancien format `refund-<paymentId>-<ts>` (~38 car.)
+      //    dépassait la limite Orange → "Invalid body field".
+      //    Format court (~25 car.): le lien paymentId est dans le doc refunds.
+      const refundId = `refund-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
       const creditBody = {
         peerId: msisdn,
