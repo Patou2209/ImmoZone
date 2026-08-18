@@ -397,10 +397,12 @@ exports.orangeMoneyWebhook = onRequest(
       return;
     }
 
-    // Répondre 200 immédiatement (exigence Orange: accusé de réception)
-    res.status(200).json({ status: 'OK' });
-
-    try {
+    // ⚠️ FIX: traiter la notification AVANT de répondre 200.
+    // Cloud Functions gèle l'exécution dès que la réponse HTTP est envoyée
+    // (surtout au cold start) → le traitement post-réponse était parfois perdu
+    // et Orange devait renvoyer la notification une 2ème fois.
+    // Le traitement Firestore prend < 2s, largement sous la limite Orange de 5s.
+    const handleNotification = async () => {
       const body = req.body || {};
       console.log(`[orangeWebhook] RAW payload (path=${path}):`, JSON.stringify(body));
 
@@ -538,10 +540,17 @@ exports.orangeMoneyWebhook = onRequest(
         console.log(`[orangeWebhook] Status inconnu: ${transactionStatus} — ignoré`);
       }
 
+    };
+
+    try {
+      await handleNotification();
     } catch (err) {
-      // Ne jamais crasher — Orange attend HTTP 200
-      console.error('[orangeWebhook] Exception (after 200 sent):', err);
+      // Ne jamais renvoyer d'erreur — Orange attend toujours un HTTP 200
+      console.error('[orangeWebhook] Exception pendant le traitement:', err);
     }
+
+    // Accusé de réception APRÈS traitement complet (exigence Orange: 200 < 5s)
+    res.status(200).json({ status: 'OK' });
   }
 );
 
@@ -637,6 +646,36 @@ exports.checkOrangePaymentStatus = onRequest(
     }
   }
 );
+
+// ─── Helper: poller le statut d'un CREDIT après le 202 ─────────────────────────
+// En sandbox (et souvent en prod), le CREDIT passe en SUCCESS en ~2s mais la
+// réponse 202 initiale dit encore PENDING. Sans ce polling, le remboursement
+// resterait bloqué 'pending' jusqu'au webhook (qui peut ne jamais arriver si
+// Orange a déjà résolu la transaction avant d'appeler le callback).
+// Retourne { finalStatus: 'SUCCESS'|'FAILED'|'PENDING', txnId, executionDate, message }
+async function pollCreditFinalStatus(refundId, { delayMs = 2500, attempts = 2 } = {}) {
+  for (let i = 0; i < attempts; i++) {
+    await new Promise(r => setTimeout(r, delayMs));
+    try {
+      const statusResp = await orangeApiCall({
+        method: 'GET',
+        path: omStatusPath(refundId, 'credit'),
+      });
+      console.log(`[pollCreditFinalStatus] ${refundId} tentative ${i + 1}: HTTP ${statusResp.status}`, JSON.stringify(statusResp.body));
+      const body = statusResp.body || {};
+      const txData = body.transactionData || {};
+      if (body.status === 'SUCCESS') {
+        return { finalStatus: 'SUCCESS', txnId: txData.txnId || '', executionDate: txData.executionDate || '', message: body.message || '' };
+      }
+      if (body.status === 'FAILED') {
+        return { finalStatus: 'FAILED', txnId: txData.txnId || '', executionDate: txData.executionDate || '', message: body.message || '' };
+      }
+    } catch (err) {
+      console.warn(`[pollCreditFinalStatus] ${refundId} tentative ${i + 1} erreur:`, err.message);
+    }
+  }
+  return { finalStatus: 'PENDING', txnId: '', executionDate: '', message: '' };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CLOUD FUNCTION 4: refundOrangePayment
@@ -735,7 +774,24 @@ exports.refundOrangePayment = onRequest(
 
       if (omResp.status === 202) {
         const respBody = omResp.body || {};
-        const isImmediate = respBody.status === 'SUCCESS';
+        let isImmediate = respBody.status === 'SUCCESS';
+        let isFailed = false;
+        let omTxnId = (respBody.transactionData || {}).txnId || '';
+        let failMessage = '';
+
+        // ⚠️ FIX: si le 202 dit PENDING, poller la Status API (~2,5s) —
+        // le CREDIT aboutit quasi immédiatement et le webhook peut ne jamais
+        // être appelé si la transaction est déjà résolue.
+        if (!isImmediate) {
+          const polled = await pollCreditFinalStatus(refundId);
+          if (polled.finalStatus === 'SUCCESS') {
+            isImmediate = true;
+            omTxnId = polled.txnId || omTxnId;
+          } else if (polled.finalStatus === 'FAILED') {
+            isFailed = true;
+            failMessage = polled.message || 'Remboursement refusé par Orange';
+          }
+        }
 
         // Doc de suivi du remboursement (le webhook le retrouvera par refundId)
         await db.collection('refunds').doc(refundId).set({
@@ -745,16 +801,17 @@ exports.refundOrangePayment = onRequest(
           msisdn,
           amount: refundAmount,
           currency: creditBody.currency,
-          status: isImmediate ? 'confirmed' : 'pending',
+          status: isImmediate ? 'confirmed' : (isFailed ? 'failed' : 'pending'),
           reason: reason || null,
           adminId,
           adminName: adminName || '',
           createdAt: new Date().toISOString(),
-          ...(isImmediate ? { confirmedAt: new Date().toISOString() } : {}),
+          ...(isImmediate ? { confirmedAt: new Date().toISOString(), omTxnId } : {}),
+          ...(isFailed ? { failedAt: new Date().toISOString(), failureReason: failMessage } : {}),
         });
 
         await payRef.update({
-          refundStatus: isImmediate ? 'refunded' : 'pending',
+          refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           refundId,
           refundAmount,
           refundReason: reason || null,
@@ -766,14 +823,15 @@ exports.refundOrangePayment = onRequest(
         if (isImmediate) await revokeCreditsAfterRefund(paymentId);
 
         res.status(200).json({
-          success: true,
+          success: !isFailed,
           refundId,
-          refundStatus: isImmediate ? 'refunded' : 'pending',
+          refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           amount: refundAmount,
           currency: creditBody.currency,
+          ...(isFailed ? { error: failMessage } : {}),
           message: isImmediate
             ? 'Remboursement effectué avec succès'
-            : 'Remboursement initié — confirmation Orange en attente',
+            : (isFailed ? failMessage : 'Remboursement initié — confirmation Orange en attente'),
         });
         return;
       }
@@ -865,7 +923,24 @@ exports.directOrangeCredit = onRequest(
 
       if (omResp.status === 202) {
         const respBody = omResp.body || {};
-        const isImmediate = respBody.status === 'SUCCESS';
+        let isImmediate = respBody.status === 'SUCCESS';
+        let isFailed = false;
+        let omTxnId = (respBody.transactionData || {}).txnId || '';
+        let failMessage = '';
+
+        // ⚠️ FIX: si le 202 dit PENDING, poller la Status API (~2,5s) —
+        // le CREDIT aboutit quasi immédiatement; sans ce polling le doc
+        // resterait bloqué 'pending' (cas refund-direct-1787083866992).
+        if (!isImmediate) {
+          const polled = await pollCreditFinalStatus(refundId);
+          if (polled.finalStatus === 'SUCCESS') {
+            isImmediate = true;
+            omTxnId = polled.txnId || omTxnId;
+          } else if (polled.finalStatus === 'FAILED') {
+            isFailed = true;
+            failMessage = polled.message || 'Remboursement refusé par Orange';
+          }
+        }
 
         // Doc de suivi (collection refunds — le webhook le retrouvera par refundId)
         await db.collection('refunds').doc(refundId).set({
@@ -876,26 +951,25 @@ exports.directOrangeCredit = onRequest(
           msisdn,
           amount: creditAmount,
           currency: env.currency,
-          status: isImmediate ? 'confirmed' : 'pending',
+          status: isImmediate ? 'confirmed' : (isFailed ? 'failed' : 'pending'),
           reason: reason || null,
           adminId,
           adminName: adminName || '',
           createdAt: new Date().toISOString(),
-          ...(isImmediate ? {
-            confirmedAt: new Date().toISOString(),
-            omTxnId: (respBody.transactionData || {}).txnId || '',
-          } : {}),
+          ...(isImmediate ? { confirmedAt: new Date().toISOString(), omTxnId } : {}),
+          ...(isFailed ? { failedAt: new Date().toISOString(), failureReason: failMessage } : {}),
         });
 
         res.status(200).json({
-          success: true,
+          success: !isFailed,
           refundId,
-          refundStatus: isImmediate ? 'refunded' : 'pending',
+          refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           amount: creditAmount,
           currency: env.currency,
+          ...(isFailed ? { error: failMessage } : {}),
           message: isImmediate
             ? `Remboursement de ${creditAmount} ${env.currency} envoyé au ${msisdn}`
-            : 'Remboursement initié — confirmation Orange en attente',
+            : (isFailed ? failMessage : 'Remboursement initié — confirmation Orange en attente'),
         });
         return;
       }

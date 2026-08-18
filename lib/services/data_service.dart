@@ -37,6 +37,7 @@ class DataService {
   CollectionReference get _notificationsCol => _db.collection('notifications');
   CollectionReference get _messagesCol => _db.collection('messages');
   CollectionReference get _paymentsCol => _db.collection('payments');
+  CollectionReference get _refundsCol => _db.collection('refunds');
   CollectionReference get _reportsCol => _db.collection('reports');
   CollectionReference get _logsCol => _db.collection('audit_logs');
   CollectionReference get _contactLogsCol => _db.collection('contact_logs');
@@ -1756,7 +1757,30 @@ class DataService {
         ? confirmedPayments.where((p) => p.createdAt.isAfter(resetDate))
         : confirmedPayments;
 
-    final revenue = revenuePayments.fold(0.0, (sum, p) => sum + p.amount);
+    final grossRevenue = revenuePayments.fold(0.0, (sum, p) => sum + p.amount);
+
+    // ── Déduire les remboursements confirmés du CA ────────────────────────
+    // Inclut les remboursements directs (type 'direct', sans paiement lié)
+    // ET les remboursements liés à un paiement (le paiement reste 'confirmed'
+    // dans le CA brut, donc on soustrait le montant remboursé).
+    double totalRefunded = 0.0;
+    try {
+      final refundsSnap = await _refundsCol.get();
+      for (final doc in refundsSnap.docs) {
+        final r = doc.data() as Map<String, dynamic>;
+        if (r['status'] != 'confirmed') continue;
+        // Respecter la date de reset CA (même logique que les paiements)
+        if (resetDate != null) {
+          final created = DateTime.tryParse(r['createdAt'] as String? ?? '');
+          if (created == null || !created.isAfter(resetDate)) continue;
+        }
+        totalRefunded += ((r['amount'] as num?) ?? 0).toDouble();
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('getAdminStats refunds error: $e');
+    }
+
+    final revenue = grossRevenue - totalRefunded;
 
     return {
       'totalProperties': props.length,
@@ -1771,6 +1795,8 @@ class DataService {
       'vente': props.where((p) => p.transactionType == 'Vente').length,
       'location': props.where((p) => p.transactionType == 'Location').length,
       'totalRevenue': revenue,
+      'grossRevenue': grossRevenue,
+      'totalRefunded': totalRefunded,
       'revenueResetDate': resetDateStr,
       'pendingPayments': payments.where((p) => p.status == 'awaiting_manual').length,
       'pendingReports': reports.length,
