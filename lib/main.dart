@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'web_storage_helper.dart' if (dart.library.io) 'web_storage_helper_stub.dart' as ws;
 import 'package:go_router/go_router.dart';
@@ -160,6 +161,14 @@ class ImmoZoneApp extends StatelessWidget {
         title: 'ImmoZone',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        // ── Localisation FR : tooltips système ("Back" → "Retour", etc.) ──────
+        locale: const Locale('fr'),
+        supportedLocales: const [Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         routerConfig: _router,
       ),
     );

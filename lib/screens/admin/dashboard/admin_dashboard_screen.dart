@@ -310,6 +310,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           backgroundColor: AppTheme.successColor,
           duration: const Duration(seconds: 5),
         ));
+        // Rafraîchir les stats → le CA affiché déduit le remboursement
+        await _load();
       }
     } catch (e) {
       if (mounted) {
@@ -883,6 +885,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   : const Text('Rembourser',
                                       style: TextStyle(fontFamily: 'Poppins',
                                           fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                          ]),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // ── HISTORIQUE DES PAIEMENTS (accès permanent) ─────
+                        // C'est ICI que se trouve le bouton "Rembourser" par
+                        // paiement (Orange Money confirmé, non remboursé).
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white, borderRadius: BorderRadius.circular(16),
+                            boxShadow: [BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+                          ),
+                          child: Row(children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.successColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.receipt_long_rounded,
+                                  color: AppTheme.successColor, size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start, children: const [
+                              Text('Historique des paiements',
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
+                              Text(
+                                'Voir tous les paiements et rembourser un paiement Orange Money',
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                                    color: AppTheme.textSecondary),
+                              ),
+                            ])),
+                            ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AdminPaymentsScreen()),
+                              ).then((_) => _load()),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.successColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ),
+                              child: const Text('Ouvrir',
+                                  style: TextStyle(fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700, fontSize: 12)),
                             ),
                           ]),
                         ),

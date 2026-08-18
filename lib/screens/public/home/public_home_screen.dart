@@ -45,10 +45,10 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   int _unreadNotifCount = 0;
   final DataService _ds = DataService();
 
-  final List<Widget> _pages = const [
-    _HomeTab(),
-    FavoritesScreen(),
-    _AlertsTab(),
+  late final List<Widget> _pages = [
+    const _HomeTab(),
+    const FavoritesScreen(),
+    _AlertsTab(onBack: () => setState(() => _currentIndex = 0)),
   ];
 
   // Coordonnées contact récupérées depuis DataService
@@ -531,7 +531,8 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
 // ONGLET ALERTES (placeholder)
 // ══════════════════════════════════════════════════════════════════════════════
 class _AlertsTab extends StatefulWidget {
-  const _AlertsTab();
+  const _AlertsTab({this.onBack});
+  final VoidCallback? onBack;
   @override
   State<_AlertsTab> createState() => _AlertsTabState();
 }
@@ -596,6 +597,13 @@ class _AlertsTabState extends State<_AlertsTab> {
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary)),
         automaticallyImplyLeading: false,
+        centerTitle: true,
+        // Flèche retour → revient à l'onglet Recherche
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
+          tooltip: 'Retour',
+          onPressed: widget.onBack,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
