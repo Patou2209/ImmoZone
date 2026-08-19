@@ -2883,6 +2883,110 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     _load();
   }
 
+  // ── Renouveler une annonce expirée (remise en attente + 30 jours) ─────────
+  Future<void> _confirmRenew(PropertyModel p) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.refresh_rounded,
+                color: AppTheme.primaryColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Renouveler l\'annonce',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 15)),
+          ),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('"${p.title}"',
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'L\'annonce sera remise en attente de validation '
+                'et redeviendra visible au public après approbation.\n\n'
+                'Durée de renouvellement : 30 jours.',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                    color: AppTheme.textSecondary),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx, false),
+            child: const Text('Annuler',
+                style: TextStyle(fontFamily: 'Poppins',
+                    color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(dCtx, true),
+            icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
+            label: const Text('Renouveler',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await _ds.renewProperty(p.id, days: 30);
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                '✅ Annonce renouvelée — en attente de validation',
+                style: TextStyle(fontFamily: 'Poppins'),
+              ),
+              backgroundColor: AppTheme.primaryColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur : $e',
+                  style: const TextStyle(fontFamily: 'Poppins')),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _deleteProperty(PropertyModel p) async {
     final confirmed = await _confirmDialog(
       title: 'Supprimer l\'annonce',
@@ -3174,6 +3278,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final isSold    = p.isSold;
     final isRented  = p.isRented;
     final isClosed  = isSold || isRented;
+    // Expirée : statut 'Expire'/'Expiré' (mis par la Cloud Function) OU date
+    // d'expiration dépassée (même si le cron n'est pas encore passé)
+    final isExpired = !isClosed &&
+        (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired);
 
     Color statusColor;
     String statusLabel;
@@ -3187,6 +3295,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       statusColor = const Color(0xFF4FC3F7);
       statusLabel = 'Occupé';
       statusIcon  = Icons.lock_rounded;
+    } else if (isExpired) {
+      statusColor = AppTheme.errorColor;
+      statusLabel = 'Expirée';
+      statusIcon  = Icons.timer_off_rounded;
     } else if (p.status == 'En attente') {
       statusColor = AppTheme.warningColor;
       statusLabel = 'En attente';
@@ -3283,8 +3395,41 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ]),
         ),
 
-        // Actions
-        if (!isClosed && p.status != 'Rejete') ...[
+        // Actions — annonce EXPIRÉE : Modifier + Renouveler
+        if (isExpired) ...[
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(children: [
+              Expanded(child: _actionButton(
+                icon: Icons.edit_outlined,
+                label: 'Modifier',
+                color: AppTheme.accentColor,
+                onTap: () async {
+                  final updated = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditPropertyScreen(property: p),
+                    ),
+                  );
+                  if (updated == true && mounted) _load();
+                },
+              )),
+              const SizedBox(width: 8),
+              Expanded(child: _actionButton(
+                icon: Icons.refresh_rounded,
+                label: 'Renouveler',
+                color: AppTheme.primaryColor,
+                onTap: () => _confirmRenew(p),
+              )),
+              const SizedBox(width: 8),
+              _iconAction(Icons.delete_outline_rounded, AppTheme.errorColor,
+                  () => _deleteProperty(p)),
+            ]),
+          ),
+        ]
+        // Actions — annonce active/en attente
+        else if (!isClosed && p.status != 'Rejete') ...[
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
