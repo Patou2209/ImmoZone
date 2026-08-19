@@ -3343,13 +3343,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   Row(children: [
                     _statCard('Actives', actives.length, Icons.check_circle_outline_rounded,
                         AppTheme.successColor, filterKey: 'actives'),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     _statCard('En attente', pending.length, Icons.hourglass_top_rounded,
                         AppTheme.warningColor, filterKey: 'pending'),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    _statCard('Expirées', expired.length, Icons.timer_off_rounded,
+                        const Color(0xFFE65100), filterKey: 'expired'),
+                    const SizedBox(width: 8),
                     _statCard('Fermées', closed.length, Icons.lock_outline_rounded,
                         AppTheme.accentColor, filterKey: 'closed'),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     _statCard('Rejetées', rejected.length, Icons.cancel_outlined,
                         AppTheme.errorColor, filterKey: 'rejected'),
                   ]),
@@ -3401,7 +3404,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                   if (_myProperties.isEmpty)
                     _buildEmpty()
-                  else if (displayed.isEmpty)
+                  else if (_statFilter != null && displayed.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: Center(
@@ -3410,11 +3413,71 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 fontSize: 12, color: AppTheme.textSecondary)),
                       ),
                     )
-                  else
-                    ...displayed.map((p) => _buildPropertyCard(p)),
+                  else if (_statFilter != null)
+                    // Filtre actif → liste plate de la catégorie choisie
+                    ...displayed.map((p) => _buildPropertyCard(p))
+                  else ...[
+                    // Pas de filtre → annonces GROUPÉES par catégorie
+                    if (actives.isNotEmpty) ...[
+                      _groupHeader('Actives', actives.length,
+                          Icons.check_circle_outline_rounded, AppTheme.successColor),
+                      ...actives.map((p) => _buildPropertyCard(p)),
+                    ],
+                    if (pending.isNotEmpty) ...[
+                      _groupHeader('En attente de validation', pending.length,
+                          Icons.hourglass_top_rounded, AppTheme.warningColor),
+                      ...pending.map((p) => _buildPropertyCard(p)),
+                    ],
+                    if (expired.isNotEmpty) ...[
+                      _groupHeader('Expirées', expired.length,
+                          Icons.timer_off_rounded, const Color(0xFFE65100)),
+                      ...expired.map((p) => _buildPropertyCard(p)),
+                    ],
+                    if (closed.isNotEmpty) ...[
+                      _groupHeader('Fermées (vendues / occupées)', closed.length,
+                          Icons.lock_outline_rounded, AppTheme.accentColor),
+                      ...closed.map((p) => _buildPropertyCard(p)),
+                    ],
+                    if (rejected.isNotEmpty) ...[
+                      _groupHeader('Rejetées', rejected.length,
+                          Icons.cancel_outlined, AppTheme.errorColor),
+                      ...rejected.map((p) => _buildPropertyCard(p)),
+                    ],
+                  ],
                 ]),
               ),
             ),
+    );
+  }
+
+  /// En-tête de groupe dans la liste "Mes annonces" (groupement par catégorie)
+  Widget _groupHeader(String label, int count, IconData icon, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(top: 6, bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Text(label,
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                fontSize: 12.5, color: color)),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text('$count',
+              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                  fontSize: 11, color: color)),
+        ),
+      ]),
     );
   }
 
@@ -3491,7 +3554,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     // d'expiration dépassée (même si le cron n'est pas encore passé).
     // ⚠️ EXCLURE 'En attente' : un renouvellement en cours de validation garde
     // son ancienne date dépassée — il doit s'afficher "En attente", pas "Expirée".
-    final isExpired = !isClosed && p.status != 'En attente' &&
+    // ⚠️ EXCLURE 'Rejeté' : un renouvellement REJETÉ par l'admin reste "Rejeté"
+    // définitivement (même si la date est dépassée) — il ne redevient PAS "Expirée".
+    final isRejected = p.status == 'Rejeté' || p.status == 'Rejete';
+    final isExpired = !isClosed && p.status != 'En attente' && !isRejected &&
         (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired);
 
     Color statusColor;
@@ -3514,7 +3580,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       statusColor = AppTheme.warningColor;
       statusLabel = 'En attente';
       statusIcon  = Icons.hourglass_top_rounded;
-    } else if (p.status == 'Rejeté' || p.status == 'Rejete') {
+    } else if (isRejected) {
       statusColor = AppTheme.errorColor;
       statusLabel = 'Rejeté';
       statusIcon  = Icons.cancel_rounded;
@@ -3607,7 +3673,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         ),
 
         // Actions — annonce EXPIRÉE ou REJETÉE : Modifier + Renouveler + Supprimer
-        if (isExpired || p.status == 'Rejeté' || p.status == 'Rejete') ...[
+        if (isExpired || isRejected) ...[
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3640,7 +3706,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ),
         ]
         // Actions — annonce active/en attente
-        else if (!isClosed && p.status != 'Rejeté' && p.status != 'Rejete') ...[
+        else if (!isClosed && !isRejected) ...[
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
