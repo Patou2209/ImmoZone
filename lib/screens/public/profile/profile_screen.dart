@@ -337,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             Icons.pending_outlined, AppTheme.warningColor)),
                         const SizedBox(width: 12),
                         Expanded(child: _statCard('Expirées',
-                            '${_myProperties.where((p) => p.isExpired).length}',
+                            '${_myProperties.where((p) => p.isExpired && p.status != 'En attente').length}',
                             Icons.timer_off_outlined, Colors.red)),
                       ],
                     ),
@@ -554,8 +554,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     // Séparer annonces actives/en attente et expirées
-    final activeProps  = _myProperties.where((p) => !p.isExpired).toList();
-    final expiredProps = _myProperties.where((p) => p.isExpired).toList();
+    // ⚠️ Une annonce 'En attente' (renouvellement en cours de validation)
+    // garde son ancienne date dépassée → elle reste côté actif, pas expirée.
+    final expiredProps = _myProperties
+        .where((p) => p.isExpired && p.status != 'En attente')
+        .toList();
+    final activeProps = _myProperties
+        .where((p) => !(p.isExpired && p.status != 'En attente'))
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.only(top: 14),

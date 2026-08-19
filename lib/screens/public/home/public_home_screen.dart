@@ -2805,6 +2805,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   List<PropertyModel> _myProperties = [];
   bool _loading = true;
   int _availableCredits = 0;
+  // Filtre actif via les cartes statistiques (null = toutes les annonces)
+  String? _statFilter;
 
 
   @override
@@ -3200,10 +3202,40 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     }
 
     final user = auth.currentUser;
-    final actives    = _myProperties.where((p) => p.status == 'Actif' && !p.isMarkedClosed).toList();
-    final pending    = _myProperties.where((p) => p.status == 'En attente').toList();
-    final closed     = _myProperties.where((p) => p.isMarkedClosed).toList();
-    final rejected   = _myProperties.where((p) => p.status == 'Rejete').toList();
+    // ── Catégorisation des annonces (mutuellement exclusives) ──────────────
+    // Actives    : statut Actif, non fermées, date d'expiration NON dépassée
+    // En attente : statut 'En attente' (y compris renouvellements en validation)
+    // Fermées    : marquées vendues / occupées
+    // Rejetées   : statut 'Rejeté' (admin écrit avec accent) ou legacy 'Rejete'
+    // Expirées   : date dépassée ou statut Expire/Expiré (hors attente/fermées)
+    final actives  = _myProperties.where((p) =>
+        p.status == 'Actif' && !p.isMarkedClosed && !p.isExpired).toList();
+    final pending  = _myProperties.where((p) => p.status == 'En attente').toList();
+    final closed   = _myProperties.where((p) => p.isMarkedClosed).toList();
+    final rejected = _myProperties.where((p) =>
+        p.status == 'Rejeté' || p.status == 'Rejete').toList();
+    final expired  = _myProperties.where((p) =>
+        !p.isMarkedClosed && p.status != 'En attente' &&
+        p.status != 'Rejeté' && p.status != 'Rejete' &&
+        (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired)).toList();
+
+    // ── Liste affichée selon le filtre actif (carte stat cliquée) ──────────
+    final List<PropertyModel> displayed = switch (_statFilter) {
+      'actives'  => actives,
+      'pending'  => pending,
+      'closed'   => closed,
+      'rejected' => rejected,
+      'expired'  => expired,
+      _          => _myProperties,
+    };
+    final String filterLabel = switch (_statFilter) {
+      'actives'  => 'Actives',
+      'pending'  => 'En attente',
+      'closed'   => 'Fermées',
+      'rejected' => 'Rejetées',
+      'expired'  => 'Expirées',
+      _          => '',
+    };
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
@@ -3307,19 +3339,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Statistiques rapides
+                  // Statistiques rapides — CLIQUABLES (filtrent la liste)
                   Row(children: [
                     _statCard('Actives', actives.length, Icons.check_circle_outline_rounded,
-                        AppTheme.successColor),
+                        AppTheme.successColor, filterKey: 'actives'),
                     const SizedBox(width: 10),
                     _statCard('En attente', pending.length, Icons.hourglass_top_rounded,
-                        AppTheme.warningColor),
+                        AppTheme.warningColor, filterKey: 'pending'),
                     const SizedBox(width: 10),
                     _statCard('Fermées', closed.length, Icons.lock_outline_rounded,
-                        AppTheme.accentColor),
+                        AppTheme.accentColor, filterKey: 'closed'),
                     const SizedBox(width: 10),
                     _statCard('Rejetées', rejected.length, Icons.cancel_outlined,
-                        AppTheme.errorColor),
+                        AppTheme.errorColor, filterKey: 'rejected'),
                   ]),
                   const SizedBox(height: 24),
 
@@ -3344,40 +3376,81 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Liste des annonces
-                  _sectionTitle('Mes annonces (${_myProperties.length})'),
+                  // Liste des annonces (filtrée si une carte stat est active)
+                  Row(children: [
+                    Expanded(
+                      child: _sectionTitle(_statFilter == null
+                          ? 'Mes annonces (${_myProperties.length})'
+                          : 'Mes annonces — $filterLabel (${displayed.length})'),
+                    ),
+                    if (_statFilter != null)
+                      TextButton.icon(
+                        onPressed: () => setState(() => _statFilter = null),
+                        icon: const Icon(Icons.filter_alt_off_rounded, size: 15),
+                        label: const Text('Tout afficher',
+                            style: TextStyle(fontFamily: 'Poppins',
+                                fontSize: 11, fontWeight: FontWeight.w600)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.accentColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ]),
                   const SizedBox(height: 12),
 
                   if (_myProperties.isEmpty)
                     _buildEmpty()
+                  else if (displayed.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text('Aucune annonce dans « $filterLabel »',
+                            style: const TextStyle(fontFamily: 'Poppins',
+                                fontSize: 12, color: AppTheme.textSecondary)),
+                      ),
+                    )
                   else
-                    ..._myProperties.map((p) => _buildPropertyCard(p)),
+                    ...displayed.map((p) => _buildPropertyCard(p)),
                 ]),
               ),
             ),
     );
   }
 
-  Widget _statCard(String label, int count, IconData icon, Color color) {
+  Widget _statCard(String label, int count, IconData icon, Color color,
+      {String? filterKey}) {
+    final bool isActive = filterKey != null && _statFilter == filterKey;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: filterKey == null
+            ? null
+            : () => setState(() =>
+                _statFilter = (_statFilter == filterKey) ? null : filterKey),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isActive ? color.withValues(alpha: 0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: color.withValues(alpha: isActive ? 0.7 : 0.25),
+                width: isActive ? 1.6 : 1),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+          ),
+          child: Column(children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
+            Text('$count',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                    fontSize: 18, color: color)),
+            Text(label, style: TextStyle(fontFamily: 'Poppins',
+                fontSize: 9,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                color: isActive ? color : AppTheme.textSecondary),
+                textAlign: TextAlign.center),
+          ]),
         ),
-        child: Column(children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text('$count',
-              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                  fontSize: 18, color: color)),
-          Text(label, style: const TextStyle(fontFamily: 'Poppins',
-              fontSize: 9, color: AppTheme.textSecondary),
-              textAlign: TextAlign.center),
-        ]),
       ),
     );
   }
@@ -3415,8 +3488,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final isRented  = p.isRented;
     final isClosed  = isSold || isRented;
     // Expirée : statut 'Expire'/'Expiré' (mis par la Cloud Function) OU date
-    // d'expiration dépassée (même si le cron n'est pas encore passé)
-    final isExpired = !isClosed &&
+    // d'expiration dépassée (même si le cron n'est pas encore passé).
+    // ⚠️ EXCLURE 'En attente' : un renouvellement en cours de validation garde
+    // son ancienne date dépassée — il doit s'afficher "En attente", pas "Expirée".
+    final isExpired = !isClosed && p.status != 'En attente' &&
         (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired);
 
     Color statusColor;
@@ -3439,7 +3514,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       statusColor = AppTheme.warningColor;
       statusLabel = 'En attente';
       statusIcon  = Icons.hourglass_top_rounded;
-    } else if (p.status == 'Rejete') {
+    } else if (p.status == 'Rejeté' || p.status == 'Rejete') {
       statusColor = AppTheme.errorColor;
       statusLabel = 'Rejeté';
       statusIcon  = Icons.cancel_rounded;
@@ -3531,8 +3606,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ]),
         ),
 
-        // Actions — annonce EXPIRÉE : Modifier + Renouveler
-        if (isExpired) ...[
+        // Actions — annonce EXPIRÉE ou REJETÉE : Modifier + Renouveler + Supprimer
+        if (isExpired || p.status == 'Rejeté' || p.status == 'Rejete') ...[
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3565,7 +3640,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ),
         ]
         // Actions — annonce active/en attente
-        else if (!isClosed && p.status != 'Rejete') ...[
+        else if (!isClosed && p.status != 'Rejeté' && p.status != 'Rejete') ...[
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

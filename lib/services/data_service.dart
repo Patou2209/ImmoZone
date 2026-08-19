@@ -982,13 +982,16 @@ class DataService {
     }
   }
 
-  /// Renouvelle une annonce expirée : remet le statut à 'En attente' et
-  /// repousse la date d'expiration de [days] jours à partir d'aujourd'hui.
+  /// Renouvelle une annonce expirée : remet le statut à 'En attente'.
+  /// ⚠️ expiresAt N'EST PAS repoussé ici — il le sera à l'APPROBATION admin
+  /// (updatePropertyStatus('Actif') répare toute date dépassée : now + validité).
+  /// Ainsi, en cas de REJET, l'annonce redevient automatiquement "Expirée"
+  /// (statut initial) et peut être renouvelée à nouveau.
   Future<void> renewProperty(String id, {int days = 30}) async {
     final now = DateTime.now();
     await _propertiesCol.doc(id).update({
       'status': 'En attente',
-      'expiresAt': now.add(Duration(days: days)).toIso8601String(),
+      'renewalRequestedAt': now.toIso8601String(),
       'updatedAt': now.toIso8601String(),
     });
   }
@@ -2247,6 +2250,11 @@ class DataService {
         'chargeType': charge['type'],
         'chargeCredits': charge['credits'] ?? 0,
         if (charge['quotaId'] != null) 'chargeQuotaId': charge['quotaId'],
+        // Un NOUVEAU prélèvement vient d'avoir lieu (publication ou
+        // renouvellement) → réarmer le droit à restitution. Sans ça, un
+        // renouvellement payé après un ancien rejet resterait bloqué par le
+        // flag creditsRefunded=true et l'utilisateur perdrait ses crédits.
+        'creditsRefunded': false,
       });
     } catch (e) {
       if (kDebugMode) debugPrint('recordPublicationCharge error: $e');
