@@ -14,8 +14,14 @@ const _kInitiateUrl =
 const _kStatusUrl =
     'https://us-central1-immozone-d9a68.cloudfunctions.net/checkOrangePaymentStatus';
 
-// ── Timeout d'attente PIN : Orange laisse 5 min (serviceTimeout 300 s) au client
-// pour valider — on attend 320 s (300 s + marge) avant d'afficher l'échec ──────
+// ── Timeout d'attente PIN ─────────────────────────────────────────────
+// ⚠️ PÉRIODE DE TEST : timeout DÉSACTIVÉ — la transaction reste PENDING chez
+// Orange tant qu'ils ne la clôturent pas eux-mêmes (c'est sur cette base
+// qu'Orange valide nos tests d'intégration). L'app continue le polling sans
+// jamais afficher d'échec par expiration. Le client peut toujours Annuler.
+// → AU GO-LIVE PRODUCTION : remettre _kDisablePinTimeout = false
+//   (Orange laisse 5 min / serviceTimeout 300 s au client pour valider le PIN).
+const bool _kDisablePinTimeout = true;
 const _kUssdTimeoutSeconds = 320;
 // ── Polling toutes les 10 secondes ────────────────────────────────────────────
 const _kPollingIntervalSeconds = 10;
@@ -169,8 +175,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     setState(() => _pollingSecondsElapsed += _kPollingIntervalSeconds);
 
-    // Timeout : 3 minutes sans réponse → échec
-    if (_pollingSecondsElapsed >= _kUssdTimeoutSeconds) {
+    // Timeout d'expiration — DÉSACTIVÉ en période de test (_kDisablePinTimeout).
+    // La transaction reste PENDING chez Orange ; on continue le polling indéfiniment.
+    if (!_kDisablePinTimeout && _pollingSecondsElapsed >= _kUssdTimeoutSeconds) {
       _pollingTimer?.cancel();
       if (!mounted) return;
       setState(() => _orangeWaitingUssd = false);
@@ -402,8 +409,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // ÉCRAN D'ATTENTE USSD (Orange Money uniquement)
   // ─────────────────────────────────────────────────────────────────────────────
   Widget _buildUssdWaitingScreen() {
-    final remaining = _kUssdTimeoutSeconds - _pollingSecondsElapsed;
-    final progress = _pollingSecondsElapsed / _kUssdTimeoutSeconds;
+    // Timeout désactivé (test) → spinner infini + temps écoulé.
+    // Timeout actif (production) → compte à rebours + jauge décroissante.
+    final remaining = _kDisablePinTimeout
+        ? _pollingSecondsElapsed
+        : _kUssdTimeoutSeconds - _pollingSecondsElapsed;
+    final double? progress = _kDisablePinTimeout
+        ? null
+        : (_pollingSecondsElapsed / _kUssdTimeoutSeconds).clamp(0.0, 1.0);
 
     return Padding(
       padding: const EdgeInsets.all(28),
@@ -424,7 +437,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 width: 100,
                 height: 100,
                 child: CircularProgressIndicator(
-                  value: 1 - progress,
+                  value: progress == null ? null : 1 - progress,
                   strokeWidth: 5,
                   backgroundColor: Colors.grey.withValues(alpha: 0.2),
                   color: const Color(0xFFFF7900),
