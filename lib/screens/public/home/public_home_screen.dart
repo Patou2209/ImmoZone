@@ -17,6 +17,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../core/widgets/property_image.dart';
 import '../../../core/widgets/ad_banner_card.dart';
+import '../../../core/widgets/recharge_form_widget.dart';
 import '../../../models/ad_model.dart';
 import '../../../services/data_service.dart';
 import '../../../models/property_model.dart';
@@ -2883,8 +2884,103 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     _load();
   }
 
-  // ── Renouveler une annonce expirée (remise en attente + 30 jours) ─────────
+  // ── Renouveler une annonce expirée (PAYANT — mêmes règles qu'une publication) ──
+  // Flux : vérif du droit (essai/quota/crédits) → si solde insuffisant,
+  // redirection vers l'espace de recharge (RechargeDialog) → sinon dialogue de
+  // confirmation avec le coût affiché → prélèvement (consumePublicationRight)
+  // → renewProperty → traçage (recordPublicationCharge).
   Future<void> _confirmRenew(PropertyModel p) async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    // 1. Vérifier le droit de publication (rafraîchit le cache des zones si besoin)
+    final right = await _ds.checkPublicationRight(user.id,
+        commune: p.commune, days: 30, transactionType: p.transactionType);
+    final required = _ds.getCreditsForCommune(p.commune,
+        days: 30, transactionType: p.transactionType);
+    final available = await _ds.getUserAvailableCredits(user.id);
+    final bool isFree = right == 'free_trial' || right == 'free_quota';
+    final bool enough =
+        isFree || (right == 'paid_credit' && available >= required);
+    if (!mounted) return;
+
+    // 2. Solde insuffisant → reconduire vers l'espace de paiement / recharge
+    if (!enough) {
+      final goRecharge = await showDialog<bool>(
+        context: context,
+        builder: (dCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.account_balance_wallet_rounded,
+                  color: AppTheme.errorColor, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Crédits insuffisants',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700, fontSize: 15)),
+            ),
+          ]),
+          content: Text(
+            'Le renouvellement de « ${p.title} » coûte '
+            '$required crédit${required > 1 ? 's' : ''} '
+            '(${p.commune} · ${p.transactionType} · 30 jours).\n\n'
+            'Solde actuel : $available crédit${available != 1 ? 's' : ''}.\n\n'
+            'Veuillez recharger votre compte pour continuer.',
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: const Text('Annuler',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(dCtx, true),
+              icon: const Icon(Icons.add_circle_outline_rounded,
+                  size: 16, color: Colors.white),
+              label: const Text('Recharger',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (goRecharge == true && mounted) {
+        // Espace de paiement : même flux éprouvé que post_property (CAS 4b)
+        await showDialog(
+          context: context,
+          builder: (_) => RechargeDialog(user: user, ds: _ds),
+        );
+        // Rafraîchir le solde après une éventuelle recharge —
+        // l'utilisateur pourra recliquer sur « Renouveler » ensuite.
+        await _load();
+      }
+      return;
+    }
+
+    // 3. Confirmation avec affichage du coût réel
+    final String costLabel = right == 'free_trial'
+        ? 'Gratuit (période d\'essai)'
+        : right == 'free_quota'
+            ? 'Gratuit (quota disponible)'
+            : '$required crédit${required > 1 ? 's' : ''} '
+              '(solde : $available)';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dCtx) => AlertDialog(
@@ -2929,6 +3025,22 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     color: AppTheme.textSecondary),
               ),
             ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.accentColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppTheme.accentColor.withValues(alpha: 0.25)),
+              ),
+              child: Text(
+                'Coût du renouvellement : $costLabel',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12.5,
+                    fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -2957,14 +3069,38 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
     if (confirmed == true && mounted) {
       try {
+        // 4. RE-VÉRIFICATION finale (protection anti-race) puis PRÉLÈVEMENT
+        final rightNow = await _ds.checkPublicationRight(user.id,
+            commune: p.commune, days: 30, transactionType: p.transactionType);
+        final availNow = await _ds.getUserAvailableCredits(user.id);
+        final okNow = rightNow == 'free_trial' || rightNow == 'free_quota' ||
+            (rightNow == 'paid_credit' && availNow >= required);
+        if (!okNow) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  'Solde insuffisant : $availNow disponible, $required requis.',
+                  style: const TextStyle(fontFamily: 'Poppins')),
+              backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating,
+            ));
+          }
+          return;
+        }
+        final charge = await _ds.consumePublicationRight(user.id,
+            commune: p.commune, days: 30, transactionType: p.transactionType);
         await _ds.renewProperty(p.id, days: 30);
+        await _ds.recordPublicationCharge(p.id, charge);
         await _load();
         if (mounted) {
+          final debited = (charge['credits'] as int? ?? 0);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text(
-                '✅ Annonce renouvelée — en attente de validation',
-                style: TextStyle(fontFamily: 'Poppins'),
+              content: Text(
+                debited > 0
+                    ? '✅ Annonce renouvelée — $debited crédit${debited > 1 ? 's' : ''} débité${debited > 1 ? 's' : ''}. En attente de validation.'
+                    : '✅ Annonce renouvelée (gratuit) — en attente de validation',
+                style: const TextStyle(fontFamily: 'Poppins'),
               ),
               backgroundColor: AppTheme.primaryColor,
               behavior: SnackBarBehavior.floating,

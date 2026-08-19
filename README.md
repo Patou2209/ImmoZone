@@ -399,15 +399,15 @@ POST {{cf_base}}/orangeMoneyWebhook/notifications
 | `Authorization` | `{{webhook_auth}}` ⚠️ **obligatoire** — sans lui → `401` |
 | `Content-Type` | `application/json` |
 
-**Body (format exact envoyé par Orange) :**
+**Body (format exact envoyé par Orange — VÉRIFIÉ EN LIVE le 19/08/2026) :**
 
 ```json
 {
-  "notificationType": "TRANSACTION_STATUS",
-  "transaction": {
-    "transactionId": "CI260818.2331.A02520",
-    "requestId": "pay-test-1787099999999",
-    "status": "SUCCESSFUL",
+  "status": "SUCCESS",
+  "message": "Transaction completed",
+  "transactionData": {
+    "transactionId": "pay-test-1787099999999",
+    "txnId": "CI260818.2331.A02520",
     "type": "withdraw",
     "peerId": "7704100021",
     "amount": 17,
@@ -418,9 +418,18 @@ POST {{cf_base}}/orangeMoneyWebhook/notifications
 }
 ```
 
-**Réponse attendue : `200 {"status":"OK"}`** (en ~3 s : le webhook **traite AVANT de répondre** — crédite l'utilisateur, met `payments/{id}.status: "confirmed"`, envoie la notif push).
+**Champs importants :**
+- `status` (racine) : `"SUCCESS"` ou `"FAILED"` — c'est CE champ que le webhook lit
+- `transactionData.transactionId` : **NOTRE** identifiant (`pay-...` / `refund-...`)
+- `transactionData.txnId` : l'identifiant **Orange** (ex: `CI260818.2331.A02520`)
 
-**Routage automatique par préfixe du `requestId` :**
+> ⚠️ **Attention** : un body au mauvais format (ex: `{"notificationType": ..., "transaction": {...}}`)
+> renvoie quand même `200` mais en ~0,1 s et **ne traite RIEN** (aucun champ reconnu).
+> Le bon format répond `200` en ~2–3 s avec traitement complet.
+
+**Réponse attendue : `200 {"status":"OK"}`** (en ~2-3 s : le webhook **traite AVANT de répondre** — crédite l'utilisateur, met `payments/{id}.status: "confirmed"`, envoie la notif push).
+
+**Routage automatique par préfixe du `transactionData.transactionId` :**
 - `pay-...` → traité comme un **paiement** (withdraw)
 - `refund-...` ou `refund_...` → traité comme un **remboursement** (credit)
 
