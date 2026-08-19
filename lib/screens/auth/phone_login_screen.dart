@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
 import 'otp_screen.dart';
@@ -27,7 +28,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   String _countryCode   = '+243';
   bool   _isSending     = false;
 
-  String get _fullPhone => '$_countryCode${_phoneCtrl.text.trim()}';
+  // Normalisation intelligente : supprime le 0 national saisi par habitude
+  // (ex: '0812345678' → +243812345678, jamais +2430812345678).
+  String get _fullPhone => '$_countryCode${PhoneUtils.normalizeLocal(_phoneCtrl.text)}';
 
   @override
   void dispose() {

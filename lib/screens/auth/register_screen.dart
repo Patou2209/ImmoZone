@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/data_service.dart';
 import '../../services/phone_auth_service.dart';
@@ -42,7 +43,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Nombre d'annonces gratuites configuré par l'admin (lu depuis Firestore settings)
   int _freeQuotaCount = 3; // valeur par défaut avant chargement
 
-  String get _fullPhone => '$_phoneCountryCode${_phoneNumberCtrl.text.trim()}';
+  // Normalisation intelligente : supprime le 0 national saisi par habitude
+  // (ex: '0812345678' → +243812345678, jamais +2430812345678).
+  String get _fullPhone => '$_phoneCountryCode${PhoneUtils.normalizeLocal(_phoneNumberCtrl.text)}';
 
   /// Mappe un indicatif téléphonique vers le nom de pays utilisé par AppConstants.
   String _phoneCountryToAppCountry(String code) {

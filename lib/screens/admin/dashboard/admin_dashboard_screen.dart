@@ -153,6 +153,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
+  // ── Déconnexion (avec confirmation) — bouton du header ────────────────────
+  Future<void> _confirmLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.logout, color: AppTheme.textSecondary),
+          SizedBox(width: 10),
+          Text('Déconnexion', style: TextStyle(
+              fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700)),
+        ]),
+        content: const Text(
+          'Voulez-vous vraiment vous déconnecter du panneau d\'administration ?',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
+              color: AppTheme.textSecondary, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Déconnecter', style: TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      await context.read<immo_auth.AuthProvider>().logout();
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   // ── Réinitialiser le chiffre d'affaire ────────────────────────────────────
   Future<void> _showDirectRefundDialog() async {
     final phoneCtrl = TextEditingController();
@@ -195,7 +239,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 validator: (v) {
-                  final cleaned = (v ?? '').replaceAll(RegExp(r'[\s\-]'), '').replaceAll('+', '');
+                  // Normalisation: retire espaces/tirets/+ ET le 0 national saisi
+                  // par habitude (081... → 81...) — jamais valide côté Orange.
+                  final cleaned = (v ?? '')
+                      .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
+                      .replaceAll('+', '')
+                      .replaceFirst(RegExp(r'^0+'), '');
                   if (cleaned.isEmpty) return 'Numéro requis';
                   if (!RegExp(r'^\d{7,15}$').hasMatch(cleaned)) return 'Numéro invalide (7 à 15 chiffres)';
                   return null;
@@ -222,13 +271,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: reasonCtrl,
-                maxLines: 2,
+                maxLines: 1,
+                maxLength: 19,
                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
                 decoration: InputDecoration(
-                  labelText: 'Motif (optionnel)',
-                  hintText: 'Motif du remboursement...',
+                  labelText: 'Motif (obligatoire)',
+                  hintText: 'Ex: Geste commercial',
+                  helperText: 'Max 19 caractères (limite Orange)',
+                  helperStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                validator: (v) {
+                  final reason = (v ?? '').trim();
+                  if (reason.isEmpty) return 'Motif obligatoire';
+                  if (reason.length >= 20) return 'Maximum 19 caractères';
+                  return null;
+                },
               ),
             ]),
           ),
@@ -258,7 +316,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (confirmed != true || !mounted) return;
 
     // Double confirmation — opération financière irréversible
-    final phone = phoneCtrl.text.replaceAll(RegExp(r'[\s\-]'), '').replaceAll('+', '');
+    // Même normalisation que le validator (0 national retiré)
+    final phone = phoneCtrl.text
+        .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
+        .replaceAll('+', '')
+        .replaceFirst(RegExp(r'^0+'), '');
     final amount = double.parse(amountCtrl.text.replaceAll(',', '.'));
     final doubleCheck = await showDialog<bool>(
       context: context,
@@ -302,7 +364,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         amount: amount,
         adminId: auth.currentUser?.id ?? '',
         adminName: auth.currentUser?.name ?? 'Admin',
-        reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+        reason: reasonCtrl.text.trim(),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -608,26 +670,90 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
                                   style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
                             ]),
-                            // Badge rôle admin — orange pour contraste sur fond bleu
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFA726).withValues(alpha: 0.20),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.7)),
+                            // Badge Admin + boutons Accueil / Déconnexion
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              // Badge rôle admin — orange pour contraste sur fond bleu
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFA726).withValues(alpha: 0.20),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.7)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.admin_panel_settings_rounded,
+                                        color: Color(0xFFFFA726), size: 15),
+                                    SizedBox(width: 5),
+                                    Text('Admin', style: TextStyle(
+                                        fontFamily: 'Poppins', fontSize: 11,
+                                        color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
                               ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.admin_panel_settings_rounded,
-                                      color: Color(0xFFFFA726), size: 15),
-                                  SizedBox(width: 5),
-                                  Text('Admin', style: TextStyle(
-                                      fontFamily: 'Poppins', fontSize: 11,
-                                      color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
-                                ],
+                              const SizedBox(width: 8),
+                              // ── Bouton Accueil : retour à la page d'accueil publique ──
+                              Tooltip(
+                                message: 'Accueil de l\'application',
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.home_rounded, color: Colors.white, size: 15),
+                                          SizedBox(width: 5),
+                                          Text('Accueil', style: TextStyle(
+                                              fontFamily: 'Poppins', fontSize: 11,
+                                              color: Colors.white, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              // ── Bouton Déconnexion (avec confirmation) ──
+                              Tooltip(
+                                message: 'Se déconnecter',
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: _confirmLogout,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withValues(alpha: 0.20),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.7)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.logout_rounded, color: Color(0xFFFF8A80), size: 15),
+                                          SizedBox(width: 5),
+                                          Text('Quitter', style: TextStyle(
+                                              fontFamily: 'Poppins', fontSize: 11,
+                                              color: Color(0xFFFF8A80), fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ]),
                           ],
                         ),
 
@@ -980,88 +1106,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ),
                               child: const Text('Effacer tout',
                                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 12)),
-                            ),
-                          ]),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── DÉCONNEXION ────────────────────────────────────
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white, borderRadius: BorderRadius.circular(16),
-                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
-                          ),
-                          child: Row(children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.textSecondary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.logout, color: AppTheme.textSecondary, size: 24),
-                            ),
-                            const SizedBox(width: 14),
-                            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('Déconnexion',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                      fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                              Text('Quitter le panneau d\'administration',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                                      color: AppTheme.textSecondary)),
-                            ])),
-                            ElevatedButton(
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                    title: const Row(children: [
-                                      Icon(Icons.logout, color: AppTheme.textSecondary),
-                                      SizedBox(width: 10),
-                                      Text('Déconnexion', style: TextStyle(
-                                          fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700)),
-                                    ]),
-                                    content: const Text(
-                                      'Voulez-vous vraiment vous déconnecter du panneau d\'administration ?',
-                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
-                                          color: AppTheme.textSecondary, height: 1.5),
-                                    ),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(ctx, false),
-                                          child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(ctx, true),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        ),
-                                        child: const Text('Déconnecter', style: TextStyle(
-                                            fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true && mounted) {
-                                  await context.read<immo_auth.AuthProvider>().logout();
-                                  if (mounted) {
-                                    Navigator.pushAndRemoveUntil(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
-                                      (route) => false,
-                                    );
-                                  }
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.textSecondary.withValues(alpha: 0.15),
-                                foregroundColor: AppTheme.textPrimary,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              child: const Text('Quitter', style: TextStyle(
-                                  fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 12)),
                             ),
                           ]),
                         ),

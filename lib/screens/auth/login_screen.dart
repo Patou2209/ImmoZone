@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../core/utils/phone_utils.dart';
+
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -48,8 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return remaining;
   }
 
+  // Normalisation intelligente : supprime le 0 national que l'utilisateur
+  // ajoute souvent par habitude alors que l'indicatif (+243) est déjà là.
+  // Ex: saisie '0812345678' → +243812345678 (et non +2430812345678).
   String get _fullPhone =>
-      '$_countryCode${_phoneCtrl.text.trim()}';
+      '$_countryCode${PhoneUtils.normalizeLocal(_phoneCtrl.text)}';
 
   @override
   void dispose() {
@@ -280,7 +285,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               number.startsWith('00')) {
                             full = number.replaceAll(RegExp(r'^00'), '+');
                           } else {
-                            full = '$selectedCode$number';
+                            // Supprime le 0 national saisi par habitude
+                            full = '$selectedCode${PhoneUtils.normalizeLocal(number)}';
                           }
                           setSB(() => isSending = true);
 
@@ -522,7 +528,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (number.startsWith('+') || number.startsWith('00')) {
       return number.replaceAll(RegExp(r'^00'), '+');
     }
-    return '$code$number';
+    // Supprime le 0 national saisi par habitude (081... → 81...)
+    return '$code${PhoneUtils.normalizeLocal(number)}';
   }
 
   // ── Sélecteur d'indicatif pays ────────────────────────────────────────────

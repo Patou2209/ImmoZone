@@ -403,6 +403,7 @@ class _PaymentTileState extends State<_PaymentTile> {
   // ── Dialog de confirmation du remboursement Orange Money ───────────────
   void _showRefundDialog(BuildContext context) {
     final reasonCtrl = TextEditingController();
+    final refundFormKey = GlobalKey<FormState>();
     final payment = widget.payment;
 
     showDialog(
@@ -481,16 +482,30 @@ class _PaymentTileState extends State<_PaymentTile> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: reasonCtrl,
-            maxLines: 2,
-            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Motif du remboursement...',
-              hintStyle: const TextStyle(fontFamily: 'Poppins',
-                  color: AppTheme.textHint),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
+          Form(
+            key: refundFormKey,
+            child: TextFormField(
+              controller: reasonCtrl,
+              maxLines: 1,
+              maxLength: 19,
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+              decoration: InputDecoration(
+                labelText: 'Motif (obligatoire)',
+                hintText: 'Ex: Annulation client',
+                helperText: 'Max 19 caractères (limite Orange)',
+                helperStyle: const TextStyle(
+                    fontFamily: 'Poppins', fontSize: 10),
+                hintStyle: const TextStyle(fontFamily: 'Poppins',
+                    color: AppTheme.textHint),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              validator: (v) {
+                final reason = (v ?? '').trim();
+                if (reason.isEmpty) return 'Motif obligatoire';
+                if (reason.length >= 20) return 'Maximum 19 caractères';
+                return null;
+              },
             ),
           ),
         ]),
@@ -506,9 +521,9 @@ class _PaymentTileState extends State<_PaymentTile> {
           ),
           ElevatedButton.icon(
             onPressed: () async {
-              final reason = reasonCtrl.text.trim().isEmpty
-                  ? null
-                  : reasonCtrl.text.trim();
+              // Motif obligatoire (< 20 caractères — limite Orange)
+              if (!(refundFormKey.currentState?.validate() ?? false)) return;
+              final reason = reasonCtrl.text.trim();
               Navigator.pop(ctx);
               reasonCtrl.dispose();
               if (!mounted) return;

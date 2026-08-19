@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../models/payment_model.dart';
 import '../../services/data_service.dart';
 import 'transaction_success_screen.dart';
@@ -79,7 +80,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // ORANGE MONEY — Initier le paiement via Cloud Function
   // ─────────────────────────────────────────────────────────────────────────────
   Future<void> _initiateOrangePayment() async {
-    final phone = _phoneCtrl.text.trim();
+    // Normalisation intelligente : supprime espaces/tirets/+, et le 0 national
+    // saisi par habitude (081... → 81... ; +243 081... → 243 81...).
+    final phone = PhoneUtils.normalizeMsisdn(_phoneCtrl.text);
     if (phone.isEmpty) {
       _showMsg('Veuillez entrer votre numéro Orange Money', isError: true);
       return;
@@ -236,6 +239,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
     setState(() => _isLoading = true);
 
+    // Normalisation intelligente : supprime le 0 national saisi par habitude
+    final phone = PhoneUtils.normalizeMsisdn(_phoneCtrl.text);
+
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
     final orderId = 'ord_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -244,7 +250,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       userId: _ds.currentUserId,
       orderId: orderId,
       operator: _useManualValidation ? 'manual' : _selectedOperator,
-      phoneNumber: _phoneCtrl.text.trim(),
+      phoneNumber: phone,
       amount: widget.amount,
       productType: widget.productType,
       status: _useManualValidation ? 'awaiting_manual' : 'pending',
