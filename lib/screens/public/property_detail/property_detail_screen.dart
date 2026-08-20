@@ -29,17 +29,21 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _currentImageIndex = 0;
   final PageController _pageCtrl = PageController();
   String _officialMessage = '';
-  bool _messageExpanded = false;
+  // Affiché intégralement par défaut (le chevron permet de replier)
+  bool _messageExpanded = true;
   String _ownerSince = '';
   bool _ownerSinceLoaded = false; // true une fois la requête terminée
   // Avatar de l'annonceur — chargé depuis Firestore (peut être null)
   String? _ownerAvatar;
   // Compteur de vues local — mis à jour après incrément Firestore
   late int _views;
+  // Copie locale de l'annonce — rafraîchissable depuis Firestore
+  late PropertyModel _property;
 
   @override
   void initState() {
     super.initState();
+    _property = widget.property;
     // Initialiser avec la valeur cachée puis mettre à jour après incrément
     _views = widget.property.views;
     _checkFavorite();
@@ -161,6 +165,21 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   Future<void> _loadOfficialMessage() async {
     final msg = _ds.officialMessage;
     if (mounted) setState(() => _officialMessage = msg);
+  }
+
+  /// Rafraîchit l'annonce et ses données associées depuis Firestore
+  Future<void> _refreshAll() async {
+    try {
+      final fresh = await _ds.getPropertyById(widget.property.id);
+      if (fresh != null && mounted) {
+        setState(() {
+          _property = fresh;
+          _views = fresh.views;
+        });
+      }
+    } catch (_) {}
+    await _checkFavorite();
+    await _loadOfficialMessage();
   }
 
   Color _statusColor(String s) {
@@ -288,7 +307,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.property;
+    final p = _property;
     final auth = context.watch<AuthProvider>();
     final isOwner = auth.currentUser?.id == p.ownerId;
 
@@ -335,6 +354,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           child: Container(height: 1, color: const Color(0xFFE9EBF0)),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
+            onPressed: _refreshAll,
+            tooltip: 'Rafraîchir',
+          ),
           IconButton(
             icon: Icon(
               _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -644,21 +668,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               color: Colors.white70,
                               height: 1.6)),
                     ],
-                    if (!_messageExpanded) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        _officialMessage.length > 80
-                            ? '${_officialMessage.substring(0, 80)}...'
-                            : _officialMessage,
-                        style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: Colors.white54,
-                            height: 1.4),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                    // Replié : aucun aperçu tronqué — le texte complet
+                    // s'affiche via le chevron (état déplié par défaut).
                   ]),
                 ),
               )),

@@ -2892,6 +2892,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   // confirmation avec le coût affiché → prélèvement (consumePublicationRight)
   // → renewProperty → traçage (recordPublicationCharge).
   Future<void> _confirmRenew(PropertyModel p) async {
+    // Annonce rejetée → parcours "Réessayer" (mêmes règles, libellés adaptés)
+    final bool isRetry = p.status == 'Rejeté' || p.status == 'Rejete';
     final auth = context.read<AuthProvider>();
     final user = auth.currentUser;
     if (user == null) return;
@@ -2998,9 +3000,9 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 color: AppTheme.primaryColor, size: 18),
           ),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text('Renouveler l\'annonce',
-                style: TextStyle(fontFamily: 'Poppins',
+          Expanded(
+            child: Text(isRetry ? 'Réessayer la publication' : 'Renouveler l\'annonce',
+                style: const TextStyle(fontFamily: 'Poppins',
                     fontWeight: FontWeight.w700, fontSize: 15)),
           ),
         ]),
@@ -3019,11 +3021,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 color: AppTheme.primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'L\'annonce sera remise en attente de validation '
-                'et redeviendra visible au public après approbation.\n\n'
-                'Durée de renouvellement : 30 jours.',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+              child: Text(
+                isRetry
+                    ? 'L\'annonce sera soumise à nouveau pour validation. '
+                      'Pensez à corriger le motif du rejet avant de réessayer.\n\n'
+                      'Durée de publication : 30 jours.'
+                    : 'L\'annonce sera remise en attente de validation '
+                      'et redeviendra visible au public après approbation.\n\n'
+                      'Durée de renouvellement : 30 jours.',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
                     color: AppTheme.textSecondary),
               ),
             ),
@@ -3055,8 +3061,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(dCtx, true),
             icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-            label: const Text('Renouveler',
-                style: TextStyle(fontFamily: 'Poppins',
+            label: Text(isRetry ? 'Réessayer' : 'Renouveler',
+                style: const TextStyle(fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,
@@ -3241,6 +3247,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(
         title: 'Mon Tableau de Bord',
+        onRefresh: _load,
         onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
       ),
       body: _loading
@@ -3694,8 +3701,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               )),
               const SizedBox(width: 8),
               Expanded(child: _actionButton(
-                icon: Icons.refresh_rounded,
-                label: 'Renouveler',
+                icon: isRejected ? Icons.replay_rounded : Icons.refresh_rounded,
+                label: isRejected ? 'Réessayer' : 'Renouveler',
                 color: AppTheme.primaryColor,
                 onTap: () => _confirmRenew(p),
               )),
@@ -3903,6 +3910,21 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
     super.dispose();
   }
 
+  // ── Refresh : recharge le profil utilisateur depuis Firestore ───────────────
+  Future<void> _refreshProfile() async {
+    final auth = context.read<AuthProvider>();
+    final current = auth.currentUser;
+    if (current == null) return;
+    try {
+      final fresh = await _ds.getUserById(current.id);
+      if (fresh != null && mounted) {
+        auth.updateCurrentUserLocally(fresh);
+        if (!_editingDesc) _descCtrl.text = fresh.description ?? '';
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
   // ── Photo upload ─────────────────────────────────────────────────────────────
   Future<void> _pickAndUploadPhoto(AuthProvider auth) async {
     final user = auth.currentUser;
@@ -4085,6 +4107,7 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
       backgroundColor: const Color(0xFFF4F6FB),
       appBar: ImmoZoneAppBar(
         title: 'Réglages',
+        onRefresh: _refreshProfile,
         onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
       ),
       body: SingleChildScrollView(

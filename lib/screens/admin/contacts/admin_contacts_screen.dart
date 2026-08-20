@@ -53,6 +53,11 @@ class _AdminContactsScreenState extends State<AdminContactsScreen> {
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Rafraîchir',
+            onPressed: _load,
+          ),
           TextButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),

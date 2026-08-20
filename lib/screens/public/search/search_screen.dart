@@ -124,6 +124,16 @@ class _SearchScreenState extends State<SearchScreen> {
     await SharePlus.instance.share(ShareParams(text: text));
   }
 
+  Future<void> _refresh() async {
+    if (widget.initialHistorique) {
+      await context.read<PropertyProvider>().loadHistoriqueProperties();
+    } else {
+      await context.read<PropertyProvider>().loadProperties();
+    }
+    await _loadFavorites();
+    if (_hasSearched && mounted) _applyFilters();
+  }
+
   void _applyFilters() {
     setState(() => _hasSearched = true);
     final provider = context.read<PropertyProvider>();
@@ -159,6 +169,7 @@ class _SearchScreenState extends State<SearchScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(
         title: 'Rechercher',
+        onRefresh: _refresh,
         extraActions: [
           IconButton(
             icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list,

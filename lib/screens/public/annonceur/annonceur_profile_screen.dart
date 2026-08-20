@@ -201,7 +201,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      appBar: ImmoZoneAppBar(title: displayName),
+      appBar: ImmoZoneAppBar(title: displayName, onRefresh: _load),
       body: _loading
           ? const Center(child: CircularProgressIndicator(
               color: AppTheme.accentColor))

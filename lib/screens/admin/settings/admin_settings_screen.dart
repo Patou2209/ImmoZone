@@ -274,6 +274,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       appBar: AppBar(
         title: const Text('Paramètres', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Rafraîchir',
+            onPressed: _load,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: const Color(0xFFFFA726),

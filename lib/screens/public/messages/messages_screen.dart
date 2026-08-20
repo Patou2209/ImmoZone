@@ -40,6 +40,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(
         title: 'Messages',
+        onRefresh: _load,
         extraActions: [
           if (msgProvider.unreadCount > 0)
             Center(

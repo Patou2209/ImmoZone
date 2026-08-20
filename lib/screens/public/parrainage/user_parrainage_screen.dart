@@ -133,14 +133,8 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(
         title: 'Mes Parrainages',
+        onRefresh: _load,
         onAvatarMenu: (val) => handleImmoZoneAvatarNav(context, val),
-        extraActions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
-            tooltip: 'Actualiser',
-            onPressed: _load,
-          ),
-        ],
       ),
       body: _loading
           ? const Center(

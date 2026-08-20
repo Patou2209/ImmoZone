@@ -30,6 +30,8 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
   final _ds = DataService();
+  // Incrémenté à chaque refresh — force la reconstruction des tabs (relance leur _load)
+  int _refreshTick = 0;
 
   @override
   void initState() {
@@ -57,6 +59,11 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Rafraîchir',
+            onPressed: () => setState(() => _refreshTick++),
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
             tooltip: 'Déconnexion',
@@ -88,8 +95,8 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
       body: TabBarView(
         controller: _tabCtrl,
         children: [
-          _StatsTab(ds: _ds),
-          _ParrainsTab(ds: _ds),
+          _StatsTab(key: ValueKey('stats_$_refreshTick'), ds: _ds),
+          _ParrainsTab(key: ValueKey('parrains_$_refreshTick'), ds: _ds),
         ],
       ),
     );
@@ -102,7 +109,7 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
 
 class _StatsTab extends StatefulWidget {
   final DataService ds;
-  const _StatsTab({required this.ds});
+  const _StatsTab({super.key, required this.ds});
 
   @override
   State<_StatsTab> createState() => _StatsTabState();
@@ -395,7 +402,7 @@ class _StatsTabState extends State<_StatsTab> {
 
 class _ParrainsTab extends StatefulWidget {
   final DataService ds;
-  const _ParrainsTab({required this.ds});
+  const _ParrainsTab({super.key, required this.ds});
 
   @override
   State<_ParrainsTab> createState() => _ParrainsTabState();

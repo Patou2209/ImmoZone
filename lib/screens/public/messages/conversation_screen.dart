@@ -128,6 +128,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Rafraîchir',
+            onPressed: _load,
+          ),
+        ],
       ),
       body: Column(
         children: [

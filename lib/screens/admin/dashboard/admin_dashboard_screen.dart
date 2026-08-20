@@ -693,6 +693,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              // ── Bouton Rafraîchir ──
+                              Tooltip(
+                                message: 'Rafraîchir',
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: _load,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                                      ),
+                                      child: const Icon(Icons.refresh_rounded,
+                                          color: Colors.white, size: 16),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               // ── Bouton Accueil : retour à la page d'accueil publique ──
                               Tooltip(
                                 message: 'Accueil de l\'application',

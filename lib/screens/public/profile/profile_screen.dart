@@ -127,6 +127,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
               IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: 'Rafraîchir',
+                onPressed: _load,
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _showEditProfile(context, user),
               ),
@@ -787,6 +792,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   // confirmation avec le coût affiché → prélèvement (consumePublicationRight)
   // → renewProperty → traçage (recordPublicationCharge).
   Future<void> _confirmRenew(BuildContext ctx, PropertyModel p) async {
+    // Annonce rejetée → parcours "Réessayer" (mêmes règles, libellés adaptés)
+    final bool isRetry = p.status == 'Rejeté' || p.status == 'Rejete';
     final auth = context.read<AuthProvider>();
     final user = auth.currentUser;
     if (user == null) return;
@@ -893,9 +900,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                 color: AppTheme.primaryColor, size: 18),
           ),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text('Renouveler l\'annonce',
-                style: TextStyle(fontFamily: 'Poppins',
+          Expanded(
+            child: Text(isRetry ? 'Réessayer la publication' : 'Renouveler l\'annonce',
+                style: const TextStyle(fontFamily: 'Poppins',
                     fontWeight: FontWeight.w700, fontSize: 15)),
           ),
         ]),
@@ -914,11 +921,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                 color: AppTheme.primaryColor.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'L\'annonce sera remise en attente de validation '
-                'et redeviendra visible au public après approbation.\n\n'
-                'Durée de renouvellement : 30 jours.',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+              child: Text(
+                isRetry
+                    ? 'L\'annonce sera soumise à nouveau pour validation. '
+                      'Pensez à corriger le motif du rejet avant de réessayer.\n\n'
+                      'Durée de publication : 30 jours.'
+                    : 'L\'annonce sera remise en attente de validation '
+                      'et redeviendra visible au public après approbation.\n\n'
+                      'Durée de renouvellement : 30 jours.',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
                     color: AppTheme.textSecondary),
               ),
             ),
@@ -950,8 +961,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(dCtx, true),
             icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.white),
-            label: const Text('Renouveler',
-                style: TextStyle(fontFamily: 'Poppins',
+            label: Text(isRetry ? 'Réessayer' : 'Renouveler',
+                style: const TextStyle(fontFamily: 'Poppins',
                     fontWeight: FontWeight.w600, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primaryColor,

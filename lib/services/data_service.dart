@@ -992,6 +992,10 @@ class DataService {
     await _propertiesCol.doc(id).update({
       'status': 'En attente',
       'renewalRequestedAt': now.toIso8601String(),
+      // Renouvellement = republication → la date de l'annonce est REMISE À JOUR
+      // (affichée sur la carte et la page de détail, réouvre la fenêtre
+      // de modification 24h, remonte l'annonce dans les tris par date)
+      'createdAt': now.toIso8601String(),
       'updatedAt': now.toIso8601String(),
     });
   }

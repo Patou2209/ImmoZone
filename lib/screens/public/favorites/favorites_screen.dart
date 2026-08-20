@@ -55,7 +55,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(
-        title: 'Mes Favoris',
+        title: 'Mes favoris',
+        onRefresh: _load,
         extraActions: [
           if (_favorites.isNotEmpty)
             Center(

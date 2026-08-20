@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
@@ -24,11 +23,17 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
   final AvatarMenuCallback? onAvatarMenu;
   final List<Widget>? extraActions;
 
+  /// Rafraîchissement de la page : si fourni, un bouton ↻ apparaît dans
+  /// l'AppBar (avant l'avatar). À brancher sur le rechargement des données
+  /// de l'écran hôte. Laisser null pour masquer (ex: page d'accueil, paiements).
+  final Future<void> Function()? onRefresh;
+
   const ImmoZoneAppBar({
     super.key,
     required this.title,
     this.onAvatarMenu,
     this.extraActions,
+    this.onRefresh,
   });
 
   @override
@@ -56,6 +61,8 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           actions: [
+            if (onRefresh != null)
+              _RefreshButton(onRefresh: onRefresh!),
             if (extraActions != null) ...extraActions!,
             Padding(
               padding: const EdgeInsets.only(right: 10),
@@ -79,6 +86,45 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         Container(height: 1, color: const Color(0xFFE4E8F0)),
       ],
+    );
+  }
+}
+
+// ── Bouton Rafraîchir (spinner pendant le rechargement) ──────────────────────
+class _RefreshButton extends StatefulWidget {
+  final Future<void> Function() onRefresh;
+  const _RefreshButton({required this.onRefresh});
+
+  @override
+  State<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends State<_RefreshButton> {
+  bool _refreshing = false;
+
+  Future<void> _handleTap() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await widget.onRefresh();
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Rafraîchir',
+      onPressed: _refreshing ? null : _handleTap,
+      icon: _refreshing
+          ? const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2.2, color: AppTheme.primaryColor),
+            )
+          : const Icon(Icons.refresh_rounded,
+              color: AppTheme.primaryColor, size: 22),
     );
   }
 }
