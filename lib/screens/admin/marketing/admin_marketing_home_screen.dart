@@ -58,12 +58,12 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          tooltip: 'Rafraîchir',
+          onPressed: () => setState(() => _refreshTick++),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            tooltip: 'Rafraîchir',
-            onPressed: () => setState(() => _refreshTick++),
-          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
             tooltip: 'Déconnexion',

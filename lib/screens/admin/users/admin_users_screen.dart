@@ -96,8 +96,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
       appBar: AppBar(
         title: const Text('Gestion Utilisateurs'),
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Rafraîchir',
+          onPressed: _loadUsers,
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadUsers),
           IconButton(
             icon: const Icon(Icons.download_outlined),
             tooltip: 'Exporter CSV',

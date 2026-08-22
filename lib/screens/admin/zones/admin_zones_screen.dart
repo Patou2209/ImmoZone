@@ -262,12 +262,12 @@ class _AdminZonesScreenState extends State<AdminZonesScreen>
             Tab(icon: Icon(Icons.map_outlined, size: 16), text: 'Communes'),
           ],
         ),
+        leading: IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            tooltip: 'Rafraîchir',
-            onPressed: _load,
-          ),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(

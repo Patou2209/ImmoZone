@@ -320,6 +320,18 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        // ── Retour + Refresh, tous deux à gauche ─────────────────────────
+        automaticallyImplyLeading: false,
+        leadingWidth: 100,
+        leading: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (Navigator.of(context).canPop())
+            const BackButton(color: AppTheme.primaryColor),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
+            onPressed: _refreshAll,
+            tooltip: 'Rafraîchir',
+          ),
+        ]),
         title: MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
           onTap: () {
             // Logo → accueil : pop toute la pile puis go /public
@@ -354,11 +366,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           child: Container(height: 1, color: const Color(0xFFE9EBF0)),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppTheme.textSecondary),
-            onPressed: _refreshAll,
-            tooltip: 'Rafraîchir',
-          ),
           IconButton(
             icon: Icon(
               _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,

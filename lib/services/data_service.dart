@@ -1782,6 +1782,27 @@ class DataService {
     }
   }
 
+  /// Remboursements confirmés — utilisés pour déduire du CA dans les KPI.
+  /// Retourne une liste de maps {amount: double, createdAt: DateTime?}.
+  Future<List<Map<String, dynamic>>> getConfirmedRefunds() async {
+    try {
+      final snap = await _refundsCol.get();
+      final List<Map<String, dynamic>> out = [];
+      for (final doc in snap.docs) {
+        final r = doc.data() as Map<String, dynamic>;
+        if (r['status'] != 'confirmed') continue;
+        out.add({
+          'amount': ((r['amount'] as num?) ?? 0).toDouble(),
+          'createdAt': DateTime.tryParse(r['createdAt'] as String? ?? ''),
+        });
+      }
+      return out;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getConfirmedRefunds] $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> getAdminStats() async {
     final props = await getProperties();
     final users = await getUsers();
@@ -1826,18 +1847,30 @@ class DataService {
 
     final revenue = grossRevenue - totalRefunded;
 
+    // ── Annonces RÉELLEMENT actives : status 'Actif', non expirées,
+    //    non vendues/louées — cohérent avec ce que voit le public.
+    final trulyActive = props.where((p) =>
+        p.status == 'Actif' && !p.isExpired && !p.isSold && !p.isRented).toList();
+
     return {
       'totalProperties': props.length,
-      'activeProperties': props.where((p) => p.status == 'Actif').length,
+      'activeProperties': trulyActive.length,
       'pendingProperties': props.where((p) => p.status == 'En attente').length,
       'soldProperties': props.where((p) => p.isSold || p.isRented).length,
       'suspendedProperties': props.where((p) => p.status == 'Suspendu').length,
+      'expiredProperties': props.where((p) =>
+          p.status == 'Expire' || p.status == 'Expiré' ||
+          (p.status == 'Actif' && p.isExpired)).length,
+      'rejectedProperties': props.where((p) =>
+          p.status == 'Rejeté' || p.status == 'Rejete').length,
       'totalUsers': users.where((u) => u.role != 'admin').length,
       'annonceurs': users.where((u) => u.role == 'annonceur').length,
       'demandeurs': users.where((u) => u.role == 'demandeur').length,
       'totalMessages': msgs.length,
-      'vente': props.where((p) => p.transactionType == 'Vente').length,
-      'location': props.where((p) => p.transactionType == 'Location').length,
+      // Vente/Location : comptées UNIQUEMENT sur les annonces actives
+      // (cohérence avec la carte 'Annonces actives' : vente + location = actives)
+      'vente': trulyActive.where((p) => p.transactionType == 'Vente').length,
+      'location': trulyActive.where((p) => p.transactionType == 'Location').length,
       'totalRevenue': revenue,
       'grossRevenue': grossRevenue,
       'totalRefunded': totalRefunded,

@@ -25,6 +25,12 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
     _property = widget.property;
   }
 
+  // ── Rafraîchir l'annonce depuis Firestore ───────────────────────────
+  Future<void> _refresh() async {
+    final fresh = await _ds.getPropertyById(_property.id);
+    if (fresh != null && mounted) setState(() => _property = fresh);
+  }
+
   // ── Couleur selon statut ──────────────────────────────────────────────────
   Color _statusColor(String status) {
     switch (status) {
@@ -78,6 +84,18 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
+        // Retour + refresh à gauche
+        automaticallyImplyLeading: false,
+        leadingWidth: 100,
+        leading: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (Navigator.of(context).canPop())
+            const BackButton(color: Colors.white),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            tooltip: 'Rafraîchir',
+            onPressed: _refresh,
+          ),
+        ]),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

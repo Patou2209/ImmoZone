@@ -4,12 +4,18 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
 
-class AdminCategoriesScreen extends StatelessWidget {
+class AdminCategoriesScreen extends StatefulWidget {
   const AdminCategoriesScreen({super.key});
 
   @override
+  State<AdminCategoriesScreen> createState() => _AdminCategoriesScreenState();
+}
+
+class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
+  final DataService ds = DataService();
+
+  @override
   Widget build(BuildContext context) {
-    final ds = DataService();
     final settings = ds.systemSettings;
     final adminName  = settings['admin_name']  as String? ?? 'Administrateur';
     final adminEmail = settings['admin_email'] as String? ?? '';
@@ -20,6 +26,14 @@ class AdminCategoriesScreen extends StatelessWidget {
         title: const Text('Catégories & Infos',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          tooltip: 'Rafraîchir',
+          onPressed: () async {
+            await ds.getSettingsMap();
+            if (context.mounted) setState(() {});
+          },
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

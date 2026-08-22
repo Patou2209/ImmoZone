@@ -46,7 +46,11 @@ class _AdminLogsScreenState extends State<AdminLogsScreen> {
       appBar: AppBar(
         title: const Text('Journal d\'Audit'),
         automaticallyImplyLeading: false,
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
+        leading: IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
       ),
       body: Column(
         children: [

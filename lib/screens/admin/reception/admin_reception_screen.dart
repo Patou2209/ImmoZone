@@ -114,13 +114,11 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
             ),
         ]),
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _load,
-            tooltip: 'Actualiser',
-          ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
         bottom: TabBar(
           controller: _tabCtrl,
           indicatorColor: const Color(0xFFFFA726),

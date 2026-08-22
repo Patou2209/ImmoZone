@@ -41,7 +41,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen>
       appBar: AppBar(
         title: const Text('Signalements'),
         automaticallyImplyLeading: false,
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)],
+        leading: IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: Colors.white,

@@ -41,6 +41,12 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.of(context).canPop();
+    // ── Leading : bouton retour + bouton refresh, tous deux à GAUCHE ──────
+    final List<Widget> leadingChildren = [
+      if (canPop) const BackButton(color: AppTheme.primaryColor),
+      if (onRefresh != null) _RefreshButton(onRefresh: onRefresh!),
+    ];
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -51,6 +57,11 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
           elevation: 0,
           centerTitle: true,
           iconTheme: const IconThemeData(color: AppTheme.primaryColor),
+          automaticallyImplyLeading: false,
+          leadingWidth: leadingChildren.length * 48.0 + 4,
+          leading: leadingChildren.isEmpty
+              ? null
+              : Row(mainAxisSize: MainAxisSize.min, children: leadingChildren),
           title: Text(
             title,
             style: const TextStyle(
@@ -61,8 +72,6 @@ class ImmoZoneAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           actions: [
-            if (onRefresh != null)
-              _RefreshButton(onRefresh: onRefresh!),
             if (extraActions != null) ...extraActions!,
             Padding(
               padding: const EdgeInsets.only(right: 10),

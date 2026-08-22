@@ -81,6 +81,18 @@ class _ProfileScreenState extends State<ProfileScreen>
             pinned: true,
             backgroundColor: AppTheme.primaryColor,
             foregroundColor: Colors.white,
+            // ── Retour + Refresh à gauche ───────────────────────────────
+            automaticallyImplyLeading: false,
+            leadingWidth: 100,
+            leading: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (Navigator.of(context).canPop())
+                const BackButton(color: Colors.white),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                tooltip: 'Rafraîchir',
+                onPressed: _load,
+              ),
+            ]),
             title: const Text('Mon Profil',
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
             actions: [
@@ -126,11 +138,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                   ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                tooltip: 'Rafraîchir',
-                onPressed: _load,
-              ),
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () => _showEditProfile(context, user),

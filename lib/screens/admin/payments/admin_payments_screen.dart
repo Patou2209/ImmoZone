@@ -120,17 +120,21 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
         title: const Text('Gestion des Paiements',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                 color: Colors.white)),
-        // Flèche retour visible (blanche sur fond bleu)
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          tooltip: 'Retour',
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        actions: [
+        // Flèche retour + refresh, tous deux à gauche
+        automaticallyImplyLeading: false,
+        leadingWidth: 100,
+        leading: Row(mainAxisSize: MainAxisSize.min, children: [
           IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _load),
-        ],
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            tooltip: 'Retour',
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Rafraîchir',
+            onPressed: _load,
+          ),
+        ]),
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: Colors.white,

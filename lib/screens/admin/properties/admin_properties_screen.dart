@@ -78,12 +78,11 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
       appBar: AppBar(
         title: const Text('Gestion des Annonces'),
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Rafraîchir',
+          onPressed: _loadData,
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(100),
           child: Column(

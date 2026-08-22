@@ -31,6 +31,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _refundingDirect = false; // remboursement Orange Money direct en cours
   // ── KPI Performance du Marché & Monétisation ──────────────────────
   List<PaymentModel> _confirmedPayments = [];
+  // Remboursements confirmés {amount, createdAt} — déduits de la Recette KPI
+  List<Map<String, dynamic>> _confirmedRefunds = [];
   String _kpiPeriod = 'mois'; // jour | semaine | mois | annee
   // ── KPI 2 Attraction & Engagement ────────────────────────────────────
   List<UserModel> _allUsers = [];
@@ -47,26 +49,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _load() async {
     setState(() => _isLoading = true);
     final provider = context.read<PropertyProvider>();
-    final stats = await provider.getStats();
-    final pending = await provider.getPendingProperties();
-    final pendingPays = await _ds.getPendingManualPayments();
-    // Charger les paiements confirmés pour KPI
-    final allPayments = await _ds.getPayments();
-    // Charger users + properties pour KPI 2
-    final allUsers = await _ds.getUsers();
-    final allProperties = await _ds.getProperties();
-    // Charger logs de contact pour KPI 3
-    final contactLogs = await _ds.getContactLogs();
+    // ── Chargement PARALLÈLE de toutes les données (au lieu de séquentiel)
+    //    → temps de chargement = la requête la plus lente, pas la somme.
+    final results = await Future.wait([
+      provider.getStats(),               // 0
+      provider.getPendingProperties(),   // 1
+      _ds.getPendingManualPayments(),    // 2
+      _ds.getPayments(),                 // 3 — paiements confirmés pour KPI
+      _ds.getUsers(),                    // 4 — users pour KPI 2
+      _ds.getProperties(),               // 5 — properties pour KPI 2
+      _ds.getContactLogs(),              // 6 — logs de contact pour KPI 3
+      _ds.getConfirmedRefunds(),         // 7 — remboursements pour Recette KPI
+    ]);
+    if (!mounted) return;
+    final allPayments = results[3] as List<PaymentModel>;
     setState(() {
-      _stats = stats;
-      _pendingProps = pending;
-      _pendingPayments = pendingPays;
-        _confirmedPayments = allPayments.where((p) => p.isConfirmed).toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _allUsers = allUsers;
-        _allProperties = allProperties;
-        _contactLogs = contactLogs;
-        _isFreeTrial = _ds.isFreeTrial;
+      _stats = results[0] as Map<String, dynamic>;
+      _pendingProps = results[1] as List<PropertyModel>;
+      _pendingPayments = results[2] as List<PaymentModel>;
+      _confirmedPayments = allPayments.where((p) => p.isConfirmed).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _allUsers = results[4] as List<UserModel>;
+      _allProperties = results[5] as List<PropertyModel>;
+      _contactLogs = results[6] as List<Map<String, dynamic>>;
+      _confirmedRefunds = results[7] as List<Map<String, dynamic>>;
+      _isFreeTrial = _ds.isFreeTrial;
       _isLoading = false;
     });
   }
@@ -1603,7 +1610,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return _confirmedPayments.where((p) => p.createdAt.isAfter(from)).toList();
   }
 
-  double get _kpiTotalRevenue => _kpiFiltered.fold(0.0, (s, p) => s + p.amount);
+  /// Remboursements confirmés sur la même période que _kpiFiltered
+  double get _kpiRefunded {
+    final now = DateTime.now();
+    DateTime from;
+    switch (_kpiPeriod) {
+      case 'jour': from = DateTime(now.year, now.month, now.day); break;
+      case 'semaine': from = now.subtract(const Duration(days: 7)); break;
+      case 'annee': from = DateTime(now.year, 1, 1); break;
+      default: from = DateTime(now.year, now.month, 1); // mois
+    }
+    final resetDateStr = _stats['revenueResetDate'] as String?;
+    final resetDate = resetDateStr != null ? DateTime.tryParse(resetDateStr) : null;
+    if (resetDate != null && resetDate.isAfter(from)) from = resetDate;
+    return _confirmedRefunds
+        .where((r) => r['createdAt'] != null &&
+            (r['createdAt'] as DateTime).isAfter(from))
+        .fold(0.0, (s, r) => s + (r['amount'] as double));
+  }
+
+  /// Recette NETTE de la période = paiements confirmés − remboursements
+  /// (cohérent avec la carte 'Revenus' des Statistiques Générales)
+  double get _kpiTotalRevenue =>
+      _kpiFiltered.fold(0.0, (s, p) => s + p.amount) - _kpiRefunded;
 
   double get _kpiRechargeRevenue => _kpiFiltered
       .where((p) => p.productType.contains('souscription') ||
@@ -1737,7 +1766,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             value: '\$${_kpiTotalRevenue.toStringAsFixed(2)}',
             icon: Icons.monetization_on_outlined,
             color: const Color(0xFF1A237E),
-            sub: '${_kpiFiltered.length} transactions',
+            sub: _kpiRefunded > 0
+                ? '${_kpiFiltered.length} transactions · -\$${_kpiRefunded.toStringAsFixed(0)} remb.'
+                : '${_kpiFiltered.length} transactions',
           )),
           const SizedBox(width: 10),
           Expanded(child: _kpiCard(

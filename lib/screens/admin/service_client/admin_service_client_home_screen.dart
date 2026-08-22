@@ -194,12 +194,12 @@ class _AdminServiceClientHomeScreenState
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _load,
-            tooltip: 'Actualiser',
-          ),
           IconButton(
             icon: const Icon(Icons.download_outlined, color: Colors.white),
             tooltip: 'Exporter CSV',

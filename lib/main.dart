@@ -316,9 +316,11 @@ class _SplashScreenState extends State<SplashScreen> {
               textAlign: TextAlign.center,
               maxLines: 2,
               text: TextSpan(
+                // Texte bleu — mots-clés '1ère' et 'immobilier' en orange
+                // (identique à la version web)
                 style: const TextStyle(
                   fontSize: 12,
-                  color: AppTheme.textHint,
+                  color: AppTheme.primaryColor,
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
                   height: 1.45,
@@ -330,8 +332,13 @@ class _SplashScreenState extends State<SplashScreen> {
                     text: '1ère',
                     style: TextStyle(color: AppTheme.orangeColor),
                   ),
+                  const TextSpan(text: ' plateforme de l\''),
+                  TextSpan(
+                    text: 'immobilier',
+                    style: TextStyle(color: AppTheme.orangeColor),
+                  ),
                   const TextSpan(
-                    text: ' plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
+                    text: ' en RD Congo et au Congo Brazzaville',
                   ),
                 ],
               ),

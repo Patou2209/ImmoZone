@@ -45,9 +45,11 @@ class _AdminAdsScreenState extends State<AdminAdsScreen> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-        ],
+        leading: IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Rafraîchir',
+          onPressed: _load,
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openAdForm(context),
