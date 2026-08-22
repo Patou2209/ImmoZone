@@ -115,7 +115,8 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
         ]),
         automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          // Icône bleue : l'AppBar a un fond blanc, une icône blanche serait invisible
+          icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
           tooltip: 'Rafraîchir',
           onPressed: _load,
         ),

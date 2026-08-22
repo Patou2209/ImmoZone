@@ -2699,11 +2699,14 @@ class _HomeTabState extends State<_HomeTab>
           ]),
         ),
         Container(
+          // Badge uniforme : même fond et même bordure pour TOUTES les lignes
+          // (la bordure basée sur la couleur de ligne était invisible pour
+          //  les couleurs sombres — ex. Maisons/Appartements en vente, Terrains)
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: total ? 0.25 : 0.15),
+            color: Colors.white.withValues(alpha: total ? 0.22 : 0.14),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withValues(alpha: 0.5)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.65)),
           ),
           child: Text('$count',
               style: TextStyle(fontFamily: 'Poppins',
@@ -3227,6 +3230,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
     // ── Liste affichée selon le filtre actif (carte stat cliquée) ──────────
     final List<PropertyModel> displayed = switch (_statFilter) {
+      'all'      => _myProperties,
       'actives'  => actives,
       'pending'  => pending,
       'closed'   => closed,
@@ -3235,6 +3239,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       _          => _myProperties,
     };
     final String filterLabel = switch (_statFilter) {
+      'all'      => 'Toutes les annonces',
       'actives'  => 'Actives',
       'pending'  => 'En attente',
       'closed'   => 'Fermées',
@@ -3348,6 +3353,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                   // Statistiques rapides — CLIQUABLES (filtrent la liste)
                   Row(children: [
+                    _statCard('Toutes les annonces', _myProperties.length,
+                        Icons.apps_rounded,
+                        AppTheme.primaryColor, filterKey: 'all'),
+                    const SizedBox(width: 8),
                     _statCard('Actives', actives.length, Icons.check_circle_outline_rounded,
                         AppTheme.successColor, filterKey: 'actives'),
                     const SizedBox(width: 8),

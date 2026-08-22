@@ -670,37 +670,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('Tableau de Bord',
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
-                                      color: Colors.white, fontFamily: 'Poppins')),
-                              Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
-                                  style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
-                            ]),
-                            // Badge Admin + boutons Accueil / Déconnexion
                             Row(mainAxisSize: MainAxisSize.min, children: [
-                              // Badge rôle admin — orange pour contraste sur fond bleu
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFA726).withValues(alpha: 0.20),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.7)),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.admin_panel_settings_rounded,
-                                        color: Color(0xFFFFA726), size: 15),
-                                    SizedBox(width: 5),
-                                    Text('Admin', style: TextStyle(
-                                        fontFamily: 'Poppins', fontSize: 11,
-                                        color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // ── Bouton Rafraîchir ──
+                              // ── Bouton Rafraîchir (à gauche, comme sur les autres pages) ──
                               Tooltip(
                                 message: 'Rafraîchir',
                                 child: MouseRegion(
@@ -720,36 +691,35 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // ── Bouton Accueil : retour à la page d'accueil publique ──
-                              Tooltip(
-                                message: 'Accueil de l\'application',
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.home_rounded, color: Colors.white, size: 15),
-                                          SizedBox(width: 5),
-                                          Text('Accueil', style: TextStyle(
-                                              fontFamily: 'Poppins', fontSize: 11,
-                                              color: Colors.white, fontWeight: FontWeight.w600)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                              const SizedBox(width: 12),
+                              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                const Text('Tableau de Bord',
+                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
+                                        color: Colors.white, fontFamily: 'Poppins')),
+                                Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
+                                    style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
+                              ]),
+                            ]),
+                            // Badge Admin + bouton Déconnexion
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              // Badge rôle admin — orange pour contraste sur fond bleu
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFA726).withValues(alpha: 0.20),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFFFA726).withValues(alpha: 0.7)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.admin_panel_settings_rounded,
+                                        color: Color(0xFFFFA726), size: 15),
+                                    SizedBox(width: 5),
+                                    Text('Admin', style: TextStyle(
+                                        fontFamily: 'Poppins', fontSize: 11,
+                                        color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 8),

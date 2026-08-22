@@ -344,6 +344,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _nameCtrl,
                   textCapitalization: TextCapitalization.words,
+                  // Enter → champ suivant
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   decoration: InputDecoration(
                     labelText: 'Nom complet',
                     hintText: 'Votre nom et prénom',
@@ -423,6 +426,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
+                  // Enter → champ suivant (confirmation)
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                   decoration: InputDecoration(
                     labelText: 'Mot de passe',
                     prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.accentColor),
@@ -465,6 +471,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: _obscureConfirm,
+                  // Enter → soumet le formulaire (même effet que « Créer mon compte »)
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!_isSending) _sendOtpAndRegister();
+                  },
                   decoration: InputDecoration(
                     labelText: 'Confirmer le mot de passe',
                     prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.accentColor),
@@ -806,6 +817,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: TextFormField(
               controller: _phoneNumberCtrl,
               keyboardType: TextInputType.phone,
+              // Enter → champ suivant
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
               style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
               decoration: const InputDecoration(
                 hintText: 'Numéro (ex : 812345678)',

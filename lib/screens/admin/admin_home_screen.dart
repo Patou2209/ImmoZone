@@ -13,6 +13,7 @@ import 'ads/admin_ads_screen.dart';
 import 'financier/admin_financier_home_screen.dart';
 import 'service_client/admin_service_client_home_screen.dart';
 import 'marketing/admin_marketing_home_screen.dart';
+import '../public/home/public_home_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -92,6 +93,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (i) {
+          // Dernier onglet = Accueil : ouvre la page d'accueil publique
+          // sans changer l'onglet admin courant.
+          if (i == 6) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+            );
+            return;
+          }
           setState(() => _currentIndex = i);
           if (i == 1) _loadPendingCount();
         },
@@ -131,6 +141,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             icon: Icon(Icons.settings_outlined),
             activeIcon: Icon(Icons.settings),
             label: 'Paramètres',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home_rounded),
+            label: 'Accueil',
           ),
         ],
       ),

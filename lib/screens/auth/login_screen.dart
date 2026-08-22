@@ -930,6 +930,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _phoneCtrl,
                           keyboardType:
                               TextInputType.phone,
+                          // Enter → passe au champ mot de passe
+                          textInputAction:
+                              TextInputAction.next,
+                          onFieldSubmitted: (_) =>
+                              FocusScope.of(context)
+                                  .nextFocus(),
                           style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 13),
@@ -965,6 +971,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _passwordCtrl,
                     obscureText: _obscure,
+                    // Enter → soumet le formulaire (même effet que « Se connecter »)
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!context.read<AuthProvider>().isLoading) _login();
+                    },
                     decoration: InputDecoration(
                       labelText: 'Mot de passe',
                       prefixIcon: const Icon(

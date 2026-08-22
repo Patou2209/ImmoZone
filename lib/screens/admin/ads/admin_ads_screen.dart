@@ -42,11 +42,10 @@ class _AdminAdsScreenState extends State<AdminAdsScreen> {
       appBar: AppBar(
         title: const Text('Publicités',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         leading: IconButton(
-          icon: const Icon(Icons.refresh),
+          // Icône bleue : fond d'AppBar blanc (thème par défaut), icône visible
+          icon: const Icon(Icons.refresh_rounded, color: AppTheme.primaryColor),
           tooltip: 'Rafraîchir',
           onPressed: _load,
         ),
