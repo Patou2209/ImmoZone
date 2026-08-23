@@ -716,9 +716,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     Icon(Icons.admin_panel_settings_rounded,
                                         color: Color(0xFFFFA726), size: 15),
                                     SizedBox(width: 5),
-                                    Text('Admin', style: TextStyle(
-                                        fontFamily: 'Poppins', fontSize: 11,
-                                        color: Color(0xFFFFA726), fontWeight: FontWeight.w600)),
+                                    
                                   ],
                                 ),
                               ),
@@ -742,9 +740,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                         children: [
                                           Icon(Icons.logout_rounded, color: Color(0xFFFF8A80), size: 15),
                                           SizedBox(width: 5),
-                                          Text('Quitter', style: TextStyle(
-                                              fontFamily: 'Poppins', fontSize: 11,
-                                              color: Color(0xFFFF8A80), fontWeight: FontWeight.w600)),
+                                          
                                         ],
                                       ),
                                     ),

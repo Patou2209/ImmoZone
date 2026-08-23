@@ -171,7 +171,7 @@ POST {{om_base}}/{{country}}/withdraw
 {
   "peerId": "7704100021",
   "peerIdType": "msisdn",
-  "amount": 13,
+  "amount": 19,
   "currency": "OUV",
   "transactionId": "pay-test-1787088337459"
 }
