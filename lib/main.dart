@@ -45,7 +45,7 @@ void main() async {
   } else {
     try {
       await FirebaseAuth.instance.setSettings(
-        forceRecaptchaFlow: false,
+        forceRecaptchaFlow: true,
         appVerificationDisabledForTesting: false,
       );
     } catch (_) {}
