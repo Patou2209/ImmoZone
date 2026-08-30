@@ -30,8 +30,12 @@ void main() async {
   );
 
   if (!kIsWeb) {
+    // ── App Check : Play Integrity (production Play Store) ──────────────────
+    // L'app doit être installée depuis le Play Store pour obtenir un verdict
+    // Play Integrity valide. Pour un APK sideloadé (dev), utiliser
+    // AndroidProvider.debug + debug token dans le manifest.
     await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.debug,
+      androidProvider: AndroidProvider.playIntegrity,
     );
   }
 
