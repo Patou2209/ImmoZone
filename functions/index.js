@@ -28,7 +28,7 @@ const ORANGE_CONFIG = {
   // ── Bascule sandbox/production ─────────────────────────────────────────────
   // sandboxMode=true  → pays 'sx', devise 'OUV', montants ENTIERS uniquement
   // sandboxMode=false → pays 'cd' (RDC), devise 'USD'
-  sandboxMode: true,                    // ← passer à false au go-live production
+  sandboxMode: false,                   // ✅ PRODUCTION (go-live 02/09/2026) — app "Immozone production", pays 'cd', devise 'USD'
 
   sandbox: {
     country: 'sx',
