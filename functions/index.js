@@ -77,6 +77,17 @@ function omEnv() {
 function omOauthCredentials() {
   return (process.env.ORANGE_OAUTH_BASIC || '').trim();
 }
+// Normalisation msisdn — ⚠️ VÉRIFIÉ EN PROD (03/09/2026): Orange Money RDC (cd)
+// n'accepte QUE le format LOCAL (0840931102). Le format international 243840931102
+// retourne "The customer account is unknown" (code 24).
+// → on retire espaces/tirets/+, puis on convertit 243XXXXXXXXX → 0XXXXXXXXX.
+function omNormalizeMsisdn(phoneNumber) {
+  let m = String(phoneNumber || '').replace(/[\s\-]/g, '').replace(/^\+/, '');
+  if (!ORANGE_CONFIG.sandboxMode && m.startsWith('243') && m.length === 12) {
+    m = '0' + m.slice(3);
+  }
+  return m;
+}
 // Chemin d'encaissement — piloté par ORANGE_CONFIG.collectionService (withdraw/debit)
 function omCollectPath() { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/${ORANGE_CONFIG.collectionService}`; }
 function omCreditPath()  { return `${ORANGE_CONFIG.basePath}/${omEnv().country}/credit`; }
@@ -270,8 +281,8 @@ exports.initiateOrangePayment = onRequest(
       const env = omEnv();
       console.log(`[initiateOrangePayment] paymentId=${paymentId} msisdn=${phoneNumber} amount=${amount} env=${env.country}`);
 
-      // 1. Normaliser le numéro (format msisdn: chiffres uniquement, sans +)
-      const msisdn = String(phoneNumber).replace(/[\s\-]/g, '').replace(/^\+/, '');
+      // 1. Normaliser le numéro (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
+      const msisdn = omNormalizeMsisdn(phoneNumber);
 
       // 2. Montant: le sandbox n'accepte QUE des entiers (doc section 8)
       let txAmount = parseFloat(amount);
@@ -732,8 +743,8 @@ exports.refundOrangePayment = onRequest(
       const env = omEnv();
 
       // 2. Destinataire: le msisdn confirmé par Orange, sinon le numéro saisi
-      const msisdn = String(payment.omPeerId || payment.phoneNumber || '')
-        .replace(/[\s\-]/g, '').replace(/^\+/, '');
+      //    (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
+      const msisdn = omNormalizeMsisdn(payment.omPeerId || payment.phoneNumber || '');
       if (!msisdn) {
         res.status(400).json({ error: 'Numéro Orange Money du client introuvable sur ce paiement' });
         return;
@@ -884,8 +895,8 @@ exports.directOrangeCredit = onRequest(
 
       const env = omEnv();
 
-      // 1. Normaliser le numéro (msisdn: chiffres uniquement, sans +)
-      const msisdn = String(phoneNumber).replace(/[\s\-]/g, '').replace(/^\+/, '');
+      // 1. Normaliser le numéro (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
+      const msisdn = omNormalizeMsisdn(phoneNumber);
       if (!/^\d{7,15}$/.test(msisdn)) {
         res.status(400).json({ error: 'Numéro Orange Money invalide' });
         return;
