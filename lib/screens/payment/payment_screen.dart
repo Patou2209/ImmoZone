@@ -26,6 +26,13 @@ const bool _kDisablePinTimeout = true;
 const _kUssdTimeoutSeconds = 320;
 // ── Polling toutes les 10 secondes ────────────────────────────────────────────
 const _kPollingIntervalSeconds = 10;
+// ── Succès provisoire ──────────────────────────────────────────────────────
+// ⚠️ Constat production RDC (10/09/2026) : Orange peut mettre ~20 min à exposer
+// le statut SUCCESS (Status API + callback), alors que le client est débité et
+// reçoit son SMS en quelques secondes. Après 60 s de polling sans statut final,
+// on affiche un écran « Succès provisoire » : le client peut quitter, la
+// créditation reste automatique (webhook + checkOrangePaymentStatus, idempotents).
+const _kProvisionalSuccessSeconds = 60;
 
 class PaymentScreen extends StatefulWidget {
   final String productType;
@@ -59,6 +66,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   // ── État Orange Money spécifique ───────────────────────────────────────────
   bool _orangeWaitingUssd = false;  // spinner USSD en cours
+  bool _provisionalSuccess = false; // écran « Succès provisoire » après 60 s
   int _pollingSecondsElapsed = 0;
   Timer? _pollingTimer;
   String? _currentPaymentId;
@@ -176,7 +184,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Future<void> _checkStatus() async {
     if (!mounted || _currentPaymentId == null) return;
 
-    setState(() => _pollingSecondsElapsed += _kPollingIntervalSeconds);
+    setState(() {
+      _pollingSecondsElapsed += _kPollingIntervalSeconds;
+      // Après 60 s sans statut final → basculer sur l'écran « Succès provisoire ».
+      // Le polling CONTINUE en arrière-plan : si SUCCESS arrive pendant que
+      // l'écran est affiché, on navigue vers le succès définitif.
+      if (!_provisionalSuccess &&
+          _pollingSecondsElapsed >= _kProvisionalSuccessSeconds) {
+        _provisionalSuccess = true;
+      }
+    });
 
     // Timeout d'expiration — DÉSACTIVÉ en période de test (_kDisablePinTimeout).
     // La transaction reste PENDING chez Orange ; on continue le polling indéfiniment.
@@ -225,8 +242,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _pollingTimer?.cancel();
     setState(() {
       _orangeWaitingUssd = false;
+      _provisionalSuccess = false;
       _currentPaymentId = null;
     });
+  }
+
+  // Quitter l'écran « Succès provisoire » : la créditation restera automatique
+  // (webhook Orange + checkOrangePaymentStatus côté serveur, idempotents).
+  void _exitToHome() {
+    _pollingTimer?.cancel();
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -396,7 +422,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
       body: SafeArea(
         top: false,
         child: _orangeWaitingUssd
-            ? _buildUssdWaitingScreen()
+            ? (_provisionalSuccess
+                ? _buildProvisionalSuccessScreen()
+                : _buildUssdWaitingScreen())
             // Scrollbar toujours visible pour défiler jusqu'en bas
             : Scrollbar(
                 controller: _scrollCtrl,
@@ -561,6 +589,154 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     fontFamily: 'Poppins',
                     fontSize: 13,
                     color: AppTheme.textSecondary)),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ÉCRAN « SUCCÈS PROVISOIRE » — affiché après 60 s de polling sans statut final.
+  // Orange production RDC peut mettre ~20 min à exposer SUCCESS alors que le
+  // client est déjà débité. Le polling continue en arrière-plan ; la créditation
+  // est garantie côté serveur même si le client quitte cet écran.
+  // ─────────────────────────────────────────────────────────────────────────────
+  Widget _buildProvisionalSuccessScreen() {
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Spacer(flex: 1),
+
+          // ── Icône succès provisoire ─────────────────────────────────────────
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_rounded,
+                size: 56, color: Color(0xFF16A34A)),
+          ),
+          const SizedBox(height: 24),
+
+          const Text(
+            'Succès Provisoire',
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+
+          // ── Message principal ────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
+            ),
+            child: const Text(
+              'Si vous avez confirmé votre PIN et reçu le SMS d\'Orange, '
+              'votre paiement est en cours de finalisation.\n\n'
+              'Vos crédits seront ajoutés automatiquement dès validation. '
+              'Vous pouvez quitter cet écran.',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 14,
+                height: 1.55,
+                color: AppTheme.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Rappel du montant ────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE4E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Montant du paiement',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: AppTheme.textSecondary)),
+                Text(
+                  '${widget.amount.toStringAsFixed(2)} USD',
+                  style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFFF7900),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Indicateur discret: vérification toujours en cours ──────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Vérification automatique en cours…',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppTheme.textSecondary.withValues(alpha: 0.9),
+                ),
+              ),
+            ],
+          ),
+
+          const Spacer(flex: 2),
+
+          // ── Bouton retour accueil ───────────────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: _exitToHome,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.home_rounded, size: 20),
+              label: const Text(
+                'Retour à l\'accueil',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
         ],
