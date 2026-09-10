@@ -83,8 +83,13 @@ function omOauthCredentials() {
 // → on retire espaces/tirets/+, puis on convertit 243XXXXXXXXX → 0XXXXXXXXX.
 function omNormalizeMsisdn(phoneNumber) {
   let m = String(phoneNumber || '').replace(/[\s\-]/g, '').replace(/^\+/, '');
-  if (!ORANGE_CONFIG.sandboxMode && m.startsWith('243') && m.length === 12) {
-    m = '0' + m.slice(3);
+  if (!ORANGE_CONFIG.sandboxMode) {
+    if (m.startsWith('243') && m.length === 12) {
+      m = '0' + m.slice(3);          // 243840931102 → 0840931102
+    } else if (m.length === 9 && !m.startsWith('0')) {
+      m = '0' + m;                   // 840931102 → 0840931102 (le Flutter retire le 0 national)
+    }
+    // m.length === 10 && startsWith('0') → déjà au bon format
   }
   return m;
 }
