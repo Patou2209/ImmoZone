@@ -29,10 +29,10 @@ const _kPollingIntervalSeconds = 10;
 // ── Succès provisoire ──────────────────────────────────────────────────────
 // ⚠️ Constat production RDC (10/09/2026) : Orange peut mettre ~20 min à exposer
 // le statut SUCCESS (Status API + callback), alors que le client est débité et
-// reçoit son SMS en quelques secondes. Après 60 s de polling sans statut final,
+// reçoit son SMS en quelques secondes. Après 15 s de polling sans statut final,
 // on affiche un écran « Succès provisoire » : le client peut quitter, la
 // créditation reste automatique (webhook + checkOrangePaymentStatus, idempotents).
-const _kProvisionalSuccessSeconds = 60;
+const _kProvisionalSuccessSeconds = 15;
 
 class PaymentScreen extends StatefulWidget {
   final String productType;
