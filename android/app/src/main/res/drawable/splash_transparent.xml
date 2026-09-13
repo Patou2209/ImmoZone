@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône 100% transparente pour le splash Android 12+ : supprime le petit
+     logo rond du splash natif → écran blanc pur, fondu parfait avec le
+     SplashScreen Flutter (grand logo + slogan). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

@@ -57,10 +57,20 @@ class DataService {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    // Refresh settings and packs from Firestore at startup
-    await _refreshSettingsCache();
-    await _refreshPacksCache();
-    await _refreshRechargeTiersCache();
+    // ── Caches Firestore rafraîchis en ARRIÈRE-PLAN (non bloquant) ──────────
+    // Avant : 3 awaits Firestore bloquaient main() AVANT runApp() → le splash
+    // natif Android (petit logo sans texte) restait affiché 5 s et plus.
+    // Maintenant : l'UI démarre immédiatement (splash Flutter avec logo+slogan),
+    // les caches se remplissent pendant son affichage. Les getters concernés
+    // ont tous des valeurs par défaut tant que le cache n'est pas prêt.
+    Future.wait([
+      _refreshSettingsCache(),
+      _refreshPacksCache(),
+      _refreshRechargeTiersCache(),
+    ]).catchError((e) {
+      // Non fatal: les caches se rafraîchiront au prochain accès réseau
+      return <void>[];
+    });
   }
 
   // ─── SESSION LOCALE (SharedPreferences) ─────────────────────────────────────

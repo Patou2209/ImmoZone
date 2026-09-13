@@ -229,14 +229,19 @@ class _SplashScreenState extends State<SplashScreen> {
       // Lancer le chargement des propriétés (non bloquant pour la navigation)
       propProvider.loadAllProperties().ignore();
     } else {
-      // ── MOBILE : on affiche notre propre splash Flutter.
-      // Timer 4 s minimum, auth en parallèle.
-      await Future.any([
-        Future.wait([
-          auth.checkAuth(),
-          propProvider.loadAllProperties(),
+      // ── MOBILE : on affiche notre propre splash Flutter (logo + slogan).
+      // Durée GARANTIE de 5 s pour laisser le temps de lire le slogan
+      // (Future.wait = on attend le timer ET le travail), avec plafond 10 s
+      // si le réseau est lent (Future.any = on n'attend pas indéfiniment).
+      await Future.wait([
+        Future.delayed(const Duration(seconds: 5)), // minimum incompressible
+        Future.any([
+          Future.wait([
+            auth.checkAuth(),
+            propProvider.loadAllProperties(),
+          ]),
+          Future.delayed(const Duration(seconds: 10)), // plafond réseau lent
         ]),
-        Future.delayed(const Duration(seconds: 4)),
       ]);
     }
 
