@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
+import 'auth_ui.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OtpRegisterScreen — Vérification OTP PUIS création du compte
@@ -235,7 +236,7 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -280,20 +281,16 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
                         key: const ValueKey('sms'),
                         width: 80, height: 80,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [AppTheme.primaryColor, AppTheme.accentColor],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          gradient: kAuthGradient,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [
                             BoxShadow(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.35),
+                                color: AppTheme.primaryColor.withValues(alpha: 0.32),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8))
                           ],
                         ),
-                        child: const Icon(Icons.sms_rounded,
+                        child: const Icon(Icons.chat_rounded,
                             color: Colors.white, size: 40),
                       ),
               ),
@@ -323,22 +320,8 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
                       color: AppTheme.textSecondary)),
               const SizedBox(height: 28),
 
-              // ── Carte OTP ────────────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: AppTheme.accentColor.withValues(alpha: 0.15)),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.07),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4))
-                  ],
-                ),
-                child: Column(children: [
+              // ── Zone OTP (sans carte bordée) ─────────────────────────────
+              Column(children: [
                   const Text('Saisissez le code à 6 chiffres',
                       style: TextStyle(
                           fontFamily: 'Poppins',
@@ -354,40 +337,13 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
 
                   const SizedBox(height: 28),
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: (_isOtpComplete && !_isVerifying)
-                          ? _verifyAndRegister
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.successColor,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor:
-                            AppTheme.successColor.withValues(alpha: 0.4),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: _isVerifying
-                          ? const SizedBox(
-                              width: 22, height: 22,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5))
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.person_add_rounded, size: 18),
-                                SizedBox(width: 8),
-                                Text('Créer mon compte',
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700)),
-                              ],
-                            ),
-                    ),
+                  AuthPillButton(
+                    label: 'Créer mon compte',
+                    isLoading: _isVerifying,
+                    onPressed: (_isOtpComplete && !_isVerifying)
+                        ? _verifyAndRegister
+                        : null,
+                    trailingIcon: Icons.person_add_rounded,
                   ),
 
                   const SizedBox(height: 20),
@@ -410,18 +366,18 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
                             ? const SizedBox(
                                 width: 14, height: 14,
                                 child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text('Renvoyer',
+                            : const Text('Renvoyer',
                                 style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppTheme.primaryColor,
-                                    decoration: TextDecoration.underline)),
+                                    color: AppTheme.orangeColor,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppTheme.orangeColor)),
                       )),
                     ],
                   ]),
                 ]),
-              ),
 
               const SizedBox(height: 24),
 
@@ -444,24 +400,23 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
   Widget _buildOtpBox(int index) {
     final isFilled  = _otpControllers[index].text.isNotEmpty;
     final isFocused = _focusNodes[index].hasFocus;
+    // Cases remplies gris clair, sans bordure au repos ;
+    // liseré bleu au focus, vert au succès — cohérent avec le design épuré.
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: 44, height: 54,
       decoration: BoxDecoration(
-        color: isFilled
-            ? AppTheme.successColor.withValues(alpha: 0.07)
-            : AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _showSuccess
-              ? AppTheme.successColor
-              : isFocused
-                  ? AppTheme.primaryColor
-                  : isFilled
-                      ? AppTheme.accentColor
-                      : AppTheme.dividerColor,
-          width: isFocused ? 2 : 1.5,
-        ),
+        color: _showSuccess
+            ? AppTheme.successColor.withValues(alpha: 0.08)
+            : isFilled
+                ? AppTheme.primaryColor.withValues(alpha: 0.06)
+                : const Color(0xFFF4F6FB),
+        borderRadius: BorderRadius.circular(14),
+        border: _showSuccess
+            ? Border.all(color: AppTheme.successColor, width: 1.5)
+            : isFocused
+                ? Border.all(color: AppTheme.primaryColor, width: 1.5)
+                : null,
       ),
       child: Focus(
         onFocusChange: (_) => setState(() {}),

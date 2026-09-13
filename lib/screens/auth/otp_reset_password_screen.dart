@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
+import 'auth_ui.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OtpResetPasswordScreen — Écran unique OTP + nouveau mot de passe
@@ -343,7 +344,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -459,15 +460,11 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
     return Container(
       width: 80, height: 80,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.primaryColor, AppTheme.accentColor],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: kAuthGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-              color: AppTheme.primaryColor.withValues(alpha: 0.35),
+              color: AppTheme.primaryColor.withValues(alpha: 0.32),
               blurRadius: 20,
               offset: const Offset(0, 8)),
         ],
@@ -536,21 +533,9 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   // Carte OTP
   // ─────────────────────────────────────────────────────────────────────────────
   Widget _buildOtpCard() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: (_otpComplete ? AppTheme.successColor : AppTheme.accentColor)
-                .withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
-        ],
-      ),
+    // Zone OTP sans carte bordée — design épuré harmonisé avec le login
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(children: [
         Text(
           _otpComplete
@@ -593,19 +578,17 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
                     onTap: _resendOtp,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 9),
+                          horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(22),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.refresh_rounded,
                               color: AppTheme.primaryColor, size: 16),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           Text('Renvoyer le code WhatsApp',
                               style: TextStyle(
                                   fontFamily: 'Poppins',
@@ -621,12 +604,13 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
           // Lien pour modifier le code si erreur
           MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
             onTap: _clearOtp,
-            child: Text('Modifier le code',
+            child: const Text('Modifier le code',
                 style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
-                    color: AppTheme.textSecondary,
-                    decoration: TextDecoration.underline)),
+                    color: AppTheme.orangeColor,
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppTheme.orangeColor)),
           )),
         ],
       ]),
@@ -637,123 +621,63 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   // Carte mot de passe (révélée après saisie OTP complète)
   // ─────────────────────────────────────────────────────────────────────────────
   Widget _buildPasswordCard() {
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: AppTheme.accentColor.withValues(alpha: 0.15)),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(children: [
+    // Champs soulignés, sans carte bordée — harmonisé avec le login
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
         // Nouveau mot de passe
+        authFieldLabel('Nouveau mot de passe'),
         TextField(
           controller: _newPwdCtrl,
           obscureText: _obscureNew,
           enabled: !_isSaving,
-          decoration: InputDecoration(
-            labelText: 'Nouveau mot de passe',
-            labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-            prefixIcon: const Icon(Icons.lock_outline,
-                color: AppTheme.accentColor, size: 20),
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+          decoration: authUnderlineDecoration(
+            hintText: 'Minimum 6 caractères',
             suffixIcon: IconButton(
               icon: Icon(
-                  _obscureNew ? Icons.visibility_off : Icons.visibility,
-                  color: AppTheme.textSecondary,
+                  _obscureNew
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppTheme.textHint,
                   size: 20),
               onPressed: () => setState(() => _obscureNew = !_obscureNew),
             ),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.dividerColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppTheme.accentColor, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // Confirmer mot de passe
-        TextField(
-          controller: _confirmPwdCtrl,
-          obscureText: _obscureConfirm,
-          enabled: !_isSaving,
-          decoration: InputDecoration(
-            labelText: 'Confirmer le mot de passe',
-            labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-            prefixIcon: const Icon(Icons.lock_outline,
-                color: AppTheme.accentColor, size: 20),
-            suffixIcon: IconButton(
-              icon: Icon(
-                  _obscureConfirm ? Icons.visibility_off : Icons.visibility,
-                  color: AppTheme.textSecondary,
-                  size: 20),
-              onPressed: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-            ),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppTheme.dividerColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppTheme.accentColor, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           ),
         ),
         const SizedBox(height: 20),
 
-        // Bouton Enregistrer
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            onPressed: _isSaving ? null : _saveNewPassword,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.successColor,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor:
-                  AppTheme.successColor.withValues(alpha: 0.4),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+        // Confirmer mot de passe
+        authFieldLabel('Confirmer le mot de passe'),
+        TextField(
+          controller: _confirmPwdCtrl,
+          obscureText: _obscureConfirm,
+          enabled: !_isSaving,
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+          decoration: authUnderlineDecoration(
+            hintText: 'Ressaisissez le mot de passe',
+            suffixIcon: IconButton(
+              icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: AppTheme.textHint,
+                  size: 20),
+              onPressed: () =>
+                  setState(() => _obscureConfirm = !_obscureConfirm),
             ),
-            child: _isSaving
-                ? const SizedBox(
-                    width: 22, height: 22,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5))
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.save_rounded, size: 18),
-                      SizedBox(width: 8),
-                      Text('Enregistrer le mot de passe',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
           ),
+        ),
+        const SizedBox(height: 24),
+
+        // Bouton Enregistrer (pilule dégradée)
+        AuthPillButton(
+          label: 'Enregistrer le mot de passe',
+          isLoading: _isSaving,
+          onPressed: _isSaving ? null : _saveNewPassword,
+          trailingIcon: Icons.save_rounded,
         ),
       ]),
     );
@@ -766,14 +690,13 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
     return AnimatedOpacity(
       opacity: 1.0,
       duration: const Duration(milliseconds: 400),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.orange.shade200),
-        ),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(14),
+          ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -812,26 +735,23 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
   Widget _buildOtpBox(int index) {
     final isFilled  = _otpControllers[index].text.isNotEmpty;
     final isFocused = _focusNodes[index].hasFocus;
+    // Cases remplies gris clair, sans bordure au repos ;
+    // liseré bleu au focus, vert quand le code est complet.
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: 44, height: 54,
       decoration: BoxDecoration(
-        color: isFilled
-            ? (_otpComplete
-                ? AppTheme.successColor.withValues(alpha: 0.07)
-                : AppTheme.primaryColor.withValues(alpha: 0.07))
-            : AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _otpComplete
-              ? AppTheme.successColor
-              : isFocused
-                  ? AppTheme.primaryColor
-                  : isFilled
-                      ? AppTheme.accentColor
-                      : AppTheme.dividerColor,
-          width: (isFocused || _otpComplete) ? 2 : 1.5,
-        ),
+        color: _otpComplete
+            ? AppTheme.successColor.withValues(alpha: 0.08)
+            : isFilled
+                ? AppTheme.primaryColor.withValues(alpha: 0.06)
+                : const Color(0xFFF4F6FB),
+        borderRadius: BorderRadius.circular(14),
+        border: _otpComplete
+            ? Border.all(color: AppTheme.successColor, width: 1.5)
+            : isFocused
+                ? Border.all(color: AppTheme.primaryColor, width: 1.5)
+                : null,
       ),
       child: Focus(
         onFocusChange: (_) => setState(() {}),

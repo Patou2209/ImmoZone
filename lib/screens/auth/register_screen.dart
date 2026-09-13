@@ -9,6 +9,7 @@ import '../../core/utils/phone_utils.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/data_service.dart';
 import '../../services/phone_auth_service.dart';
+import 'auth_ui.dart';
 import 'otp_register_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -282,537 +283,543 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Design « Premium bandeau marque » — harmonisé avec le login :
+  // bandeau dégradé bleu compact, panneau blanc arrondi, champs soulignés,
+  // bouton pilule dégradé, accents orange marque.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Créer un compte',
-            style: TextStyle(fontFamily: 'Poppins')),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: AppTheme.textPrimary,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Rejoignez ImmoZone',
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
-                        fontFamily: 'Poppins')),
-                const SizedBox(height: 24),
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(children: [
+          // ── Bandeau marque compact ─────────────────────────────────────
+          _brandHeader(context),
 
-                // ── Catégorie ────────────────────────────────────────────
-                RichText(
-                  text: const TextSpan(
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                        fontFamily: 'Poppins'),
-                    children: [
-                      TextSpan(text: 'Sélectionnez votre catégorie'),
-                      TextSpan(
-                        text: ' *',
-                        style: TextStyle(
-                            color: AppTheme.errorColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16),
-                      ),
-                    ],
+          // ── Formulaire (fond blanc, sans carte) ────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 4, 28, 0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Catégorie ────────────────────────────────────────────
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                          fontFamily: 'Poppins'),
+                      children: [
+                        TextSpan(text: 'Sélectionnez votre catégorie'),
+                        TextSpan(
+                          text: ' *',
+                          style: TextStyle(
+                              color: AppTheme.errorColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Column(
-                  children: AppConstants.annonceurCategories
-                      .map((cat) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _categoryCard(cat),
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  Column(
+                    children: AppConstants.annonceurCategories
+                        .map((cat) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _categoryCard(cat),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
 
-                // ── Nom complet ──────────────────────────────────────────
-                TextFormField(
-                  controller: _nameCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  // Enter → champ suivant
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  decoration: InputDecoration(
-                    labelText: 'Nom complet',
-                    hintText: 'Votre nom et prénom',
-                    // Icône renforcée — fond coloré pour meilleure visibilité
-                    prefixIcon: Container(
-                      margin: const EdgeInsets.all(10),
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.25)),
+                  // ── Nom complet (souligné) ───────────────────────────────
+                  authFieldLabel('Nom complet *'),
+                  TextFormField(
+                    controller: _nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    // Enter → champ suivant
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                    decoration: authUnderlineDecoration(
+                        hintText: 'Votre nom et prénom'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Nom requis' : null,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Téléphone (souligné) ─────────────────────────────────
+                  _phoneField(),
+                  const SizedBox(height: 10),
+
+                  // Bannière numéro public (fond teinté, sans bordure)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF57C00).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.campaign_rounded,
+                            color: Color(0xFFF57C00), size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Ce numéro sera votre identifiant de connexion ET sera visible sur vos annonces.',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: Color(0xFF7B4A00),
+                                height: 1.5,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Mot de passe (souligné) ──────────────────────────────
+                  authFieldLabel('Mot de passe *'),
+                  TextFormField(
+                    controller: _passwordCtrl,
+                    obscureText: _obscure,
+                    // Enter → champ suivant (confirmation)
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                    decoration: authUnderlineDecoration(
+                      hintText: 'Minimum 6 caractères',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscure
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: AppTheme.textHint,
+                            size: 20),
+                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
-                      child: const Icon(Icons.person_rounded,
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Mot de passe requis';
+                      if (v.length < 6) return 'Minimum 6 caractères';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Confirmation (souligné) ──────────────────────────────
+                  authFieldLabel('Confirmer le mot de passe *'),
+                  TextFormField(
+                    controller: _confirmCtrl,
+                    obscureText: _obscureConfirm,
+                    // Enter → soumet le formulaire
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!_isSending) _sendOtpAndRegister();
+                    },
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                    decoration: authUnderlineDecoration(
+                      hintText: 'Ressaisissez le mot de passe',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            color: AppTheme.textHint,
+                            size: 20),
+                        onPressed: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm),
+                      ),
+                    ),
+                    validator: (v) => v != _passwordCtrl.text
+                        ? 'Les mots de passe ne correspondent pas'
+                        : null,
+                  ),
+                  const SizedBox(height: 22),
+
+                  // ── Localisation du compte (fond doux, sans bordure) ────
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4F6FB),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: const [
+                          Icon(Icons.location_on_rounded,
+                              color: AppTheme.primaryColor, size: 16),
+                          SizedBox(width: 6),
+                          Text('Localisation du compte *',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primaryColor)),
+                        ]),
+                        const SizedBox(height: 4),
+                        const Text(
+                            'Ces informations ne vous empêchent pas de poster '
+                            'des annonces partout ailleurs.',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10.5,
+                                color: AppTheme.textSecondary,
+                                height: 1.4)),
+                        const SizedBox(height: 12),
+                        // Province dropdown (dynamique selon préfixe téléphonique)
+                        authFieldLabel('Province *'),
+                        DropdownButtonFormField<String>(
+                          value: _selectedProvince,
+                          decoration: authUnderlineDecoration(),
+                          hint: const Text('Sélectionner une province',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: AppTheme.textHint)),
+                          isExpanded: true,
+                          items: AppConstants.getProvincesForCountry(
+                                  _phoneCountryToAppCountry(_phoneCountryCode))
+                              .map((p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(p,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12))))
+                              .toList(),
+                          onChanged: (v) => setState(() {
+                            _selectedProvince = v;
+                            _selectedCity = null;
+                            _selectedCommune = null;
+                          }),
+                        ),
+                        const SizedBox(height: 14),
+                        // Ville dropdown (cascadé par province)
+                        authFieldLabel('Ville *'),
+                        DropdownButtonFormField<String>(
+                          value: _selectedCity,
+                          decoration: authUnderlineDecoration(),
+                          hint: Text(
+                              _selectedProvince == null
+                                  ? "Choisissez d'abord une province"
+                                  : 'Sélectionner une ville',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: AppTheme.textHint)),
+                          isExpanded: true,
+                          items: _selectedProvince == null
+                              ? []
+                              : AppConstants.getCitiesForProvince(
+                                      _phoneCountryToAppCountry(
+                                          _phoneCountryCode),
+                                      _selectedProvince!)
+                                  .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(c,
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 12))))
+                                  .toList(),
+                          onChanged: _selectedProvince == null
+                              ? null
+                              : (v) => setState(() {
+                                    _selectedCity = v;
+                                    _selectedCommune = null;
+                                  }),
+                        ),
+                        const SizedBox(height: 14),
+                        // Commune dropdown (cascadé par ville)
+                        authFieldLabel('Commune'),
+                        DropdownButtonFormField<String>(
+                          value: _selectedCommune,
+                          decoration: authUnderlineDecoration(),
+                          hint: Text(
+                              _selectedCity == null
+                                  ? "Choisissez d'abord une ville"
+                                  : 'Sélectionner une commune',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: AppTheme.textHint)),
+                          isExpanded: true,
+                          items: _selectedCity == null
+                              ? []
+                              : AppConstants.getCommunesForCity(_selectedCity!)
+                                  .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(c,
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 12))))
+                                  .toList(),
+                          onChanged: _selectedCity == null
+                              ? null
+                              : (v) => setState(() => _selectedCommune = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Code parrainage (optionnel, souligné) ───────────────
+                  authFieldLabel('Code parrainage (optionnel)'),
+                  TextFormField(
+                    controller: _sponsorCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                    decoration:
+                        authUnderlineDecoration(hintText: 'Ex : PATOU2025'),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Cadeau annonces gratuites (fond teinté, sans bordure) ─
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.successColor.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.card_giftcard,
+                          color: AppTheme.successColor, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                            '$_freeQuotaCount annonce${_freeQuotaCount > 1 ? 's' : ''} gratuite${_freeQuotaCount > 1 ? 's' : ''} offertes à l\'inscription !',
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.successColor)),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Info WhatsApp (fond teinté, sans bordure)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(children: [
+                      Icon(Icons.chat_rounded,
                           color: AppTheme.primaryColor, size: 18),
-                    ),
-                    // Bordure visible en permanence (override du thème global)
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppTheme.primaryColor, width: 1.5),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppTheme.primaryColor, width: 2.5),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppTheme.errorColor, width: 1.5),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppTheme.errorColor, width: 2),
-                    ),
-                  ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Nom requis' : null,
-                ),
-                const SizedBox(height: 14),
-
-                // ── Téléphone ────────────────────────────────────────────
-                _phoneField(),
-                const SizedBox(height: 6),
-
-                // Bannière numéro public
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF57C00).withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFF57C00).withValues(alpha: 0.4)),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.campaign_rounded, color: Color(0xFFF57C00), size: 18),
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Ce numéro sera votre identifiant de connexion ET sera visible sur vos annonces.',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              color: Color(0xFF7B4A00),
-                              height: 1.5,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // ── Mot de passe ─────────────────────────────────────────
-                TextFormField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscure,
-                  // Enter → champ suivant (confirmation)
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.accentColor),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                          _obscure ? Icons.visibility_off : Icons.visibility,
-                          color: AppTheme.textSecondary),
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 1.5),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 2),
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Mot de passe requis';
-                    if (v.length < 6) return 'Minimum 6 caractères';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // ── Confirmation ─────────────────────────────────────────
-                TextFormField(
-                  controller: _confirmCtrl,
-                  obscureText: _obscureConfirm,
-                  // Enter → soumet le formulaire (même effet que « Créer mon compte »)
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) {
-                    if (!_isSending) _sendOtpAndRegister();
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Confirmer le mot de passe',
-                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.accentColor),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                          _obscureConfirm ? Icons.visibility_off : Icons.visibility,
-                          color: AppTheme.textSecondary),
-                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 1.5),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 2),
-                    ),
-                  ),
-                  validator: (v) =>
-                      v != _passwordCtrl.text ? 'Les mots de passe ne correspondent pas' : null,
-                ),
-                const SizedBox(height: 14),
-
-                // ── Localisation du compte (obligatoire) ──────────────
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.25)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        const Icon(Icons.location_on_rounded, color: AppTheme.accentColor, size: 16),
-                        const SizedBox(width: 6),
-                        const Text('Localisation du compte *',
+                            'Un code de vérification sera envoyé sur WhatsApp à votre numéro.',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.accentColor)),
-                      ]),
-                      const SizedBox(height: 4),
-                      const Text(
-                          'Ces informations ne vous empêchent pas de poster '
-                          'des annonces partout ailleurs.',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 10.5,
-                              color: AppTheme.textSecondary,
-                              height: 1.4)),
-                      const SizedBox(height: 10),
-                      // Province dropdown (dynamique selon préfixe téléphonique)
-                      DropdownButtonFormField<String>(
-                        value: _selectedProvince,
-                        decoration: InputDecoration(
-                          labelText: 'Province *',
-                          prefixIcon: const Icon(Icons.map_outlined, color: AppTheme.accentColor),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                          enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                        ),
-                        hint: const Text('Sélectionner une province',
-                            style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-                        isExpanded: true,
-                        items: AppConstants.getProvincesForCountry(
-                                _phoneCountryToAppCountry(_phoneCountryCode))
-                            .map((p) => DropdownMenuItem(
-                                value: p,
-                                child: Text(p, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
-                            .toList(),
-                        onChanged: (v) => setState(() {
-                          _selectedProvince = v;
-                          _selectedCity = null;
-                          _selectedCommune = null;
-                        }),
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                                height: 1.4)),
                       ),
-                      const SizedBox(height: 10),
-                      // Ville dropdown (cascadé par province)
-                      DropdownButtonFormField<String>(
-                        value: _selectedCity,
-                        decoration: InputDecoration(
-                          labelText: 'Ville *',
-                          prefixIcon: const Icon(Icons.location_city_rounded, color: AppTheme.accentColor),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                          enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                        ),
-                        hint: Text(
-                            _selectedProvince == null
-                                ? "Choisissez d'abord une province"
-                                : 'Sélectionner une ville',
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-                        isExpanded: true,
-                        items: _selectedProvince == null
-                            ? []
-                            : AppConstants.getCitiesForProvince(
-                                    _phoneCountryToAppCountry(_phoneCountryCode),
-                                    _selectedProvince!)
-                                .map((c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
-                                .toList(),
-                        onChanged: _selectedProvince == null
-                            ? null
-                            : (v) => setState(() {
-                                _selectedCity = v;
-                                _selectedCommune = null;
-                              }),
-                      ),
-                      const SizedBox(height: 10),
-                      // Commune dropdown (cascadé par ville)
-                      DropdownButtonFormField<String>(
-                        value: _selectedCommune,
-                        decoration: InputDecoration(
-                          labelText: 'Commune',
-                          prefixIcon: const Icon(Icons.holiday_village_outlined, color: AppTheme.accentColor),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                          enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppTheme.dividerColor)),
-                        ),
-                        hint: Text(
-                            _selectedCity == null
-                                ? "Choisissez d'abord une ville"
-                                : 'Sélectionner une commune',
-                            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-                        isExpanded: true,
-                        items: _selectedCity == null
-                            ? []
-                            : AppConstants.getCommunesForCity(_selectedCity!)
-                                .map((c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c, style: const TextStyle(fontFamily: 'Poppins', fontSize: 12))))
-                                .toList(),
-                        onChanged: _selectedCity == null
-                            ? null
-                            : (v) => setState(() => _selectedCommune = v),
-                      ),
-                    ],
+                    ]),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 24),
 
-                // ── Code parrainage (optionnel) ──────────────────────────
-                TextFormField(
-                  controller: _sponsorCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: 'Code parrainage (optionnel)',
-                    hintText: 'Ex : PATOU2025',
-                    prefixIcon: const Icon(Icons.group_add_outlined, color: AppTheme.accentColor),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF8A96B0), width: 2.0),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.primaryColor, width: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Cadeau annonces gratuites (valeur dynamique admin) ───
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.successColor.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(children: [
-                    const Icon(Icons.card_giftcard, color: AppTheme.successColor, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                          '$_freeQuotaCount annonce${_freeQuotaCount > 1 ? 's' : ''} gratuite${_freeQuotaCount > 1 ? 's' : ''} offertes à l\'inscription !',
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.successColor)),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 8),
-
-                // Info SMS
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accentColor.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
-                  ),
-                  child: const Row(children: [
-                    Icon(Icons.chat_rounded, color: AppTheme.accentColor, size: 18),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                          'Un code de vérification sera envoyé sur WhatsApp à votre numéro.',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              color: AppTheme.textSecondary,
-                              height: 1.4)),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 20),
-
-                // ── Bouton créer compte ──────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
+                  // ── Bouton pilule dégradé « Créer mon compte » ──────────
+                  AuthPillButton(
+                    label: _isSending
+                        ? 'Envoi du code WhatsApp...'
+                        : 'Créer mon compte',
+                    isLoading: _isSending,
                     onPressed: _isSending ? null : _sendOtpAndRegister,
-                    icon: _isSending
-                        ? const SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2))
-                        : const Icon(Icons.send_rounded, size: 18),
-                    label: Text(
-                        _isSending ? 'Envoi du code WhatsApp...' : 'Créer mon compte',
-                        style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppTheme.primaryColor.withValues(alpha: 0.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
+                    trailingIcon: Icons.send_rounded,
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-                Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Text('Déjà un compte ? ',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13,
-                          fontFamily: 'Poppins')),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Se connecter',
-                        style: TextStyle(
-                            fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+                  Center(
+                    child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                      const Text('Déjà un compte ? ',
+                          style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 13,
+                              fontFamily: 'Poppins')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text('Se connecter',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: AppTheme.orangeColor)),
+                      ),
+                    ]),
                   ),
-                ]),
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
-        ),
+        ]),
       ),
     );
   }
 
+  // ── Bandeau marque compact : dégradé bleu + retour + titre ────────────────
+  Widget _brandHeader(BuildContext context) {
+    return Stack(children: [
+      Container(
+        width: double.infinity,
+        height: 172,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF082F75),
+              AppTheme.primaryColor,
+              Color(0xFF1656C9),
+            ],
+          ),
+        ),
+        child: Stack(clipBehavior: Clip.hardEdge, children: [
+          // Cercles décoratifs subtils
+          Positioned(
+            top: -50,
+            right: -30,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 60,
+            right: 60,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.orangeColor.withValues(alpha: 0.18),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 28, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                // Bouton retour
+                IconButton(
+                  onPressed:
+                      _isSending ? null : () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white, size: 20),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            height: 1.1),
+                        children: [
+                          TextSpan(
+                              text: 'Rejoignez Immo',
+                              style: TextStyle(color: Colors.white)),
+                          TextSpan(
+                              text: 'Zone',
+                              style:
+                                  TextStyle(color: AppTheme.orangeColor)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Créez votre compte en quelques instants',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.85))),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+      // Bande blanche arrondie qui remonte sur le bandeau
+      Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
+        child: Container(
+          height: 24,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Champ téléphone souligné (indicatif + numéro) ─────────────────────────
   Widget _phoneField() {
     final selected = AppConstants.countryCodes.firstWhere(
       (c) => c['code'] == _phoneCountryCode,
       orElse: () => AppConstants.countryCodes.first,
     );
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Numéro de téléphone *',
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textSecondary)),
-      const SizedBox(height: 6),
+      authFieldLabel('Numéro de téléphone *'),
       Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.dividerColor),
+        decoration: const BoxDecoration(
+          border: Border(
+              bottom: BorderSide(color: AppTheme.dividerColor, width: 1.5)),
         ),
         child: Row(children: [
-          MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-            onTap: _showPhoneCountryPicker,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-              decoration: BoxDecoration(
-                  border: Border(right: BorderSide(color: AppTheme.dividerColor))),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(selected['flag'] ?? '', style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 6),
-                Text(_phoneCountryCode,
-                    style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppTheme.accentColor)),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_drop_down, color: AppTheme.accentColor, size: 18),
-              ]),
-            ),
-          )),
+          MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: _showPhoneCountryPicker,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 2, vertical: 15),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(selected['flag'] ?? '',
+                        style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 5),
+                    Text(_phoneCountryCode,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: AppTheme.primaryColor)),
+                    const Icon(Icons.arrow_drop_down,
+                        color: AppTheme.textHint, size: 18),
+                  ]),
+                ),
+              )),
           Expanded(
             child: TextFormField(
               controller: _phoneNumberCtrl,
@@ -820,15 +827,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // Enter → champ suivant
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
               decoration: const InputDecoration(
                 hintText: 'Numéro (ex : 812345678)',
                 hintStyle: TextStyle(
-                    fontFamily: 'Poppins', color: AppTheme.textHint, fontSize: 12),
+                    fontFamily: 'Poppins',
+                    color: AppTheme.textHint,
+                    fontSize: 12.5),
+                filled: false,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                errorBorder: InputBorder.none,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 15),
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Numéro requis';
@@ -841,6 +853,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     ]);
   }
+
 
   void _showPhoneCountryPicker() {
     final searchCtrl = TextEditingController();
