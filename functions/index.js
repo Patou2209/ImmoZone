@@ -1382,3 +1382,226 @@ function escHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WHATSAPP OTP — Authentification par code via WhatsApp Business Cloud API (Meta)
+// Remplace l'OTP SMS Firebase (bloqué par Play Integrity sur la version Play Store).
+// Flux: sendWhatsAppOtp → code 6 chiffres → template WhatsApp → verifyWhatsAppOtp
+//       → custom token Firebase → signInWithCustomToken côté Flutter.
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ TEMPLATE PROVISOIRE (entreprise Meta non vérifiée → catégorie AUTHENTICATION
+//    indisponible) : on utilise le template UTILITY 'immozone_reference' dont la
+//    variable {{1}} porte le code. Après vérification de l'entreprise :
+//    1) créer le template AUTHENTICATION 'immozone_otp' (bouton Copy code)
+//    2) passer templateName: 'immozone_otp' et templateCategory: 'AUTHENTICATION'
+// ═══════════════════════════════════════════════════════════════════════════════
+const WHATSAPP_CONFIG = {
+  apiHost: 'graph.facebook.com',
+  apiVersion: 'v21.0',
+  phoneNumberId: '1344165878774630',      // Numéro Immozone +243 982 527 498
+  wabaId: '1604739647744226',
+  templateName: 'immozone_reference',     // → 'immozone_otp' après vérif entreprise
+  templateLanguage: 'fr',
+  // 'UTILITY'        → code injecté dans la variable {{1}} du BODY
+  // 'AUTHENTICATION' → code dans BODY {{1}} + paramètre du bouton Copy code
+  templateCategory: 'UTILITY',
+  otpLength: 6,
+  otpTtlMinutes: 5,
+  maxVerifyAttempts: 5,
+  maxSendsPerWindow: 3,                   // anti-abus: 3 envois max…
+  sendWindowMinutes: 15,                  // …par fenêtre de 15 min par numéro
+};
+
+function getWhatsAppToken() {
+  return (process.env.WHATSAPP_TOKEN || '').trim();
+}
+
+/** Normalise un numéro RDC vers le format international sans '+' (243XXXXXXXXX). */
+function waNormalizeMsisdn(phoneNumber) {
+  let m = String(phoneNumber || '').replace(/[\s\-]/g, '').replace(/^\+/, '');
+  if (m.startsWith('0') && m.length === 10) m = '243' + m.slice(1);
+  else if (m.length === 9 && !m.startsWith('243')) m = '243' + m;
+  return m;
+}
+
+function hashOtp(code, msisdn) {
+  return require('crypto').createHash('sha256').update(`${code}:${msisdn}:immozone-otp`).digest('hex');
+}
+
+/** Appel HTTPS Graph API (POST JSON). */
+function waApiRequest(path, payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const req = https.request({
+      hostname: WHATSAPP_CONFIG.apiHost,
+      path: `/${WHATSAPP_CONFIG.apiVersion}${path}`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getWhatsAppToken()}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', (c) => data += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, json: JSON.parse(data) }); }
+        catch (e) { resolve({ status: res.statusCode, json: { raw: data } }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+/** Construit le payload template selon la catégorie (UTILITY vs AUTHENTICATION). */
+function buildOtpTemplatePayload(msisdn, code) {
+  const components = [
+    { type: 'body', parameters: [{ type: 'text', text: code }] },
+  ];
+  if (WHATSAPP_CONFIG.templateCategory === 'AUTHENTICATION') {
+    // Le bouton Copy code exige le code en paramètre d'URL du bouton (index 0)
+    components.push({
+      type: 'button', sub_type: 'url', index: '0',
+      parameters: [{ type: 'text', text: code }],
+    });
+  }
+  return {
+    messaging_product: 'whatsapp',
+    to: msisdn,
+    type: 'template',
+    template: {
+      name: WHATSAPP_CONFIG.templateName,
+      language: { code: WHATSAPP_CONFIG.templateLanguage },
+      components,
+    },
+  };
+}
+
+/**
+ * sendWhatsAppOtp — POST {phoneNumber}
+ * Génère un code 6 chiffres, le stocke hashé (TTL 5 min), l'envoie via WhatsApp.
+ */
+exports.sendWhatsAppOtp = onRequest(
+  { region: 'us-central1', cors: true, secrets: ['WHATSAPP_TOKEN'] },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
+    try {
+      const { phoneNumber } = req.body || {};
+      if (!phoneNumber) return res.status(400).json({ error: 'phoneNumber requis' });
+
+      const msisdn = waNormalizeMsisdn(phoneNumber);
+      if (!/^243[0-9]{9}$/.test(msisdn)) {
+        return res.status(400).json({ error: 'Numéro invalide. Format attendu: 0XXXXXXXXX ou +243XXXXXXXXX' });
+      }
+
+      const otpRef = db.collection('whatsapp_otp').doc(msisdn);
+      const now = Date.now();
+
+      // Anti-abus: fenêtre glissante d'envois
+      const snap = await otpRef.get();
+      if (snap.exists) {
+        const d = snap.data();
+        const windowStart = now - WHATSAPP_CONFIG.sendWindowMinutes * 60000;
+        const recentSends = (d.sendTimestamps || []).filter((t) => t > windowStart);
+        if (recentSends.length >= WHATSAPP_CONFIG.maxSendsPerWindow) {
+          const retryInSec = Math.ceil((recentSends[0] + WHATSAPP_CONFIG.sendWindowMinutes * 60000 - now) / 1000);
+          return res.status(429).json({
+            error: `Trop de demandes. Réessayez dans ${Math.ceil(retryInSec / 60)} min.`,
+            retryAfterSeconds: retryInSec,
+          });
+        }
+      }
+
+      // Génération du code (6 chiffres, crypto-aléatoire)
+      const code = String(require('crypto').randomInt(0, 10 ** WHATSAPP_CONFIG.otpLength)).padStart(WHATSAPP_CONFIG.otpLength, '0');
+
+      // Envoi WhatsApp
+      const wa = await waApiRequest(`/${WHATSAPP_CONFIG.phoneNumberId}/messages`, buildOtpTemplatePayload(msisdn, code));
+      if (wa.status !== 200 || wa.json.error) {
+        console.error('sendWhatsAppOtp WA error:', JSON.stringify(wa.json));
+        const waErr = (wa.json.error || {});
+        // 131026 = numéro sans WhatsApp / non joignable
+        const friendly = waErr.code === 131026
+          ? 'Ce numéro ne semble pas avoir WhatsApp.'
+          : 'Envoi WhatsApp impossible. Réessayez plus tard.';
+        return res.status(502).json({ error: friendly, waCode: waErr.code || null });
+      }
+
+      // Stockage hashé (jamais le code en clair)
+      const prevTimestamps = snap.exists ? (snap.data().sendTimestamps || []) : [];
+      await otpRef.set({
+        codeHash: hashOtp(code, msisdn),
+        expiresAt: new Date(now + WHATSAPP_CONFIG.otpTtlMinutes * 60000).toISOString(),
+        attempts: 0,
+        verified: false,
+        sendTimestamps: [...prevTimestamps.filter((t) => t > now - 3600000), now],
+        waMessageId: (wa.json.messages && wa.json.messages[0] && wa.json.messages[0].id) || null,
+        updatedAt: new Date(now).toISOString(),
+      });
+
+      console.log(`sendWhatsAppOtp: code envoyé à ${msisdn} (msg ${(wa.json.messages || [{}])[0].id})`);
+      return res.json({ success: true, expiresInSeconds: WHATSAPP_CONFIG.otpTtlMinutes * 60 });
+    } catch (err) {
+      console.error('sendWhatsAppOtp error:', err);
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
+);
+
+/**
+ * verifyWhatsAppOtp — POST {phoneNumber, code}
+ * Vérifie le code; si OK → custom token Firebase (uid lié au numéro de téléphone).
+ */
+exports.verifyWhatsAppOtp = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
+    try {
+      const { phoneNumber, code } = req.body || {};
+      if (!phoneNumber || !code) return res.status(400).json({ error: 'phoneNumber et code requis' });
+
+      const msisdn = waNormalizeMsisdn(phoneNumber);
+      const otpRef = db.collection('whatsapp_otp').doc(msisdn);
+      const snap = await otpRef.get();
+      if (!snap.exists) return res.status(400).json({ error: 'Aucun code demandé pour ce numéro.' });
+
+      const d = snap.data();
+      if (d.verified) return res.status(400).json({ error: 'Code déjà utilisé. Demandez-en un nouveau.' });
+      if (new Date(d.expiresAt).getTime() < Date.now()) {
+        return res.status(400).json({ error: 'Code expiré. Demandez-en un nouveau.' });
+      }
+      if ((d.attempts || 0) >= WHATSAPP_CONFIG.maxVerifyAttempts) {
+        return res.status(429).json({ error: 'Trop de tentatives. Demandez un nouveau code.' });
+      }
+
+      if (hashOtp(String(code).trim(), msisdn) !== d.codeHash) {
+        await otpRef.update({ attempts: admin.firestore.FieldValue.increment(1) });
+        const remaining = WHATSAPP_CONFIG.maxVerifyAttempts - (d.attempts || 0) - 1;
+        return res.status(400).json({ error: 'Code incorrect.', attemptsRemaining: remaining });
+      }
+
+      // Code valide → usage unique
+      await otpRef.update({ verified: true, verifiedAt: new Date().toISOString() });
+
+      // Utilisateur Firebase: réutilise l'uid existant (créé par l'ancien Phone Auth)
+      // ou en crée un nouveau avec ce numéro.
+      const e164 = '+' + msisdn;
+      let user;
+      try {
+        user = await admin.auth().getUserByPhoneNumber(e164);
+      } catch (e) {
+        user = await admin.auth().createUser({ phoneNumber: e164 });
+        console.log(`verifyWhatsAppOtp: nouvel utilisateur créé ${user.uid} (${e164})`);
+      }
+
+      const customToken = await admin.auth().createCustomToken(user.uid, { authMethod: 'whatsapp_otp' });
+      console.log(`verifyWhatsAppOtp: connexion OK ${user.uid} (${e164})`);
+      return res.json({ success: true, token: customToken, uid: user.uid, isNewUser: !user.metadata || user.metadata.creationTime === user.metadata.lastSignInTime });
+    } catch (err) {
+      console.error('verifyWhatsAppOtp error:', err);
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
+);
