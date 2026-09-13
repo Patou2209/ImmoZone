@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Saisissez votre numéro de téléphone. Un code SMS de vérification vous sera envoyé.',
+                    'Saisissez votre numéro de téléphone. Un code de vérification vous sera envoyé sur WhatsApp.',
                     style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
@@ -405,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             }
 
                             final errMsg = auth.error ??
-                                'Échec de l\'envoi du SMS. Réessayez.';
+                                'Échec de l\'envoi du code WhatsApp. Réessayez.';
                             final isTooMany = errMsg.contains('Trop de') ||
                                 errMsg.contains('too-many') ||
                                 errMsg.contains('tentatives') ||

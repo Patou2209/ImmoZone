@@ -234,7 +234,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
         _showErrorDialog(
           titre: 'Code expiré',
           message:
-              'Le code SMS a expiré (valide 5 minutes).\n\nAppuyez sur "Renvoyer le code SMS" pour recevoir un nouveau code, puis saisissez-le rapidement.',
+              'Le code a expiré (valide 5 minutes).\n\nAppuyez sur "Renvoyer le code WhatsApp" pour recevoir un nouveau code, puis saisissez-le rapidement.',
           icone: Icons.timer_off_rounded,
         );
       } else {
@@ -358,7 +358,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
               ? 'Succès'
               : _otpComplete
                   ? 'Nouveau mot de passe'
-                  : 'Vérification SMS',
+                  : 'Vérification WhatsApp',
           style: const TextStyle(
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w700,
@@ -472,7 +472,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
               offset: const Offset(0, 8)),
         ],
       ),
-      child: const Icon(Icons.sms_rounded, color: Colors.white, size: 40),
+      child: const Icon(Icons.chat_rounded, color: Colors.white, size: 40),
     );
   }
 
@@ -606,7 +606,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
                           Icon(Icons.refresh_rounded,
                               color: AppTheme.primaryColor, size: 16),
                           const SizedBox(width: 6),
-                          Text('Renvoyer le code SMS',
+                          Text('Renvoyer le code WhatsApp',
                               style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 13,
@@ -781,7 +781,7 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
               Icon(Icons.info_outline_rounded,
                   color: Colors.orange.shade700, size: 18),
               const SizedBox(width: 8),
-              Text('SMS non reçu ?',
+              Text('Code WhatsApp non reçu ?',
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
@@ -791,9 +791,9 @@ class _OtpResetPasswordScreenState extends State<OtpResetPasswordScreen>
             const SizedBox(height: 6),
             Text(
               '• Vérifiez que le numéro est correct\n'
-              '• Le SMS peut prendre 1-2 minutes\n'
+              '• Le message WhatsApp arrive normalement en quelques secondes\n'
               '• Vérifiez vos messages bloqués/spam\n'
-              '• Appuyez sur "Renvoyer le code SMS" ci-dessus',
+              '• Appuyez sur "Renvoyer le code WhatsApp" ci-dessus',
               style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,

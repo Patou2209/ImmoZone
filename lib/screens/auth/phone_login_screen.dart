@@ -286,7 +286,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               const SizedBox(height: 28),
 
               Center(
-                child: Text('Connexion par SMS',
+                child: Text('Connexion par WhatsApp',
                     style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 24,
@@ -296,7 +296,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  'Recevez un code OTP par SMS\npour vous connecter rapidement.',
+                  'Recevez un code OTP sur WhatsApp\npour vous connecter rapidement.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontFamily: 'Poppins',
@@ -450,7 +450,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                                   children: const [
                                     Icon(Icons.send_rounded, size: 18),
                                     SizedBox(width: 8),
-                                    Text('Envoyer le code SMS',
+                                    Text('Envoyer le code WhatsApp',
                                         style: TextStyle(
                                             fontFamily: 'Poppins',
                                             fontSize: 15,
@@ -484,7 +484,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     Expanded(
                       child: Text(
                         'Un code de vérification à 6 chiffres sera envoyé '
-                        'par SMS au numéro indiqué. Des frais SMS peuvent s\'appliquer.',
+                        'sur WhatsApp au numéro indiqué. Assurez-vous que ce numéro a un compte WhatsApp actif.',
                         style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 12,

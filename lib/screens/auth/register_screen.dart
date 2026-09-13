@@ -171,7 +171,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ]),
               content: const Text(
-                'Ce numéro a reçu trop de codes SMS récemment '
+                'Ce numéro a reçu trop de codes récemment '
                 '(peut arriver si un compte a été supprimé puis recréé).\n\n'
                 'Attendez environ 10 minutes et réessayez.\n\n'
                 'Si le problème persiste, contactez le support.',
@@ -243,7 +243,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 'Ce numéro sera votre identifiant de connexion ET sera affiché '
                 'publiquement sur toutes vos annonces.\n\n'
                 'Les chercheurs pourront vous contacter directement via ce numéro.\n\n'
-                'Assurez-vous d\'utiliser un numéro actif capable de recevoir des SMS.',
+                'Assurez-vous d\'utiliser un numéro avec un compte WhatsApp actif.',
                 style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 12,
@@ -708,11 +708,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.2)),
                   ),
                   child: const Row(children: [
-                    Icon(Icons.sms_rounded, color: AppTheme.accentColor, size: 18),
+                    Icon(Icons.chat_rounded, color: AppTheme.accentColor, size: 18),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                          'Un code de vérification SMS sera envoyé à votre numéro.',
+                          'Un code de vérification sera envoyé sur WhatsApp à votre numéro.',
                           style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 11,
@@ -736,7 +736,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.send_rounded, size: 18),
                     label: Text(
-                        _isSending ? 'Envoi du code SMS...' : 'Créer mon compte',
+                        _isSending ? 'Envoi du code WhatsApp...' : 'Créer mon compte',
                         style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontWeight: FontWeight.w700,
