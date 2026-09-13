@@ -815,7 +815,14 @@ class _LoginScreenState extends State<LoginScreen> {
     ));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Design « Premium bandeau marque » :
+  //  - Bandeau dégradé bleu marine avec logo + slogan + cercles décoratifs
+  //  - Panneau blanc à grands coins arrondis remontant sur le bandeau
+  //  - Champs soulignés d'un trait fin (aucune bordure ni carte)
+  //  - Bouton pilule dégradé bleu
+  //  - Accents orange ImmoZone (#F06428) : « Zone » du logo, lien mot de
+  //    passe oublié, lien inscription
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -825,305 +832,417 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 24, vertical: 16),
-          child: Column(children: [
-            const SizedBox(height: 32),
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(children: [
+          // ── Bandeau marque dégradé ────────────────────────────────────
+          _brandHeader(context),
 
-            // ── Logo (cliquable → accueil) ─────────────────────────────
-            MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-              onTap: () => context.go('/public'),
-              child: LayoutBuilder(builder: (ctx, _) {
-                final w = MediaQuery.of(ctx).size.width;
-                final logoW = w < 480 ? 180.0 : w < 768 ? 210.0 : w < 1024 ? 240.0 : 280.0;
-                return Image.asset(
-                  'assets/images/immozone_logo_text.png',
-                  width: logoW,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: logoW * 0.14,
-                          fontWeight: FontWeight.w800),
-                      children: const [
-                        TextSpan(text: 'Immo',
-                            style: TextStyle(color: Color(0xFF2B5BE8))),
-                        TextSpan(text: 'Zone',
-                            style: TextStyle(color: Color(0xFFED5C1F))),
+          // ── Panneau formulaire (fond blanc, sans carte ni bordure) ────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(28, 8, 28, 0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Text('Connexion',
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                        fontFamily: 'Poppins')),
+                const SizedBox(height: 4),
+                const Text('Heureux de vous revoir !',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        fontFamily: 'Poppins')),
+                const SizedBox(height: 26),
+
+                // ── Champ Téléphone (souligné) ─────────────────────────
+                const Text('Numéro de téléphone',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                        letterSpacing: 0.2)),
+                Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                        bottom: BorderSide(
+                            color: AppTheme.dividerColor, width: 1.5)),
+                  ),
+                  child: Row(children: [
+                    // Bouton indicatif (sans séparateur vertical)
+                    MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: _showCountryPicker,
+                          child: _codeButton(_countryCode, null,
+                              flag: selected['flag']),
+                        )),
+                    // Numéro sans indicatif
+                    Expanded(
+                      child: TextFormField(
+                        controller: _phoneCtrl,
+                        keyboardType: TextInputType.phone,
+                        // Enter → passe au champ mot de passe
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) =>
+                            FocusScope.of(context).nextFocus(),
+                        style: const TextStyle(
+                            fontFamily: 'Poppins', fontSize: 14),
+                        decoration: const InputDecoration(
+                          hintText: 'Numéro (ex : 812345678)',
+                          hintStyle: TextStyle(
+                              fontFamily: 'Poppins',
+                              color: AppTheme.textHint,
+                              fontSize: 12.5),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 15),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Numéro requis'
+                            : null,
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 22),
+
+                // ── Champ Mot de passe (souligné) ──────────────────────
+                const Text('Mot de passe',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary,
+                        letterSpacing: 0.2)),
+                TextFormField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  // Enter → soumet le formulaire (même effet que « Se connecter »)
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!context.read<AuthProvider>().isLoading) _login();
+                  },
+                  style: const TextStyle(
+                      fontFamily: 'Poppins', fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Votre mot de passe',
+                    hintStyle: const TextStyle(
+                        fontFamily: 'Poppins',
+                        color: AppTheme.textHint,
+                        fontSize: 12.5),
+                    filled: false,
+                    isDense: true,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 15),
+                    border: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppTheme.dividerColor, width: 1.5)),
+                    enabledBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppTheme.dividerColor, width: 1.5)),
+                    focusedBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppTheme.primaryColor, width: 1.5)),
+                    errorBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppTheme.errorColor, width: 1.5)),
+                    focusedErrorBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppTheme.errorColor, width: 1.5)),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                          _obscure
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: AppTheme.textHint,
+                          size: 20),
+                      onPressed: () =>
+                          setState(() => _obscure = !_obscure),
+                    ),
+                  ),
+                  validator: (v) => v == null || v.length < 4
+                      ? 'Mot de passe trop court'
+                      : null,
+                ),
+                const SizedBox(height: 8),
+
+                // ── Mot de passe oublié (orange ImmoZone) ──────────────
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _forgotPassword,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Mot de passe oublié ?',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.orangeColor)),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // ── Bouton pilule dégradé « Se connecter » ─────────────
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          Color(0xFF082F75),
+                          AppTheme.primaryColor,
+                          Color(0xFF1656C9),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(27),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryColor
+                              .withValues(alpha: 0.32),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
                       ],
                     ),
-                  ),
-                );
-              }),
-            )),
-            const SizedBox(height: 28),
-
-            // ── Carte formulaire ────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: AppTheme.accentColor
-                        .withValues(alpha: 0.15)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.07),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                  const Text('Connexion',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                          fontFamily: 'Poppins')),
-                  const SizedBox(height: 4),
-                  const Text(
-                      'Connectez-vous avec votre numéro de téléphone',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textSecondary,
-                          fontFamily: 'Poppins')),
-                  const SizedBox(height: 22),
-
-                  // ── Champ Téléphone ─────────────────────────────────
-                  const Text('Numéro de téléphone',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary)),
-                  const SizedBox(height: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(10),
-                      border: Border.all(
-                          color: AppTheme.dividerColor),
-                    ),
-                    child: Row(children: [
-                      // Bouton indicatif
-                      MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-                        onTap: _showCountryPicker,
-                        child: _codeButton(
-                            _countryCode, null,
-                            flag: selected['flag']),
-                      )),
-                      // Numéro sans indicatif
-                      Expanded(
-                        child: TextFormField(
-                          controller: _phoneCtrl,
-                          keyboardType:
-                              TextInputType.phone,
-                          // Enter → passe au champ mot de passe
-                          textInputAction:
-                              TextInputAction.next,
-                          onFieldSubmitted: (_) =>
-                              FocusScope.of(context)
-                                  .nextFocus(),
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText:
-                                'Numéro (ex : 812345678)',
-                            hintStyle: TextStyle(
-                                fontFamily: 'Poppins',
-                                color: AppTheme.textHint,
-                                fontSize: 12),
-                            border: InputBorder.none,
-                            enabledBorder:
-                                InputBorder.none,
-                            focusedBorder:
-                                InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            contentPadding:
-                                EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 14),
-                          ),
-                          validator: (v) =>
-                              v == null || v.trim().isEmpty
-                                  ? 'Numéro requis'
-                                  : null,
-                        ),
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // ── Champ Mot de passe ──────────────────────────────
-                  TextFormField(
-                    controller: _passwordCtrl,
-                    obscureText: _obscure,
-                    // Enter → soumet le formulaire (même effet que « Se connecter »)
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!context.read<AuthProvider>().isLoading) _login();
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: AppTheme.accentColor),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                            _obscure
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: AppTheme.textSecondary,
-                            size: 20),
-                        onPressed: () => setState(
-                            () => _obscure = !_obscure),
-                      ),
-                    ),
-                    validator: (v) =>
-                        v == null || v.length < 4
-                            ? 'Mot de passe trop court'
-                            : null,
-                  ),
-
-                  // ── Mot de passe oublié ─────────────────────────────
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: _forgotPassword,
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: Size.zero,
-                        tapTargetSize:
-                            MaterialTapTargetSize
-                                .shrinkWrap,
-                      ),
-                      child: const Text(
-                          'Mot de passe oublié ?',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.accentColor)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // ── Bouton Se connecter ─────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
                     child: ElevatedButton(
-                      onPressed:
-                          auth.isLoading ? null : _login,
+                      onPressed: auth.isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            AppTheme.primaryColor,
+                        backgroundColor: Colors.transparent,
+                        disabledBackgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 15),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(12),
-                          side: const BorderSide(
-                              color: AppTheme.accentColor,
-                              width: 1.5),
-                        ),
+                            borderRadius: BorderRadius.circular(27)),
                       ),
                       child: auth.isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child:
-                                  CircularProgressIndicator(
-                                      color: AppTheme
-                                          .accentColor,
-                                      strokeWidth: 2))
-                          : const Text('Se connecter',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontWeight:
-                                      FontWeight.w700,
-                                  fontSize: 15,
-                                  color: Colors.white)),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.center,
+                              children: const [
+                                Text('Se connecter',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        color: Colors.white)),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward_rounded,
+                                    size: 18, color: Colors.white),
+                              ],
+                            ),
                     ),
                   ),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 18),
+                ),
+                const SizedBox(height: 20),
 
-            Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-              const Text('Pas encore de compte ? ',
-                  style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                      fontFamily: 'Poppins')),
-              TextButton(
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            const RegisterScreen())),
-                child: const Text('S\'inscrire',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w700)),
-              ),
-            ]),
-            const SizedBox(height: 16),
-          ]),
-        ),
+                // ── Lien inscription ───────────────────────────────────
+                Center(
+                  child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                    const Text('Pas encore de compte ? ',
+                        style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 13,
+                            fontFamily: 'Poppins')),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const RegisterScreen())),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('S\'inscrire',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: AppTheme.orangeColor)),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 24),
+              ]),
+            ),
+          ),
+        ]),
       ),
     );
   }
 
-  // ── Bouton indicatif pays ─────────────────────────────────────────────────
-  Widget _codeButton(String code, VoidCallback? onTap,
-      {String? flag}) {
+  // ── Bandeau marque : dégradé bleu + logo + slogan + coins arrondis ────────
+  Widget _brandHeader(BuildContext context) {
+    return Stack(children: [
+      // Fond dégradé avec cercles décoratifs
+      Container(
+        width: double.infinity,
+        height: 252,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF082F75),
+              AppTheme.primaryColor,
+              Color(0xFF1656C9),
+            ],
+          ),
+        ),
+        child: Stack(clipBehavior: Clip.hardEdge, children: [
+          // Cercles décoratifs subtils
+          Positioned(
+            top: -60,
+            right: -40,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 30,
+            left: -50,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 70,
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.orangeColor.withValues(alpha: 0.18),
+              ),
+            ),
+          ),
+          // Logo + slogan
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 34, 28, 0),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                // Logo texte cliquable → accueil public
+                MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => context.go('/public'),
+                      child: RichText(
+                        text: const TextSpan(
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              height: 1.1),
+                          children: [
+                            TextSpan(
+                                text: 'Immo',
+                                style: TextStyle(color: Colors.white)),
+                            TextSpan(
+                                text: 'Zone',
+                                style: TextStyle(
+                                    color: AppTheme.orangeColor)),
+                          ],
+                        ),
+                      ),
+                    )),
+                const SizedBox(height: 10),
+                Text(
+                  'La 1ère plateforme de l\'immobilier en RD Congo\net au Congo Brazzaville',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12.5,
+                      height: 1.45,
+                      color: Colors.white.withValues(alpha: 0.85)),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+      // Bande blanche arrondie qui remonte sur le bandeau
+      Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
+        child: Container(
+          height: 28,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Bouton indicatif pays (sans bordure, style souligné) ──────────────────
+  Widget _codeButton(String code, VoidCallback? onTap, {String? flag}) {
     final entry = AppConstants.countryCodes.firstWhere(
       (c) => c['code'] == code,
       orElse: () => AppConstants.countryCodes.first,
     );
-    return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 10, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border(
-              right:
-                  BorderSide(color: AppTheme.dividerColor)),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(flag ?? entry['flag'] ?? '',
-              style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 4),
-          Text(code,
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: AppTheme.accentColor)),
-          const SizedBox(width: 2),
-          const Icon(Icons.arrow_drop_down,
-              color: AppTheme.accentColor, size: 18),
-        ]),
-      ),
-    ));
+    return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 2, vertical: 15),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(flag ?? entry['flag'] ?? '',
+                  style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 5),
+              Text(code,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      color: AppTheme.primaryColor)),
+              const Icon(Icons.arrow_drop_down,
+                  color: AppTheme.textHint, size: 18),
+            ]),
+          ),
+        ));
   }
 
 
