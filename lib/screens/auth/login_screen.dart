@@ -833,7 +833,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
+      body: SafeArea(
+        // top:false → le dégradé du bandeau s'étend sous la barre de statut
+        // (le contenu du bandeau a son propre SafeArea interne).
+        // bottom:true → rien ne passe sous la barre de navigation système.
+        top: false,
+        child: SingleChildScrollView(
         child: Column(children: [
           // ── Bandeau marque dégradé ────────────────────────────────────
           _brandHeader(context),
@@ -1093,6 +1098,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ]),
+        ),
       ),
     );
   }

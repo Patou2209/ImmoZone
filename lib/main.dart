@@ -321,35 +321,19 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            RichText(
+            // Slogan entièrement en bleu ImmoZone (une seule couleur)
+            const Text(
+              'La 1ère plateforme de l\'immobilier '
+              'en RD Congo et au Congo Brazzaville',
               textAlign: TextAlign.center,
               maxLines: 2,
-              text: TextSpan(
-                // Texte bleu — mots-clés '1ère' et 'immobilier' en orange
-                // (identique à la version web)
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.primaryColor,
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700,
-                  height: 1.45,
-                  letterSpacing: 0.1,
-                ),
-                children: [
-                  const TextSpan(text: 'La '),
-                  TextSpan(
-                    text: '1ère',
-                    style: TextStyle(color: AppTheme.orangeColor),
-                  ),
-                  const TextSpan(text: ' plateforme de l\''),
-                  TextSpan(
-                    text: 'immobilier',
-                    style: TextStyle(color: AppTheme.orangeColor),
-                  ),
-                  const TextSpan(
-                    text: ' en RD Congo et au Congo Brazzaville',
-                  ),
-                ],
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.primaryColor,
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                height: 1.45,
+                letterSpacing: 0.1,
               ),
             ),
           ],
