@@ -949,6 +949,16 @@ class DataService {
       // expiresAt absent OU déjà dépassé → (re)démarrer la validité de [days] jours
       if (existing == null || existing.isBefore(now)) {
         update['expiresAt'] = now.add(Duration(days: days)).toIso8601String();
+        // ── BLINDAGE DATE ── L'annonce était expirée (ou sans date) et
+        // redevient active : sa date d'affichage (createdAt) doit refléter
+        // cette remise en ligne. renewProperty() le fait déjà dans le flux
+        // nominal ; ceci couvre TOUT autre chemin d'activation (réactivation
+        // admin directe, données legacy, etc.). On ne touche PAS createdAt
+        // pour une simple approbation d'annonce encore dans sa fenêtre.
+        final wasExpired = existing != null && existing.isBefore(now);
+        if (wasExpired) {
+          update['createdAt'] = now.toIso8601String();
+        }
       }
     }
 
