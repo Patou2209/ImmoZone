@@ -55,8 +55,13 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
     // status + expiresAt dans UNE SEULE écriture Firestore atomique.
     // (Ancien code : 2 écritures séparées → race condition → annonces sans
     // date d'expiration si la 2e écriture échouait.)
-    await _ds.updatePropertyStatus(p.id, 'Actif');
-    _snackOk('✅ Annonce approuvée et publiée pour $days jours');
+    try {
+      await _ds.updatePropertyStatus(p.id, 'Actif');
+      _snackOk('✅ Annonce approuvée et publiée pour $days jours');
+    } catch (e) {
+      // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
+      _snackErr('⛔ ${e.toString().replaceFirst('Exception: ', '')}');
+    }
     _load();
   }
 

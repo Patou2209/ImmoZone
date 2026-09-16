@@ -172,14 +172,25 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
             onStatusChange: (newStatus) async {
               final provider = context.read<PropertyProvider>();
               final messenger = ScaffoldMessenger.of(context);
-              await provider.updateStatus(prop.id, newStatus);
+              try {
+                await provider.updateStatus(prop.id, newStatus);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Statut mis à jour: $newStatus'),
+                    backgroundColor: AppTheme.successColor,
+                  ),
+                );
+              } catch (e) {
+                // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('⛔ ${e.toString().replaceFirst('Exception: ', '')}'),
+                    backgroundColor: AppTheme.errorColor,
+                    duration: const Duration(seconds: 6),
+                  ),
+                );
+              }
               _loadData();
-              messenger.showSnackBar(
-                SnackBar(
-                  content: Text('Statut mis à jour: $newStatus'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
             },
             onDelete: () async {
               final provider = context.read<PropertyProvider>();

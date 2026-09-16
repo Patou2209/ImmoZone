@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImmoZone — Propositions écran Connexion</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins','Segoe UI',sans-serif; }
+  body { background:#e8eaf0; padding:30px 16px; }
+  h1 { text-align:center; font-size:22px; color:#1a2340; margin-bottom:6px; }
+  .sub { text-align:center; color:#667; font-size:13px; margin-bottom:30px; }
+  .row { display:flex; flex-wrap:wrap; gap:40px; justify-content:center; align-items:flex-start; }
+  .col { text-align:center; }
+  .label { font-weight:700; font-size:15px; color:#1a2340; margin-bottom:4px; }
+  .desc { font-size:12px; color:#667; margin-bottom:14px; max-width:340px; }
+  .phone {
+    width:340px; height:700px; background:#fff; border-radius:36px;
+    box-shadow:0 18px 50px rgba(0,0,0,.25); overflow:hidden; position:relative;
+    border:10px solid #111;
+  }
+  /* ═══════════ OPTION A — Épuré minimaliste ═══════════ */
+  .a-body { padding:70px 30px 0; height:100%; background:#fff; display:flex; flex-direction:column; }
+  .logo { font-size:30px; font-weight:800; }
+  .logo .b { color:#2B5BE8; } .logo .o { color:#F06428; }
+  .a-title { font-size:24px; font-weight:700; color:#1a2340; margin-top:44px; text-align:left; }
+  .a-sub { font-size:13px; color:#8a93a6; margin-top:6px; text-align:left; }
+  .a-field { margin-top:26px; text-align:left; }
+  .a-field label { font-size:12px; font-weight:600; color:#5a6475; }
+  .a-input {
+    margin-top:8px; background:#f3f5f9; border-radius:14px; height:54px;
+    display:flex; align-items:center; padding:0 16px; gap:10px;
+  }
+  .a-input .flag { font-size:18px; }
+  .a-input .cc { font-weight:700; font-size:14px; color:#1a2340; }
+  .a-input .sep { color:#c5ccd8; }
+  .a-input .ph { color:#a8b0bf; font-size:13px; }
+  .a-input .icon { color:#8a93a6; font-size:16px; }
+  .a-input.focus { background:#eef2fe; box-shadow:inset 0 0 0 1.5px #2B5BE8; }
+  .a-forgot { text-align:right; font-size:12px; color:#2B5BE8; font-weight:600; margin-top:12px; }
+  .a-btn {
+    margin-top:26px; background:#2B5BE8; color:#fff; height:54px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px;
+    box-shadow:0 8px 20px rgba(43,91,232,.30);
+  }
+  .a-register { margin-top:auto; margin-bottom:34px; font-size:13px; color:#8a93a6; }
+  .a-register b { color:#F06428; font-weight:700; }
+  .spacer { flex:1; }
+  /* ═══════════ OPTION B — Premium bandeau ═══════════ */
+  .b-header {
+    height:250px; background:linear-gradient(150deg,#1d3fa8 0%,#2B5BE8 55%,#3d6ef5 100%);
+    position:relative; display:flex; flex-direction:column; justify-content:center; padding:0 30px;
+  }
+  .b-header::after {
+    content:''; position:absolute; right:-60px; top:-60px; width:220px; height:220px;
+    border-radius:50%; background:rgba(255,255,255,.07);
+  }
+  .b-header::before {
+    content:''; position:absolute; right:30px; bottom:36px; width:90px; height:90px;
+    border-radius:50%; background:rgba(237,92,31,.25);
+  }
+  .b-logo { font-size:28px; font-weight:800; color:#fff; text-align:left; }
+  .b-logo .o { color:#F06428; }
+  .b-slogan { color:rgba(255,255,255,.85); font-size:12px; margin-top:8px; text-align:left; max-width:230px; line-height:1.5; }
+  .b-panel {
+    background:#fff; border-radius:28px 28px 0 0; margin-top:-28px; position:relative;
+    padding:30px 30px 0; height:calc(100% - 222px); display:flex; flex-direction:column; text-align:left;
+  }
+  .b-title { font-size:21px; font-weight:700; color:#1a2340; }
+  .b-sub { font-size:12.5px; color:#8a93a6; margin-top:4px; }
+  .b-field { margin-top:22px; }
+  .b-field label { font-size:12px; font-weight:600; color:#5a6475; }
+  .b-input {
+    margin-top:8px; border-bottom:1.5px solid #e3e7ee; height:46px;
+    display:flex; align-items:center; gap:10px; padding:0 2px;
+  }
+  .b-input .flag { font-size:18px; }
+  .b-input .cc { font-weight:700; font-size:14px; color:#2B5BE8; }
+  .b-input .ph { color:#a8b0bf; font-size:13px; }
+  .b-input .icon { color:#b3bac7; margin-left:auto; }
+  .b-input.focus { border-bottom-color:#2B5BE8; }
+  .b-forgot { text-align:right; font-size:12px; color:#F06428; font-weight:600; margin-top:14px; }
+  .b-btn {
+    margin-top:28px; background:linear-gradient(90deg,#2B5BE8,#1d3fa8); color:#fff; height:54px;
+    border-radius:27px; display:flex; align-items:center; justify-content:center; gap:8px;
+    font-weight:700; font-size:15px; box-shadow:0 10px 24px rgba(43,91,232,.35);
+  }
+  .b-register { margin-top:auto; margin-bottom:30px; font-size:13px; color:#8a93a6; text-align:center; }
+  .b-register b { color:#2B5BE8; font-weight:700; }
+</style>
+</head>
+<body>
+<h1>Écran Connexion — 2 propositions</h1>
+<p class="sub">Zéro bordure décorative superflue • hiérarchie claire • identité ImmoZone conservée</p>
+<div class="row">
+
+  <!-- ═══════════ OPTION A ═══════════ -->
+  <div class="col">
+    <div class="label">Option A — Épuré minimaliste</div>
+    <div class="desc">Fond blanc pur, sans carte. Champs « remplis » gris doux, aucune bordure (juste un liseré bleu au focus). Bouton bleu plein avec ombre colorée. Style Revolut / Airbnb.</div>
+    <div class="phone">
+      <div class="a-body">
+        <div class="logo" style="text-align:left"><span class="b">Immo</span><span class="o">Zone</span></div>
+        <div class="a-title">Bon retour 👋</div>
+        <div class="a-sub">Connectez-vous pour continuer</div>
+        <div class="a-field">
+          <label>Numéro de téléphone</label>
+          <div class="a-input focus">
+            <span class="flag">🇨🇩</span><span class="cc">+243</span><span class="sep">|</span><span class="ph">812 345 678</span>
+          </div>
+        </div>
+        <div class="a-field">
+          <label>Mot de passe</label>
+          <div class="a-input">
+            <span class="ph" style="letter-spacing:3px">••••••••</span>
+            <span class="icon" style="margin-left:auto">👁</span>
+          </div>
+        </div>
+        <div class="a-forgot">Mot de passe oublié ?</div>
+        <div class="a-btn">Se connecter</div>
+        <div class="spacer"></div>
+        <div class="a-register">Pas encore de compte ?  <b>Créer un compte</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ OPTION B ═══════════ -->
+  <div class="col">
+    <div class="label">Option B — Premium bandeau marque</div>
+    <div class="desc">Bandeau dégradé bleu avec logo blanc + slogan (identité forte), panneau blanc arrondi qui remonte. Champs soulignés fins (zéro cadre). Bouton pilule dégradé. Style app bancaire premium.</div>
+    <div class="phone">
+      <div class="b-header">
+        <div class="b-logo">Immo<span class="o">Zone</span></div>
+        <div class="b-slogan">La 1ère plateforme de l'immobilier en RD Congo et au Congo Brazzaville</div>
+      </div>
+      <div class="b-panel">
+        <div class="b-title">Connexion</div>
+        <div class="b-sub">Heureux de vous revoir !</div>
+        <div class="b-field">
+          <label>Numéro de téléphone</label>
+          <div class="b-input focus">
+            <span class="flag">🇨🇩</span><span class="cc">+243</span><span class="ph">812 345 678</span>
+          </div>
+        </div>
+        <div class="b-field">
+          <label>Mot de passe</label>
+          <div class="b-input">
+            <span class="ph" style="letter-spacing:3px">••••••••</span>
+            <span class="icon">👁</span>
+          </div>
+        </div>
+        <div class="b-forgot">Mot de passe oublié ?</div>
+        <div class="b-btn">Se connecter →</div>
+        <div class="b-register">Pas encore de compte ?  <b>Créer un compte</b></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

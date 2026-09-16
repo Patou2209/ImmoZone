@@ -935,12 +935,34 @@ class DataService {
     };
 
     PropertyModel? prop;
+    Map<String, dynamic> rawData = {};
     try {
       final snap = await _propertiesCol.doc(id).get();
       if (snap.exists) {
-        prop = PropertyModel.fromMap(snap.data() as Map<String, dynamic>);
+        rawData = snap.data() as Map<String, dynamic>;
+        prop = PropertyModel.fromMap(rawData);
       }
     } catch (_) {}
+
+    // ── RÈGLE 24H ── Une annonce REJETÉE ne peut être ré-approuvée que dans
+    // les 24 h suivant le rejet. Au-delà, l'annonceur doit soumettre à nouveau.
+    if (status == 'Actif' && prop != null && prop.status == 'Rejeté') {
+      final rejectedAtStr = (rawData['rejectedAt'] ?? rawData['updatedAt']) as String?;
+      final rejectedAt = rejectedAtStr != null ? DateTime.tryParse(rejectedAtStr) : null;
+      if (rejectedAt != null) {
+        final hours = now.difference(rejectedAt).inHours;
+        if (hours >= 24) {
+          throw Exception(
+              'Ré-approbation impossible : cette annonce a été rejetée il y a '
+              '${hours}h (limite 24h). L\'annonceur doit soumettre une nouvelle annonce.');
+        }
+      }
+    }
+
+    // Horodater le rejet → base de la fenêtre de ré-approbation de 24 h
+    if (status == 'Rejeté') {
+      update['rejectedAt'] = now.toIso8601String();
+    }
 
     if (status == 'Actif') {
       final days =
@@ -1225,6 +1247,19 @@ class DataService {
   Future<int> getUnreadNotificationCount(String userId) async {
     final notifs = await getNotificationsForUser(userId);
     return notifs.where((n) => !n.isRead).length;
+  }
+
+  /// Stream TEMPS RÉEL du nombre de notifications non lues.
+  /// Firestore pousse instantanément chaque changement (nouvelle notification,
+  /// marquage lu...) sans que l'app ait besoin de re-poller — supprime le
+  /// retard de transmission constaté après approbation d'une publication.
+  /// (Deux filtres d'égalité → pas d'index composite requis.)
+  Stream<int> unreadNotificationCountStream(String userId) {
+    return _notificationsCol
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snap) => snap.docs.length);
   }
 
   Future<void> addNotification(AppNotification notif) async {

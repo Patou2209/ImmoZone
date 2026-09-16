@@ -913,15 +913,17 @@ exports.refundOrangePayment = onRequest(
           ...(isImmediate ? { refundedAt: new Date().toISOString() } : {}),
         });
 
+        const totalRevokedPay = revokedList.reduce((s, r) => s + (r.remaining || 0), 0);
         res.status(200).json({
           success: !isFailed,
           refundId,
+          creditsRevoked: totalRevokedPay,
           refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           amount: refundAmount,
           currency: creditBody.currency,
           ...(isFailed ? { error: failMessage } : {}),
           message: isImmediate
-            ? 'Remboursement effectué avec succès'
+            ? `Remboursement effectué avec succès — ${totalRevokedPay} crédit(s) révoqué(s)`
             : (isFailed ? failMessage : 'Remboursement initié — confirmation Orange en attente'),
         });
         return;
@@ -1147,17 +1149,20 @@ exports.directOrangeCredit = onRequest(
           ...(isImmediate ? { refundedAt: new Date().toISOString() } : {}),
         });
 
+        // ⚠️ FIX message: compter les CRÉDITS révoqués (somme des remaining),
+        // pas le nombre de documents (1 doc peut contenir 33 crédits).
+        const totalCreditsRevoked = revokedList.reduce((s, r) => s + (r.remaining || 0), 0);
         res.status(200).json({
           success: !isFailed,
           refundId,
           paymentId: matched.id,
-          creditsRevoked: revokedList.length,
+          creditsRevoked: totalCreditsRevoked,
           refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           amount: creditAmount,
           currency: env.currency,
           ...(isFailed ? { error: failMessage } : {}),
           message: isImmediate
-            ? `Remboursement de ${creditAmount} ${env.currency} envoyé au ${msisdn} — ${revokedList.length} crédit(s) révoqué(s)`
+            ? `Remboursement de ${creditAmount} ${env.currency} envoyé au ${msisdn} — ${totalCreditsRevoked} crédit(s) révoqué(s) du compte acheteur`
             : (isFailed ? failMessage : 'Remboursement initié — confirmation Orange en attente'),
         });
         return;

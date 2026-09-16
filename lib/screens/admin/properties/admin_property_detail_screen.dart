@@ -856,13 +856,24 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
   }
 
   Future<void> _changeStatus(BuildContext context, String status) async {
-    await context.read<PropertyProvider>().updateStatus(_property.id, status);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Statut mis à jour : $status'),
-        backgroundColor: AppTheme.successColor,
-      ));
-      Navigator.pop(context);
+    try {
+      await context.read<PropertyProvider>().updateStatus(_property.id, status);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Statut mis à jour : $status'),
+          backgroundColor: AppTheme.successColor,
+        ));
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('⛔ ${e.toString().replaceFirst('Exception: ', '')}'),
+          backgroundColor: AppTheme.errorColor,
+          duration: const Duration(seconds: 6),
+        ));
+      }
     }
   }
 

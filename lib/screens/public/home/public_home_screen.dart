@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -46,6 +47,12 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
   int _unreadNotifCount = 0;
   final DataService _ds = DataService();
 
+  // Listener TEMPS RÉEL sur les notifications non lues : Firestore pousse
+  // instantanément chaque nouvelle notification (approbation, rejet...) —
+  // plus besoin d'attendre l'ouverture de l'onglet Alertes pour voir le badge.
+  StreamSubscription<int>? _unreadSub;
+  String _unreadSubUserId = '';
+
   late final List<Widget> _pages = [
     const _HomeTab(),
     const FavoritesScreen(),
@@ -89,8 +96,24 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     final auth = context.read<AuthProvider>();
     final userId = auth.currentUser?.id ?? '';
     if (userId.isEmpty) return;
+    // (Ré)attache le listener temps réel si l'utilisateur a changé
+    // (connexion, changement de compte) ou s'il n'existe pas encore.
+    if (_unreadSub == null || _unreadSubUserId != userId) {
+      await _unreadSub?.cancel();
+      _unreadSubUserId = userId;
+      _unreadSub = _ds.unreadNotificationCountStream(userId).listen((count) {
+        if (mounted) setState(() => _unreadNotifCount = count);
+      }, onError: (_) {});
+    }
+    // Chargement immédiat en complément (le stream prend le relais ensuite).
     final count = await _ds.getUnreadNotificationCount(userId);
     if (mounted) setState(() => _unreadNotifCount = count);
+  }
+
+  @override
+  void dispose() {
+    _unreadSub?.cancel();
+    super.dispose();
   }
 
   // ── CONTACT SHEET ────────────────────────────────────────────────────────
@@ -652,6 +675,8 @@ class _AlertsTabState extends State<_AlertsTab> {
                   itemBuilder: (_, i) {
                     final n = _notifications[i];
                     final color = _colorForType(n.type);
+                    // Non lue → mise en évidence (gras + fond teinté + point)
+                    final unread = !n.isRead;
                     return Dismissible(
                       key: Key(n.id),
                       direction: DismissDirection.endToStart,
@@ -683,9 +708,11 @@ class _AlertsTabState extends State<_AlertsTab> {
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: unread ? color.withValues(alpha: 0.04) : Colors.white,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: color.withValues(alpha: 0.25)),
+                          border: Border.all(
+                              color: color.withValues(alpha: unread ? 0.55 : 0.25),
+                              width: unread ? 1.4 : 1),
                           boxShadow: [
                             BoxShadow(color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 6, offset: const Offset(0, 2)),
@@ -701,22 +728,39 @@ class _AlertsTabState extends State<_AlertsTab> {
                             ),
                             child: Icon(_iconForType(n.type), color: color, size: 22),
                           ),
-                          title: Text(n.title,
-                              style: TextStyle(
-                                  fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                                  fontSize: 13, color: color)),
+                          title: Row(children: [
+                            Expanded(
+                              child: Text(n.title,
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontWeight: unread ? FontWeight.w800 : FontWeight.w700,
+                                      fontSize: 13, color: color)),
+                            ),
+                            if (unread)
+                              Container(
+                                width: 9, height: 9,
+                                margin: const EdgeInsets.only(left: 6),
+                                decoration: BoxDecoration(
+                                  color: color, shape: BoxShape.circle),
+                              ),
+                          ]),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
                               Text(n.body,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontFamily: 'Poppins', fontSize: 12,
-                                      color: AppTheme.textSecondary, height: 1.4)),
+                                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                                      color: unread
+                                          ? AppTheme.textPrimary
+                                          : AppTheme.textSecondary,
+                                      height: 1.4)),
                               const SizedBox(height: 6),
                               Text(_timeAgo(n.createdAt),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontFamily: 'Poppins', fontSize: 10,
+                                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
                                       color: AppTheme.textHint)),
                             ],
                           ),
