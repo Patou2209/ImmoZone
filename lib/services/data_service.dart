@@ -2091,6 +2091,9 @@ class DataService {
     String paymentId, {
     required String adminId,
     required String adminName,
+    required String refundPhoneNumber, // numéro OM à créditer (saisi par l'admin)
+    required String buyerPhoneNumber,  // compte Immozone qui avait été crédité
+    required double declaredAmount,    // montant déclaré (vérifié == Firestore)
     String? reason,
   }) async {
     final resp = await http
@@ -2102,6 +2105,9 @@ class DataService {
             'paymentId': paymentId,
             'adminId': adminId,
             'adminName': adminName,
+            'refundPhoneNumber': refundPhoneNumber,
+            'buyerPhoneNumber': buyerPhoneNumber,
+            'declaredAmount': declaredAmount,
             'reason': reason,
           }),
         )

@@ -708,11 +708,25 @@ exports.refundOrangePayment = onRequest(
       return;
     }
 
+    // Portée large : accessible au catch pour rollback en cas de crash après révocation
+    let revokedListOuter = [];
     try {
-      const { paymentId, adminId, adminName, reason } = req.body || {};
+      const {
+        paymentId, adminId, adminName, reason,
+        refundPhoneNumber,     // 🆕 numéro Orange Money à créditer (saisi par l'admin)
+        buyerPhoneNumber,      // 🆕 numéro du compte Immozone qui avait été crédité
+        declaredAmount,        // 🆕 montant déclaré par l'admin (doit == Firestore)
+      } = req.body || {};
 
       if (!paymentId || !adminId) {
         res.status(400).json({ error: 'Paramètres manquants: paymentId, adminId requis' });
+        return;
+      }
+      // 🆕 RÈGLE 1 : l'admin DOIT renseigner les numéros + le montant
+      if (!refundPhoneNumber || !buyerPhoneNumber || declaredAmount === undefined || declaredAmount === null) {
+        res.status(400).json({
+          error: 'Paramètres requis: refundPhoneNumber (numéro OM à créditer), buyerPhoneNumber (compte Immozone crédité), declaredAmount (montant)',
+        });
         return;
       }
 
@@ -745,21 +759,76 @@ exports.refundOrangePayment = onRequest(
         return;
       }
 
-      const env = omEnv();
-
-      // 2. Destinataire: le msisdn confirmé par Orange, sinon le numéro saisi
-      //    (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
-      const msisdn = omNormalizeMsisdn(payment.omPeerId || payment.phoneNumber || '');
-      if (!msisdn) {
-        res.status(400).json({ error: 'Numéro Orange Money du client introuvable sur ce paiement' });
+      // 🆕 RÈGLE 2 : fenêtre de 72h — au-delà, remboursement refusé
+      const opDate = new Date(payment.confirmedAt || payment.createdAt || 0).getTime();
+      const ageHours = (Date.now() - opDate) / 3600000;
+      if (!opDate || ageHours > 72) {
+        res.status(400).json({
+          error: `Remboursement refusé : l'achat date de plus de 72h (${Math.floor(ageHours)}h). Fenêtre de remboursement dépassée.`,
+        });
         return;
       }
 
-      // 3. Montant: celui débité par Orange (omAmount) sinon le montant commande
-      let refundAmount = parseFloat(payment.omAmount || payment.amount || 0);
+      // 🆕 RÈGLE 3a : le numéro Immozone renseigné doit être celui de l'acheteur
+      // On compare au numéro porté par le paiement ET au numéro du compte user.
+      const buyerNorm = omNormalizeMsisdn(buyerPhoneNumber);
+      const payNorm = omNormalizeMsisdn(payment.phoneNumber || '');
+      const omNorm = omNormalizeMsisdn(payment.omPeerId || '');
+      let userPhoneNorm = '';
+      try {
+        if (payment.userId) {
+          const buyerDoc = await db.collection('users').doc(payment.userId).get();
+          if (buyerDoc.exists) userPhoneNorm = omNormalizeMsisdn(buyerDoc.data().phone || '');
+        }
+      } catch (_) {}
+      const buyerMatches = buyerNorm && (buyerNorm === payNorm || buyerNorm === omNorm || buyerNorm === userPhoneNorm);
+      if (!buyerMatches) {
+        console.warn(`[refundOrangePayment] ⛔ buyer mismatch: saisi=${buyerNorm} vs payment=${payNorm}/${omNorm}/user=${userPhoneNorm}`);
+        res.status(400).json({
+          error: 'Vérification échouée : le numéro Immozone renseigné ne correspond pas à l\'acheteur de ce paiement.',
+        });
+        return;
+      }
+
+      // 🆕 RÈGLE 3b : le montant déclaré doit être EXACTEMENT celui de Firestore
+      const expectedAmount = parseFloat(payment.omAmount || payment.amount || 0);
+      const declared = parseFloat(String(declaredAmount).replace(',', '.'));
+      if (!declared || Math.abs(declared - expectedAmount) > 0.001) {
+        res.status(400).json({
+          error: `Vérification échouée : montant déclaré (${declared}) différent du montant enregistré (${expectedAmount} ${payment.omCurrency || 'USD'}).`,
+        });
+        return;
+      }
+
+      const env = omEnv();
+
+      // 2. Destinataire : le numéro OM RENSEIGNÉ par l'admin (règle métier),
+      //    format LOCAL exigé par Orange en prod cd
+      const msisdn = omNormalizeMsisdn(refundPhoneNumber);
+      if (!msisdn || !/^\d{7,15}$/.test(msisdn)) {
+        res.status(400).json({ error: 'Numéro Orange Money à créditer invalide' });
+        return;
+      }
+
+      // 3. Montant validé (== Firestore)
+      let refundAmount = expectedAmount;
       if (env.integerAmountsOnly) refundAmount = Math.round(refundAmount);
       if (!refundAmount || refundAmount <= 0) {
         res.status(400).json({ error: 'Montant de remboursement invalide' });
+        return;
+      }
+
+      // 🆕 RÈGLE 4 : RÉVOQUER LES CRÉDITS D'ABORD — si la révocation échoue,
+      // le remboursement N'EST PAS effectué (pas d'argent sans reprise des crédits).
+      let revokedList = [];
+      try {
+        revokedList = await revokeCreditsForPayment(paymentId);
+        revokedListOuter = revokedList;
+      } catch (revokeErr) {
+        console.error('[refundOrangePayment] ⛔ Échec révocation crédits — remboursement ANNULÉ:', revokeErr);
+        res.status(500).json({
+          error: 'Révocation des crédits impossible — remboursement annulé par sécurité. Réessayez.',
+        });
         return;
       }
 
@@ -810,15 +879,22 @@ exports.refundOrangePayment = onRequest(
           }
         }
 
+        // 🆕 Si Orange a REFUSÉ le crédit → restaurer les crédits révoqués (rollback)
+        if (isFailed && revokedList.length > 0) {
+          await unrevokeCredits(revokedList);
+        }
+
         // Doc de suivi du remboursement (le webhook le retrouvera par refundId)
         await db.collection('refunds').doc(refundId).set({
           id: refundId,
           paymentId,
           userId: payment.userId ?? null,   // robustesse: doc de test sans userId
           msisdn,
+          buyerPhoneNumber: buyerNorm,      // 🆕 traçabilité: compte acheteur vérifié
           amount: refundAmount,
           currency: creditBody.currency,
           status: isImmediate ? 'confirmed' : (isFailed ? 'failed' : 'pending'),
+          creditsRevoked: revokedList.map((r) => r.id), // 🆕 traçabilité révocation
           reason: reason || null,
           adminId,
           adminName: adminName || '',
@@ -837,8 +913,6 @@ exports.refundOrangePayment = onRequest(
           ...(isImmediate ? { refundedAt: new Date().toISOString() } : {}),
         });
 
-        if (isImmediate) await revokeCreditsAfterRefund(paymentId);
-
         res.status(200).json({
           success: !isFailed,
           refundId,
@@ -854,6 +928,8 @@ exports.refundOrangePayment = onRequest(
       }
 
       // Échec (dont code 70 tant que le service CREDIT n'est pas activé au contrat)
+      // 🆕 Orange a rejeté la requête → restaurer les crédits révoqués (rollback)
+      if (revokedList.length > 0) await unrevokeCredits(revokedList);
       const errorMsg = orangeErrorMessage(omResp.body, omResp.status);
       console.error('[refundOrangePayment] Orange error:', omResp.status, JSON.stringify(omResp.body));
       res.status(200).json({
@@ -864,6 +940,9 @@ exports.refundOrangePayment = onRequest(
 
     } catch (err) {
       console.error('[refundOrangePayment] Exception:', err);
+      // 🆕 Crash après révocation mais avant/inconnu côté Orange → restaurer les crédits
+      // (le webhook re-révoquera si Orange confirme finalement le remboursement)
+      if (revokedListOuter.length > 0) await unrevokeCredits(revokedListOuter);
       res.status(500).json({ success: false, error: err.message });
     }
   }
@@ -1007,19 +1086,60 @@ exports.directOrangeCredit = onRequest(
 );
 
 // ─── Révoquer les crédits associés à un paiement remboursé ─────────────────────
+// ⚠️ Deux formats d'ID coexistent en prod :
+//   - `credit_<paymentId>`                (crédit auto serveur — creditUserAfterPayment)
+//   - `credit_<paymentId>_<timestamp>`    (validation manuelle admin côté app)
+// → requête par PLAGE d'ID (préfixe) pour couvrir les deux.
+// Retourne la liste des docs révoqués (pour rollback éventuel) ; throw si échec.
+async function revokeCreditsForPayment(paymentId, reason = 'remboursement_orange_money') {
+  const prefix = `credit_${paymentId}`;
+  const snap = await db.collection('credits')
+    .where(admin.firestore.FieldPath.documentId(), '>=', prefix)
+    .where(admin.firestore.FieldPath.documentId(), '<=', prefix + '\uf8ff')
+    .get();
+
+  const revoked = [];
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    if (d.revoked === true) continue; // déjà révoqué (idempotent)
+    await doc.ref.update({
+      remainingBeforeRevoke: d.remaining ?? 0, // pour rollback
+      remaining: 0,
+      revoked: true,
+      revokedAt: new Date().toISOString(),
+      revokedReason: reason,
+    });
+    revoked.push({ id: doc.id, remaining: d.remaining ?? 0 });
+    console.log(`[revokeCredits] ✅ ${doc.id} révoqué (remaining ${d.remaining ?? 0} → 0)`);
+  }
+  if (snap.empty) {
+    console.warn(`[revokeCredits] Aucun doc crédit trouvé pour ${paymentId} (préfixe ${prefix})`);
+  }
+  return revoked;
+}
+
+// Rollback : restaurer les crédits révoqués si le remboursement Orange échoue ensuite
+async function unrevokeCredits(revokedList) {
+  for (const item of revokedList) {
+    try {
+      await db.collection('credits').doc(item.id).update({
+        remaining: item.remaining,
+        revoked: false,
+        revokedAt: null,
+        revokedReason: null,
+        unrevokedAt: new Date().toISOString(),
+      });
+      console.log(`[unrevokeCredits] ↩️ ${item.id} restauré (remaining=${item.remaining})`);
+    } catch (e) {
+      console.error(`[unrevokeCredits] ÉCHEC restauration ${item.id}:`, e.message);
+    }
+  }
+}
+
+// Compat : ancien nom utilisé par le webhook (révocation après confirmation asynchrone)
 async function revokeCreditsAfterRefund(paymentId) {
   try {
-    const creditRef = db.collection('credits').doc(`credit_${paymentId}`);
-    const creditDoc = await creditRef.get();
-    if (creditDoc.exists && !creditDoc.data().revoked) {
-      await creditRef.update({
-        remaining: 0,
-        revoked: true,
-        revokedAt: new Date().toISOString(),
-        revokedReason: 'remboursement_orange_money',
-      });
-      console.log(`[revokeCredits] Crédits ${paymentId} révoqués (remboursement)`);
-    }
+    await revokeCreditsForPayment(paymentId);
   } catch (e) {
     console.warn('[revokeCredits] Échec révocation:', e.message);
   }

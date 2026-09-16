@@ -1193,7 +1193,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     )),
                 const SizedBox(height: 10),
                 Text(
-                  'La 1ère plateforme de l\'immobilier en RD Congo\net au Congo Brazzaville',
+                  'La 1ère plateforme de l\'immobilier en RD Congo et au Congo Brazzaville',
+                  softWrap: true,
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12.5,

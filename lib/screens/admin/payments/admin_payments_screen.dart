@@ -49,7 +49,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
   double get _totalRevenue => _confirmed.fold(0, (s, p) => s + p.amount);
 
   // ── Callback de remboursement Orange Money — appelé depuis _PaymentTile ────
-  Future<void> _onRefund(String paymentId, String? reason) async {
+  Future<void> _onRefund(String paymentId, String? reason, String refundPhone,
+      String buyerPhone, double declaredAmount) async {
     String message;
     bool success = true;
     try {
@@ -57,6 +58,9 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
         paymentId,
         adminId: _ds.currentUserId,
         adminName: _ds.currentUserName,
+        refundPhoneNumber: refundPhone,
+        buyerPhoneNumber: buyerPhone,
+        declaredAmount: declaredAmount,
         reason: reason,
       );
     } catch (e) {
@@ -216,7 +220,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
             onValidate: showActions
                 ? (approve, note) => _onValidate(payment.id, approve, note)
                 : null,
-            onRefund: (reason) => _onRefund(payment.id, reason),
+            onRefund: (reason, refundPhone, buyerPhone, declared) =>
+                _onRefund(payment.id, reason, refundPhone, buyerPhone, declared),
             onReload: _load,
           );
         },
@@ -232,7 +237,8 @@ class _PaymentTile extends StatefulWidget {
   final PaymentModel payment;
   final bool showActions;
   final Future<void> Function(bool approve, String? note)? onValidate;
-  final Future<void> Function(String? reason)? onRefund;
+  final Future<void> Function(String? reason, String refundPhone,
+      String buyerPhone, double declaredAmount)? onRefund;
   final Future<void> Function()? onReload;
 
   const _PaymentTile({
@@ -405,10 +411,31 @@ class _PaymentTileState extends State<_PaymentTile> {
   }
 
   // ── Dialog de confirmation du remboursement Orange Money ───────────────
+  // 🔒 Règles de sécurité : l'admin DOIT renseigner le numéro OM à créditer,
+  // le numéro du compte Immozone crédité et le montant exact. Le serveur
+  // vérifie tout (acheteur, montant, fenêtre 72h) puis RÉVOQUE LES CRÉDITS
+  // AVANT d'envoyer l'argent.
   void _showRefundDialog(BuildContext context) {
     final reasonCtrl = TextEditingController();
+    final refundPhoneCtrl = TextEditingController();
+    final buyerPhoneCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
     final refundFormKey = GlobalKey<FormState>();
     final payment = widget.payment;
+
+    // Fenêtre 72h — pré-check côté client (le serveur re-vérifie)
+    final opDate = payment.confirmedAt ?? payment.createdAt;
+    final ageHours = DateTime.now().difference(opDate).inHours;
+    final isExpired = ageHours > 72;
+
+    String? validatePhone(String? v) {
+      final cleaned = (v ?? '')
+          .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
+          .replaceAll('+', '');
+      if (cleaned.isEmpty) return 'Numéro requis';
+      if (!RegExp(r'^\d{9,13}$').hasMatch(cleaned)) return 'Numéro invalide';
+      return null;
+    }
 
     showDialog(
       context: context,
@@ -424,7 +451,8 @@ class _PaymentTileState extends State<_PaymentTile> {
                     fontWeight: FontWeight.w700)),
           ),
         ]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -486,69 +514,150 @@ class _PaymentTileState extends State<_PaymentTile> {
             ),
           ),
           const SizedBox(height: 12),
-          Form(
-            key: refundFormKey,
-            child: TextFormField(
-              controller: reasonCtrl,
-              maxLines: 1,
-              maxLength: 19,
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-              decoration: InputDecoration(
-                labelText: 'Motif (obligatoire)',
-                hintText: 'Ex: Annulation client',
-                helperText: 'Max 19 caractères (limite Orange)',
-                helperStyle: const TextStyle(
-                    fontFamily: 'Poppins', fontSize: 10),
-                hintStyle: const TextStyle(fontFamily: 'Poppins',
-                    color: AppTheme.textHint),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+          if (isExpired)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.errorColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
               ),
-              validator: (v) {
-                final reason = (v ?? '').trim();
-                if (reason.isEmpty) return 'Motif obligatoire';
-                if (reason.length >= 20) return 'Maximum 19 caractères';
-                return null;
-              },
+              child: Row(children: [
+                const Icon(Icons.block_rounded, size: 16,
+                    color: AppTheme.errorColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Remboursement impossible : achat de plus de 72h (${ageHours}h).',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        color: AppTheme.errorColor),
+                  ),
+                ),
+              ]),
+            )
+          else
+            Form(
+              key: refundFormKey,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextFormField(
+                  controller: buyerPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Compte Immozone crédité (n° acheteur)',
+                    hintText: 'Ex: 0894779652',
+                    prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                    helperText: 'Doit correspondre à l\'acheteur du paiement',
+                    helperStyle: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: validatePhone,
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: refundPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Numéro Orange Money à créditer',
+                    hintText: 'Ex: 0894779652',
+                    prefixIcon: const Icon(Icons.phone_android_rounded,
+                        size: 20, color: Color(0xFFFF7900)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: validatePhone,
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: amountCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Montant exact de l\'achat (USD)',
+                    hintText: 'Ex: ${payment.amount.toStringAsFixed(2)}',
+                    prefixIcon: const Icon(Icons.attach_money_rounded,
+                        size: 20, color: Color(0xFFFF7900)),
+                    helperText: 'Vérifié contre le montant enregistré',
+                    helperStyle: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (v) {
+                    final amount =
+                        double.tryParse((v ?? '').replaceAll(',', '.'));
+                    if (amount == null || amount <= 0) return 'Montant invalide';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: reasonCtrl,
+                  maxLines: 1,
+                  maxLength: 19,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: 'Motif (obligatoire)',
+                    hintText: 'Ex: Annulation client',
+                    helperText: 'Max 19 caractères (limite Orange)',
+                    helperStyle: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 10),
+                    hintStyle: const TextStyle(fontFamily: 'Poppins',
+                        color: AppTheme.textHint),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  validator: (v) {
+                    final reason = (v ?? '').trim();
+                    if (reason.isEmpty) return 'Motif obligatoire';
+                    if (reason.length >= 20) return 'Maximum 19 caractères';
+                    return null;
+                  },
+                ),
+              ]),
             ),
-          ),
-        ]),
+        ])),
         actions: [
           TextButton(
-            onPressed: () {
-              reasonCtrl.dispose();
-              Navigator.pop(ctx);
-            },
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Annuler',
                 style: TextStyle(fontFamily: 'Poppins',
                     color: AppTheme.textSecondary)),
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              // Motif obligatoire (< 20 caractères — limite Orange)
-              if (!(refundFormKey.currentState?.validate() ?? false)) return;
-              final reason = reasonCtrl.text.trim();
-              Navigator.pop(ctx);
-              reasonCtrl.dispose();
-              if (!mounted) return;
-              setState(() => _refunding = true);
-              try {
-                await widget.onRefund?.call(reason);
-              } finally {
-                if (mounted) setState(() => _refunding = false);
-              }
-            },
-            icon: const Icon(Icons.undo_rounded, size: 16),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF7900),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+          if (!isExpired)
+            ElevatedButton.icon(
+              onPressed: () async {
+                if (!(refundFormKey.currentState?.validate() ?? false)) return;
+                final reason = reasonCtrl.text.trim();
+                final refundPhone = refundPhoneCtrl.text.trim();
+                final buyerPhone = buyerPhoneCtrl.text.trim();
+                final declared = double.parse(
+                    amountCtrl.text.replaceAll(',', '.'));
+                Navigator.pop(ctx);
+                if (!mounted) return;
+                setState(() => _refunding = true);
+                try {
+                  await widget.onRefund?.call(reason, refundPhone,
+                      buyerPhone, declared);
+                } finally {
+                  if (mounted) setState(() => _refunding = false);
+                }
+              },
+              icon: const Icon(Icons.undo_rounded, size: 16),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF7900),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              label: const Text('Rembourser',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600)),
             ),
-            label: const Text('Rembourser',
-                style: TextStyle(fontFamily: 'Poppins',
-                    fontWeight: FontWeight.w600)),
-          ),
         ],
       ),
     );

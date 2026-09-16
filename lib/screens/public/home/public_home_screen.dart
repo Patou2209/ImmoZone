@@ -2810,6 +2810,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _availableCredits = 0;
   // Filtre actif via les cartes statistiques (null = toutes les annonces)
   String? _statFilter;
+  bool _kpiLegendExpanded = false; // légende des KPI (onglet dépliable)
 
 
   @override
@@ -3372,7 +3373,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     _statCard('Rejetées', rejected.length, Icons.cancel_outlined,
                         AppTheme.errorColor, filterKey: 'rejected'),
                   ]),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
+
+                  // Onglet dépliable : légende des icônes KPI
+                  _kpiLegend(),
+                  const SizedBox(height: 16),
 
                   // Bouton publier
                   SizedBox(
@@ -3517,20 +3522,102 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 width: isActive ? 1.6 : 1),
             boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
           ),
-          child: Column(children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 4),
-            Text('$count',
-                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                    fontSize: 18, color: color)),
-            Text(label, style: TextStyle(fontFamily: 'Poppins',
-                fontSize: 9,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                color: isActive ? color : AppTheme.textSecondary),
-                textAlign: TextAlign.center),
-          ]),
+          child: Tooltip(
+            message: label,
+            child: Column(children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 4),
+              Text('$count',
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
+                      fontSize: 18, color: color)),
+            ]),
+          ),
         ),
       ),
+    );
+  }
+
+  /// Onglet dépliable expliquant chaque icône KPI du dashboard annonceur.
+  Widget _kpiLegend() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+      ),
+      child: Column(children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _kpiLegendExpanded = !_kpiLegendExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              const Icon(Icons.info_outline_rounded,
+                  size: 16, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Que signifient ces icônes ?',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary)),
+              ),
+              AnimatedRotation(
+                turns: _kpiLegendExpanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 20, color: AppTheme.textSecondary),
+              ),
+            ]),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Column(children: [
+              _legendRow(Icons.apps_rounded, AppTheme.primaryColor,
+                  'Toutes les annonces', 'Total de vos annonces publiées'),
+              _legendRow(Icons.check_circle_outline_rounded, AppTheme.successColor,
+                  'Actives', 'Annonces en ligne et visibles par les visiteurs'),
+              _legendRow(Icons.hourglass_top_rounded, AppTheme.warningColor,
+                  'En attente', 'Annonces en cours de validation par l\'équipe'),
+              _legendRow(Icons.timer_off_rounded, const Color(0xFFE65100),
+                  'Expirées', 'Annonces dont la durée de publication est terminée'),
+              _legendRow(Icons.lock_outline_rounded, AppTheme.accentColor,
+                  'Fermées', 'Annonces marquées comme vendues ou louées'),
+              _legendRow(Icons.cancel_outlined, AppTheme.errorColor,
+                  'Rejetées', 'Annonces refusées lors de la validation'),
+            ]),
+          ),
+          crossFadeState: _kpiLegendExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ]),
+    );
+  }
+
+  Widget _legendRow(IconData icon, Color color, String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: AppTheme.textSecondary),
+              children: [
+                TextSpan(text: '$title : ',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: color)),
+                TextSpan(text: desc),
+              ],
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
