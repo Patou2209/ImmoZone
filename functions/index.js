@@ -949,9 +949,11 @@ exports.refundOrangePayment = onRequest(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CLOUD FUNCTION: directOrangeCredit — Remboursement LIBRE (dashboard admin)
-// L'admin saisit un numéro Orange Money + un montant → POST /{country}/credit.
-// Indépendant de tout paiement existant (contrairement à refundOrangePayment).
+// CLOUD FUNCTION: directOrangeCredit — Remboursement dashboard admin SÉCURISÉ
+// 🔒 N'est PLUS un remboursement libre : le système recherche le paiement
+// confirmé correspondant (numéro acheteur + montant, < 72h, non remboursé),
+// RÉVOQUE SES CRÉDITS D'ABORD, puis effectue le POST /{country}/credit.
+// Aucun achat correspondant → REFUS. Rollback des crédits si Orange échoue.
 // URL: https://us-central1-immozone-d9a68.cloudfunctions.net/directOrangeCredit
 // ═══════════════════════════════════════════════════════════════════════════════
 exports.directOrangeCredit = onRequest(
@@ -962,11 +964,16 @@ exports.directOrangeCredit = onRequest(
       return;
     }
 
+    // Portée large : accessible au catch pour rollback après révocation
+    let revokedListOuter = [];
     try {
-      const { phoneNumber, amount, adminId, adminName, reason } = req.body || {};
+      const { phoneNumber, buyerPhoneNumber, amount, adminId, adminName, reason } = req.body || {};
 
-      if (!phoneNumber || !amount || !adminId) {
-        res.status(400).json({ error: 'Paramètres manquants: phoneNumber, amount, adminId requis' });
+      // 🆕 RÈGLE 1 : numéro OM à créditer + compte Immozone acheteur + montant requis
+      if (!phoneNumber || !buyerPhoneNumber || !amount || !adminId) {
+        res.status(400).json({
+          error: 'Paramètres requis: phoneNumber (numéro OM à créditer), buyerPhoneNumber (compte Immozone crédité), amount, adminId',
+        });
         return;
       }
 
@@ -979,18 +986,84 @@ exports.directOrangeCredit = onRequest(
 
       const env = omEnv();
 
-      // 1. Normaliser le numéro (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
+      // 1. Normaliser les numéros (prod cd: format LOCAL 0XXXXXXXXX exigé par Orange)
       const msisdn = omNormalizeMsisdn(phoneNumber);
       if (!/^\d{7,15}$/.test(msisdn)) {
         res.status(400).json({ error: 'Numéro Orange Money invalide' });
         return;
       }
+      const buyerNorm = omNormalizeMsisdn(buyerPhoneNumber);
+      if (!/^\d{7,15}$/.test(buyerNorm)) {
+        res.status(400).json({ error: 'Numéro du compte Immozone invalide' });
+        return;
+      }
 
       // 2. Montant (sandbox: entiers uniquement)
-      let creditAmount = parseFloat(amount);
+      let creditAmount = parseFloat(String(amount).replace(',', '.'));
       if (env.integerAmountsOnly) creditAmount = Math.round(creditAmount);
       if (!creditAmount || creditAmount <= 0) {
         res.status(400).json({ error: 'Montant invalide' });
+        return;
+      }
+
+      // 🆕 RÈGLE 2+3 : retrouver le paiement CONFIRMÉ correspondant —
+      // même acheteur, même montant, moins de 72h, pas encore remboursé.
+      // ⚠️ Filtre Firestore sur UNE seule inégalité (createdAt ISO string) pour
+      // ne pas exiger d'index composite ; le reste est vérifié en mémoire.
+      const cutoffIso = new Date(Date.now() - 73 * 3600000).toISOString(); // marge 1h
+      const paySnap = await db.collection('payments')
+        .where('createdAt', '>=', cutoffIso)
+        .get();
+
+      const candidates = [];
+      for (const doc of paySnap.docs) {
+        const p = doc.data();
+        if (p.status !== 'confirmed') continue;
+        if (p.operator && p.operator !== 'orange_money') continue;
+        if (p.refundStatus === 'pending' || p.refundStatus === 'refunded') continue;
+        // Fenêtre 72h stricte sur confirmedAt||createdAt
+        const opDate = new Date(p.confirmedAt || p.createdAt || 0).getTime();
+        if (!opDate || (Date.now() - opDate) / 3600000 > 72) continue;
+        // Acheteur : numéro du paiement OU du compte user
+        const payNorm = omNormalizeMsisdn(p.phoneNumber || '');
+        const omNorm = omNormalizeMsisdn(p.omPeerId || '');
+        let userPhoneNorm = '';
+        if (p.userId) {
+          try {
+            const uDoc = await db.collection('users').doc(p.userId).get();
+            if (uDoc.exists) userPhoneNorm = omNormalizeMsisdn(uDoc.data().phone || '');
+          } catch (_) {}
+        }
+        if (buyerNorm !== payNorm && buyerNorm !== omNorm && buyerNorm !== userPhoneNorm) continue;
+        // Montant exact (±0.001)
+        const expected = parseFloat(p.omAmount || p.amount || 0);
+        if (Math.abs(creditAmount - expected) > 0.001) continue;
+        candidates.push({ id: doc.id, data: p, opDate });
+      }
+
+      if (candidates.length === 0) {
+        console.warn(`[directOrangeCredit] ⛔ Aucun achat correspondant: buyer=${buyerNorm} amount=${creditAmount}`);
+        res.status(400).json({
+          error: 'Remboursement refusé : aucun achat confirmé de ce montant trouvé pour ce numéro dans les dernières 72h (ou déjà remboursé).',
+        });
+        return;
+      }
+
+      // Plusieurs achats identiques → rembourser le plus récent
+      candidates.sort((a, b) => b.opDate - a.opDate);
+      const matched = candidates[0];
+      const payRef = db.collection('payments').doc(matched.id);
+
+      // 🆕 RÈGLE 4 : RÉVOQUER LES CRÉDITS D'ABORD — si échec, pas de remboursement.
+      let revokedList = [];
+      try {
+        revokedList = await revokeCreditsForPayment(matched.id, 'remboursement_direct_admin');
+        revokedListOuter = revokedList;
+      } catch (revokeErr) {
+        console.error('[directOrangeCredit] ⛔ Échec révocation crédits — remboursement ANNULÉ:', revokeErr);
+        res.status(500).json({
+          error: 'Révocation des crédits impossible — remboursement annulé par sécurité. Réessayez.',
+        });
         return;
       }
 
@@ -1006,7 +1079,7 @@ exports.directOrangeCredit = onRequest(
         transactionId: refundId,
       };
 
-      console.log(`[directOrangeCredit] admin=${adminId} msisdn=${msisdn} amount=${creditAmount} refundId=${refundId}`);
+      console.log(`[directOrangeCredit] admin=${adminId} msisdn=${msisdn} amount=${creditAmount} refundId=${refundId} paymentId=${matched.id} revoked=${revokedList.length}`);
 
       // 4. POST /{country}/credit
       const omResp = await orangeApiCall({
@@ -1038,13 +1111,20 @@ exports.directOrangeCredit = onRequest(
           }
         }
 
+        // 🆕 Orange a REFUSÉ → restaurer les crédits révoqués (rollback)
+        if (isFailed && revokedList.length > 0) {
+          await unrevokeCredits(revokedList);
+        }
+
         // Doc de suivi (collection refunds — le webhook le retrouvera par refundId)
         await db.collection('refunds').doc(refundId).set({
           id: refundId,
-          paymentId: null,                      // remboursement libre, sans paiement lié
+          paymentId: matched.id,                // 🆕 paiement lié retrouvé par le système
           type: 'direct',
-          userId: null,
+          userId: matched.data.userId ?? null,
           msisdn,
+          buyerPhoneNumber: buyerNorm,          // 🆕 traçabilité: compte acheteur vérifié
+          creditsRevoked: revokedList.map((r) => r.id), // 🆕 traçabilité révocation
           amount: creditAmount,
           currency: env.currency,
           status: isImmediate ? 'confirmed' : (isFailed ? 'failed' : 'pending'),
@@ -1056,20 +1136,35 @@ exports.directOrangeCredit = onRequest(
           ...(isFailed ? { failedAt: new Date().toISOString(), failureReason: failMessage } : {}),
         });
 
+        // 🆕 Marquer le paiement remboursé → empêche tout double remboursement
+        await payRef.update({
+          refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
+          refundId,
+          refundAmount: creditAmount,
+          refundReason: reason || null,
+          refundRequestedAt: new Date().toISOString(),
+          refundRequestedBy: adminName || adminId,
+          ...(isImmediate ? { refundedAt: new Date().toISOString() } : {}),
+        });
+
         res.status(200).json({
           success: !isFailed,
           refundId,
+          paymentId: matched.id,
+          creditsRevoked: revokedList.length,
           refundStatus: isImmediate ? 'refunded' : (isFailed ? 'failed' : 'pending'),
           amount: creditAmount,
           currency: env.currency,
           ...(isFailed ? { error: failMessage } : {}),
           message: isImmediate
-            ? `Remboursement de ${creditAmount} ${env.currency} envoyé au ${msisdn}`
+            ? `Remboursement de ${creditAmount} ${env.currency} envoyé au ${msisdn} — ${revokedList.length} crédit(s) révoqué(s)`
             : (isFailed ? failMessage : 'Remboursement initié — confirmation Orange en attente'),
         });
         return;
       }
 
+      // 🆕 Orange a rejeté la requête → restaurer les crédits révoqués (rollback)
+      if (revokedList.length > 0) await unrevokeCredits(revokedList);
       const errorMsg = orangeErrorMessage(omResp.body, omResp.status);
       console.error('[directOrangeCredit] Orange error:', omResp.status, JSON.stringify(omResp.body));
       res.status(200).json({
@@ -1080,6 +1175,9 @@ exports.directOrangeCredit = onRequest(
 
     } catch (err) {
       console.error('[directOrangeCredit] Exception:', err);
+      // 🆕 Crash après révocation → restaurer les crédits (le webhook re-révoquera
+      // si Orange confirme finalement le remboursement)
+      if (revokedListOuter.length > 0) await unrevokeCredits(revokedListOuter);
       res.status(500).json({ success: false, error: err.message });
     }
   }

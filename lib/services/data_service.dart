@@ -2120,11 +2120,14 @@ class DataService {
     throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');
   }
 
-  /// Remboursement LIBRE Orange Money (dashboard admin) : envoie [amount]
-  /// au numéro [phoneNumber] via la Cloud Function directOrangeCredit
-  /// (POST /{country}/credit). Retourne le message de résultat.
+  /// Remboursement Orange Money SÉCURISÉ (dashboard admin) : envoie [amount]
+  /// au numéro [phoneNumber] via la Cloud Function directOrangeCredit.
+  /// 🔒 Le serveur exige [buyerPhoneNumber] (compte Immozone crédité), retrouve
+  /// l'achat confirmé correspondant (< 72h, montant exact), révoque ses crédits
+  /// D'ABORD puis rembourse. Refus si aucun achat ne correspond.
   Future<String> directOrangeCredit({
     required String phoneNumber,
+    required String buyerPhoneNumber,
     required double amount,
     required String adminId,
     required String adminName,
@@ -2137,6 +2140,7 @@ class DataService {
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'phoneNumber': phoneNumber,
+            'buyerPhoneNumber': buyerPhoneNumber,
             'amount': amount,
             'adminId': adminId,
             'adminName': adminName,

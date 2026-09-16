@@ -207,6 +207,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   // ── Réinitialiser le chiffre d'affaire ────────────────────────────────────
   Future<void> _showDirectRefundDialog() async {
     final phoneCtrl = TextEditingController();
+    final buyerPhoneCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -229,18 +230,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'L\'argent sera envoyé immédiatement sur le compte Orange Money du client (service CREDIT — sans confirmation du client).',
+                  '🔒 Remboursement sécurisé : le système vérifie qu\'un achat confirmé de ce montant existe pour ce compte (moins de 72h, non remboursé), révoque ses crédits D\'ABORD, puis envoie l\'argent.',
                   style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
                       color: AppTheme.textSecondary, height: 1.4),
                 ),
               ),
               const SizedBox(height: 16),
               TextFormField(
+                controller: buyerPhoneCtrl,
+                keyboardType: TextInputType.phone,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: 'Compte Immozone crédité (acheteur)',
+                  hintText: 'Numéro qui a effectué l\'achat',
+                  prefixIcon: const Icon(Icons.person_search_rounded, color: Color(0xFF1A237E)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (v) {
+                  final cleaned = (v ?? '')
+                      .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
+                      .replaceAll('+', '')
+                      .replaceFirst(RegExp(r'^0+'), '');
+                  if (cleaned.isEmpty) return 'Numéro de l\'acheteur requis';
+                  if (!RegExp(r'^\d{7,15}$').hasMatch(cleaned)) return 'Numéro invalide (7 à 15 chiffres)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'Numéro Orange Money du client',
+                  labelText: 'Numéro Orange Money à créditer',
                   hintText: 'Ex: 0894779652',
                   prefixIcon: const Icon(Icons.phone_android_rounded, color: Color(0xFFFF6600)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -263,8 +285,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
                 decoration: InputDecoration(
-                  labelText: 'Montant à rembourser (USD)',
-                  hintText: 'Ex: 3',
+                  labelText: 'Montant exact de l\'achat (USD)',
+                  hintText: 'Doit être identique au montant payé',
                   prefixIcon: const Icon(Icons.attach_money_rounded, color: Color(0xFFFF6600)),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -328,6 +350,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
         .replaceAll('+', '')
         .replaceFirst(RegExp(r'^0+'), '');
+    final buyerPhone = buyerPhoneCtrl.text
+        .replaceAll(RegExp(r'[\s\-\.\(\)]'), '')
+        .replaceAll('+', '')
+        .replaceFirst(RegExp(r'^0+'), '');
     final amount = double.parse(amountCtrl.text.replaceAll(',', '.'));
     final doubleCheck = await showDialog<bool>(
       context: context,
@@ -341,7 +367,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               style: TextStyle(fontFamily: 'Poppins', fontSize: 16, fontWeight: FontWeight.w700))),
         ]),
         content: Text(
-          'Envoyer ${amount.toStringAsFixed(2)} USD au numéro $phone ?\n\n⚠️ Cette opération est IRRÉVERSIBLE — l\'argent part immédiatement sur le compte du client.',
+          'Envoyer ${amount.toStringAsFixed(2)} USD au numéro $phone ?\n(achat du compte $buyerPhone — ses crédits seront révoqués)\n\n⚠️ Cette opération est IRRÉVERSIBLE — l\'argent part immédiatement sur le compte du client.',
           style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
               color: AppTheme.textSecondary, height: 1.5),
         ),
@@ -368,6 +394,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final auth = context.read<immo_auth.AuthProvider>();
       final message = await _ds.directOrangeCredit(
         phoneNumber: phone,
+        buyerPhoneNumber: buyerPhone,
         amount: amount,
         adminId: auth.currentUser?.id ?? '',
         adminName: auth.currentUser?.name ?? 'Admin',
