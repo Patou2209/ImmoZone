@@ -3311,8 +3311,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
                   // ── Solde de crédits + bouton Recharger ─────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
+                  // Wrap (et non Row) : sur écran étroit le bouton Recharger
+                  // passe proprement à la ligne au lieu de déborder.
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       // Solde disponible — fit-content (shrink-wrap)
                       Container(
@@ -3368,8 +3372,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           ),
                         ]),
                       ),
-                      const SizedBox(width: 10),
-                      // Bouton Recharger
+                      // Bouton Recharger (spacing géré par le Wrap)
                       ElevatedButton.icon(
                         onPressed: () {
                           Navigator.push(context,

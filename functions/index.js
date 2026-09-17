@@ -781,6 +781,14 @@ exports.refundOrangePayment = onRequest(
           if (buyerDoc.exists) userPhoneNorm = omNormalizeMsisdn(buyerDoc.data().phone || '');
         }
       } catch (_) {}
+      // 🆕 Fallback Firebase AUTH : doc Firestore supprimé (compte effacé/recréé)
+      // → le numéro reste dans Auth (celui de l'OTP WhatsApp).
+      if (!userPhoneNorm && payment.userId) {
+        try {
+          const authUser = await admin.auth().getUser(payment.userId);
+          userPhoneNorm = omNormalizeMsisdn(authUser.phoneNumber || '');
+        } catch (_) {}
+      }
       const buyerMatches = buyerNorm && (buyerNorm === payNorm || buyerNorm === omNorm || buyerNorm === userPhoneNorm);
       if (!buyerMatches) {
         console.warn(`[refundOrangePayment] ⛔ buyer mismatch: saisi=${buyerNorm} vs payment=${payNorm}/${omNorm}/user=${userPhoneNorm}`);
@@ -1035,6 +1043,16 @@ exports.directOrangeCredit = onRequest(
             const uDoc = await db.collection('users').doc(p.userId).get();
             if (uDoc.exists) userPhoneNorm = omNormalizeMsisdn(uDoc.data().phone || '');
           } catch (_) {}
+          // 🆕 Fallback Firebase AUTH : si le doc Firestore du compte a été
+          // supprimé (compte effacé/recréé), le numéro reste dans Auth —
+          // c'est lui qui a servi à l'OTP WhatsApp. Sans ce fallback, le
+          // lien acheteur↔paiement est cassé et le remboursement refusé à tort.
+          if (!userPhoneNorm) {
+            try {
+              const authUser = await admin.auth().getUser(p.userId);
+              userPhoneNorm = omNormalizeMsisdn(authUser.phoneNumber || '');
+            } catch (_) {}
+          }
         }
         if (buyerNorm !== payNorm && buyerNorm !== omNorm && buyerNorm !== userPhoneNorm) continue;
         // Montant exact (±0.001)
