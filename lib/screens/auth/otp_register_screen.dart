@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../public/home/public_home_screen.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
@@ -157,12 +157,20 @@ class _OtpRegisterScreenState extends State<OtpRegisterScreen>
       if (!mounted) return;
 
       if (ok) {
-        // Animation succès
+        // Animation succès — affichée ~2 s puis redirection automatique
         setState(() => _showSuccess = true);
         await _successAnimCtrl.forward();
-        await Future.delayed(const Duration(milliseconds: 900));
+        await Future.delayed(const Duration(milliseconds: 1400));
         if (!mounted) return;
-        context.go('/public');
+        // NOTE: context.go() échoue quand cet écran est ouvert via
+        // Navigator.push (Login → Register → OTP restent AU-DESSUS de la
+        // pile GoRouter : la route change en dessous mais l'écran succès
+        // reste affiché). pushAndRemoveUntil vide toute la pile → l'accueil
+        // s'affiche réellement, utilisateur déjà connecté.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+          (_) => false,
+        );
       } else {
         setState(() => _isVerifying = false);
         _clearOtp();

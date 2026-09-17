@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -9,6 +8,7 @@ import '../../core/utils/phone_utils.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/data_service.dart';
 import '../../services/phone_auth_service.dart';
+import '../public/home/public_home_screen.dart';
 import 'auth_ui.dart';
 import 'otp_register_screen.dart';
 
@@ -143,7 +143,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         if (!mounted) return;
         if (ok) {
-          context.go('/public');
+          // pushAndRemoveUntil : fiable même quand cet écran est au-dessus
+          // de la pile GoRouter (context.go ne raffraîchit pas l'affichage).
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+            (_) => false,
+          );
         } else {
           _showError(auth.error ?? 'Erreur lors de l\'inscription.');
         }

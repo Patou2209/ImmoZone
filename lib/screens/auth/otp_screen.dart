@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../admin/admin_home_screen.dart';
+import '../public/home/public_home_screen.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
 
@@ -186,10 +187,19 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     }
 
     if (user != null) {
+      // NOTE: context.go() échoue quand cet écran est ouvert via
+      // Navigator.push (pile au-dessus de GoRouter) → l'écran resterait
+      // bloqué sur le succès. pushAndRemoveUntil vide toute la pile.
       if (auth.isAdmin) {
-        context.go('/admin');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+          (_) => false,
+        );
       } else {
-        context.go('/public');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+          (_) => false,
+        );
       }
     } else {
       setState(() { _isVerifying = false; _showSuccess = false; });

@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -8,6 +7,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_utils.dart';
 import '../../providers/auth_provider.dart' as app_auth;
 import '../../services/phone_auth_service.dart';
+import '../admin/admin_home_screen.dart';
+import '../public/home/public_home_screen.dart';
 import 'otp_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,10 +105,18 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       if (!mounted) return;
     }
     if (user != null) {
+      // pushAndRemoveUntil : fiable même quand cet écran est au-dessus
+      // de la pile GoRouter (context.go ne raffraîchirait pas l'affichage).
       if (auth.isAdmin) {
-        context.go('/admin');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AdminHomeScreen()),
+          (_) => false,
+        );
       } else {
-        context.go('/public');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()),
+          (_) => false,
+        );
       }
     } else {
       _showError(
