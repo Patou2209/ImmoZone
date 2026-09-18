@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/utils/error_helper.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -542,7 +543,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur lors du chargement de l\'image : $e',
+          content: Text('Le chargement de l\'image a échoué : ${ErrorHelper.friendly(e)}',
               style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
         ));
@@ -593,7 +594,7 @@ class _AdFormSheetState extends State<_AdFormSheet> {
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur : $e',
+          content: Text(ErrorHelper.friendly(e),
               style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
         ));

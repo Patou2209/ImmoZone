@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../core/utils/error_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -92,7 +93,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+        content: Text(ErrorHelper.friendly(e), style: const TextStyle(fontFamily: 'Poppins')),
         backgroundColor: AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -412,7 +413,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('❌ ${e.toString().replaceFirst('Exception: ', '')}',
+          content: Text('❌ ${ErrorHelper.friendly(e)}',
               style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
           duration: const Duration(seconds: 6),

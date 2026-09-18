@@ -1,3 +1,5 @@
+import '../core/utils/text_formatter.dart';
+
 class PropertyModel {
   final String id;
   final String title;
@@ -259,7 +261,9 @@ class PropertyModel {
     amenities: List<String>.from(m['amenities'] ?? []),
     images: List<String>.from(m['images'] ?? []),
     mainImageIndex: m['mainImageIndex'] ?? 0,
-    ownerId: m['ownerId'] ?? '', ownerName: m['ownerName'] ?? '',
+    ownerId: m['ownerId'] ?? '',
+    // Title Case : uniformise l'affichage du nom de l'annonceur partout
+    ownerName: TextFormatter.toTitleCase(m['ownerName'] ?? ''),
     ownerPhone: m['ownerPhone'] ?? '', ownerEmail: m['ownerEmail'] ?? '',
     ownerWhatsApp: m['ownerWhatsApp'] ?? '',
     ownerCategory: m['ownerCategory'] ?? '',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import '../../../services/data_service.dart';
 import '../../../services/csv_export_service.dart';
 import '../../../models/user_model.dart';
@@ -44,7 +45,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _loadError = 'Erreur de chargement: $e';
+        _loadError = 'Erreur de chargement : ${ErrorHelper.friendly(e)}';
       });
     }
   }
@@ -262,14 +263,29 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
             onDelete: () async {
               final confirm = await _confirmDelete(context, user.name);
               if (confirm == true) {
-                await _dataService.deleteUser(user.id);
-                _loadUsers();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Utilisateur supprimé'),
-                        backgroundColor: AppTheme.errorColor),
+                // Suppression COMPLÈTE via Cloud Function : doc user + crédits
+                // + notifications + compte Firebase Auth + clôture des annonces.
+                try {
+                  final msg = await _dataService.deleteUserAccountComplete(
+                    userId: user.id,
+                    adminId: _dataService.currentUserId,
                   );
+                  _loadUsers();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(msg),
+                          backgroundColor: AppTheme.errorColor),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(ErrorHelper.friendly(e)),
+                          backgroundColor: AppTheme.errorColor),
+                    );
+                  }
                 }
               }
             },
@@ -394,14 +410,28 @@ class _AdminUsersScreenState extends State<AdminUsersScreen>
                 : () async {
                     final confirm = await _confirmDelete(context, user.name);
                     if (confirm == true) {
-                      await _dataService.deleteUser(user.id);
-                      _loadUsers();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Compte admin supprimé'),
-                              backgroundColor: AppTheme.errorColor),
+                      // Suppression complète (doc + crédits + Auth) via Cloud Function
+                      try {
+                        final msg = await _dataService.deleteUserAccountComplete(
+                          userId: user.id,
+                          adminId: _dataService.currentUserId,
                         );
+                        _loadUsers();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(msg),
+                                backgroundColor: AppTheme.errorColor),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(ErrorHelper.friendly(e)),
+                                backgroundColor: AppTheme.errorColor),
+                          );
+                        }
                       }
                     }
                   },

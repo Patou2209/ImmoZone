@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/data_service.dart';
 import '../services/phone_auth_service.dart';
+import '../core/utils/text_formatter.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ARCHITECTURE AUTHENTIFICATION — Téléphone + Mot de passe
@@ -271,6 +272,9 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
+
+    // Normaliser le nom en Title Case AVANT enregistrement (base propre)
+    name = TextFormatter.toTitleCase(name);
 
     final virtualEmail = phoneToVirtualEmail(phone);
 
@@ -652,6 +656,9 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    // Normaliser le nom en Title Case AVANT enregistrement (base propre)
+    name = TextFormatter.toTitleCase(name);
+
     final firebaseUser = credential.user;
     final uid = firebaseUser?.uid;
 
@@ -810,7 +817,8 @@ class AuthProvider extends ChangeNotifier {
       case 'user-disabled':
         return 'Ce compte a été désactivé. Contactez le support.';
       default:
-        return 'Erreur d\'authentification ($code).';
+        // Ne jamais montrer un code technique à l'utilisateur
+        return 'La connexion a échoué. Veuillez réessayer dans un instant.';
     }
   }
 }

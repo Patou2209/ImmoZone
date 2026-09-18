@@ -95,7 +95,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Lien invalide : $e',
+          content: Text('Impossible d\'ouvrir ce lien. Veuillez réessayer plus tard.',
               style: const TextStyle(fontFamily: 'Poppins')),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.red,

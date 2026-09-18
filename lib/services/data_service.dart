@@ -683,6 +683,33 @@ class DataService {
     await _usersCol.doc(userId).delete();
   }
 
+  /// Suppression COMPLÈTE d'un compte utilisateur via la Cloud Function
+  /// deleteUserAccount : doc users + crédits + notifications + compte
+  /// Firebase Auth + clôture des annonces. Retourne un résumé lisible.
+  /// Lève une exception avec message métier en cas d'échec.
+  Future<String> deleteUserAccountComplete({
+    required String userId,
+    required String adminId,
+  }) async {
+    final resp = await http
+        .post(
+          Uri.parse(
+              'https://us-central1-immozone-d9a68.cloudfunctions.net/deleteUserAccount'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'userId': userId, 'adminId': adminId}),
+        )
+        .timeout(const Duration(seconds: 45));
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    if (resp.statusCode == 200 && data['success'] == true) {
+      final s = (data['summary'] as Map<String, dynamic>?) ?? {};
+      return 'Compte supprimé — ${s['credits'] ?? 0} lot(s) de crédits effacé(s), '
+          '${s['propertiesClosed'] ?? 0} annonce(s) clôturée(s)'
+          '${s['authDeleted'] == true ? ', accès définitivement révoqué' : ''}.';
+    }
+    throw Exception(data['error'] ?? 'La suppression du compte a échoué. Réessayez.');
+  }
+
   // ─── PROPERTIES ─────────────────────────────────────────────────────────────
 
   Map<String, dynamic> _propertyToFirestore(PropertyModel p) => {

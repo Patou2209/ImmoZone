@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/utils/share_helper.dart';
+import '../../../core/utils/error_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
@@ -2437,28 +2438,6 @@ class _HomeTabState extends State<_HomeTab>
         (p) => p.setInt(_kAdRotKey, next));
   }
 
-  // ── ANNONCES RECENTES (quand la categorie n'a pas de resultat) ──────────
-  List<PropertyModel> _getRecentListings() {
-    final provider = context.read<PropertyProvider>();
-    final now = DateTime.now();
-    return provider.properties
-        .where((p) {
-          // Meme logique de visibilite : actif + vendues/occupees dans 72h
-          final visible = (p.status == 'Actif' && !p.isSold && !p.isRented) ||
-              ((p.isSold || p.isRented) && p.updatedAt != null &&
-                  now.difference(p.updatedAt!).inHours < AppConstants.soldAutoDeleteHours);
-          if (!visible) return false;
-          return (_activeMode == 'Location' && p.transactionType == 'Location') ||
-              (_activeMode == 'Achat' && p.transactionType == 'Vente');
-        })
-        .toList()
-        ..sort((a, b) {
-          final aDate = a.updatedAt ?? a.createdAt;
-          final bDate = b.updatedAt ?? b.createdAt;
-          return bDate.compareTo(aDate);
-        });
-  }
-
   Widget _buildEmptyWithSimilar(List<PropertyModel> similar) {
     final bool hasActiveFilter = _searchQuery.isNotEmpty || _hasSearched ||
         _province != null || _city != null ||
@@ -2468,65 +2447,40 @@ class _HomeTabState extends State<_HomeTab>
         _maxBeds != null || _minHectares != null || _maxHectares != null ||
         _filterParking != null || _filterGroupeElec != null || _filterSecurite != null;
 
-    // Si aucune recherche active → afficher les annonces récentes
-    if (!hasActiveFilter) {
-      final recent = _getRecentListings();
-      if (recent.isNotEmpty) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.accentColor),
-              const SizedBox(width: 6),
-              const Text('Annonces récentes',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                      fontSize: 14, color: AppTheme.textPrimary)),
-            ]),
-            const SizedBox(height: 10),
-            _buildGrid(context, recent.take(8).toList()),
-          ]),
-        );
-      }
-      // Aucune annonce du tout dans cette catégorie/mode
-      return const SizedBox.shrink();
-    }
-
-    // Recherche active mais aucun résultat
+    // ⚠️ Demande utilisateur : quand une catégorie (ou une recherche) ne
+    // contient AUCUNE annonce, ne rien afficher comme annonce (pas de
+    // fallback « Annonces récentes ») — uniquement le message
+    // « Aucune annonce trouvée ».
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(children: [
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.warningColor.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
+            color: AppTheme.warningColor.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.25)),
           ),
-          child: Row(children: [
-            const Icon(Icons.info_outline_rounded,
-                color: AppTheme.warningColor, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                _searchQuery.isNotEmpty
-                    ? 'Aucun résultat pour "$_searchQuery" en $_activeMode. Essayez un autre mot-clé.'
-                    : 'Aucune annonce ne correspond à vos critères pour "$_selectedCategory" en $_activeMode.',
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
-                    color: AppTheme.warningColor, height: 1.4),
-              ),
+          child: Column(children: [
+            const Icon(Icons.search_off_rounded,
+                color: AppTheme.warningColor, size: 40),
+            const SizedBox(height: 12),
+            const Text('Aucune annonce trouvée',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    fontSize: 15, color: AppTheme.textPrimary)),
+            const SizedBox(height: 6),
+            Text(
+              hasActiveFilter
+                  ? (_searchQuery.isNotEmpty
+                      ? 'Aucun résultat pour "$_searchQuery" en $_activeMode. Essayez un autre mot-clé.'
+                      : 'Aucune annonce ne correspond à vos critères pour « $_selectedCategory » en $_activeMode.')
+                  : 'Aucune annonce disponible pour « $_selectedCategory » en $_activeMode pour le moment.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                  color: AppTheme.textSecondary, height: 1.4),
             ),
           ]),
         ),
-        const SizedBox(height: 20),
-        Row(children: [
-          const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.accentColor),
-          const SizedBox(width: 6),
-          const Text('Annonces récentes',
-              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                  fontSize: 14, color: AppTheme.textPrimary)),
-        ]),
-        const SizedBox(height: 10),
-        _buildGrid(context, _getRecentListings().take(4).toList()),
       ]),
     );
   }
@@ -3165,7 +3119,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur : $e',
+              content: Text(ErrorHelper.friendly(e),
                   style: const TextStyle(fontFamily: 'Poppins')),
               backgroundColor: Colors.red,
             ),
@@ -4096,7 +4050,7 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+        content: Text(ErrorHelper.friendly(e), style: const TextStyle(fontFamily: 'Poppins')),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ));
@@ -4124,7 +4078,7 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
       ));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+        content: Text(ErrorHelper.friendly(e), style: const TextStyle(fontFamily: 'Poppins')),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ));

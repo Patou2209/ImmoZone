@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -72,7 +73,7 @@ class _AdminServiceClientHomeScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _snackErr('Erreur de chargement : $e');
+      _snackErr('Erreur de chargement : ${ErrorHelper.friendly(e)}');
     }
   }
 
@@ -546,7 +547,7 @@ class _ManualCreditTabState extends State<_ManualCreditTab> {
       }
     } catch (e) {
       setState(() {
-        _searchError = 'Erreur de recherche : $e';
+        _searchError = 'Erreur de recherche : ${ErrorHelper.friendly(e)}';
         _searching = false;
       });
     }
@@ -611,7 +612,7 @@ class _ManualCreditTabState extends State<_ManualCreditTab> {
       await widget.onRefresh();
     } catch (e) {
       setState(() => _saving = false);
-      widget.onError('Erreur : $e');
+      widget.onError(ErrorHelper.friendly(e));
     }
   }
 
@@ -1100,7 +1101,7 @@ class _PaymentActionTileState extends State<_PaymentActionTile> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Erreur : $e',
+                    content: Text(ErrorHelper.friendly(e),
                         style:
                             const TextStyle(fontFamily: 'Poppins')),
                     backgroundColor: AppTheme.errorColor,

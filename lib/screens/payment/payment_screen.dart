@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_utils.dart';
+import '../../core/utils/error_helper.dart';
 import '../../models/payment_model.dart';
 import '../../services/data_service.dart';
 import 'transaction_success_screen.dart';
@@ -166,7 +167,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (!mounted) return;
-      _showMsg('Erreur réseau: $e', isError: true);
+      _showMsg(ErrorHelper.friendly(e,
+          fallback: 'Le paiement n\'a pas pu être initié. Vérifiez votre connexion et réessayez.'), isError: true);
     }
   }
 

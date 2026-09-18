@@ -1846,3 +1846,110 @@ exports.verifyWhatsAppOtp = onRequest(
     }
   }
 );
+
+/**
+ * deleteUserAccount — POST {userId, adminId}
+ * Suppression COMPLÈTE d'un compte utilisateur (admin uniquement) :
+ *   1. Doc Firestore users/{userId}
+ *   2. Tous ses crédits (collection credits)
+ *   3. Ses notifications
+ *   4. Le compte Firebase Auth (empêche toute reconnexion fantôme)
+ * Les paiements et annonces sont CONSERVÉS (historique comptable / audit),
+ * mais les annonces de l'utilisateur sont clôturées (status → Rejeté).
+ */
+exports.deleteUserAccount = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
+    try {
+      const { userId, adminId } = req.body || {};
+      if (!userId || !adminId) {
+        return res.status(400).json({ error: 'Paramètres requis: userId, adminId' });
+      }
+
+      // 🔒 Garde-fou : l'appelant doit être un admin
+      const adminDoc = await db.collection('users').doc(adminId).get();
+      if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+        return res.status(403).json({ error: 'Accès refusé — réservé aux administrateurs' });
+      }
+      // 🔒 Interdire l'auto-suppression et la suppression de l'admin principal
+      if (userId === adminId) {
+        return res.status(403).json({ error: 'Impossible de supprimer votre propre compte.' });
+      }
+      const targetDoc = await db.collection('users').doc(userId).get();
+      const targetData = targetDoc.exists ? targetDoc.data() : null;
+      const PRINCIPAL_ADMIN_PHONES = ['+243821908888', '0821908888', '243821908888'];
+      if (targetData && PRINCIPAL_ADMIN_PHONES.includes(String(targetData.phone || '').replace(/\s/g, ''))) {
+        return res.status(403).json({ error: 'Impossible de supprimer le compte de l\'Administrateur Général.' });
+      }
+
+      const summary = { userDoc: false, credits: 0, notifications: 0, propertiesClosed: 0, authDeleted: false };
+
+      // 1. Crédits de l'utilisateur → suppression (plus aucun crédit orphelin)
+      const creditsSnap = await db.collection('credits').where('userId', '==', userId).get();
+      let batch = db.batch();
+      let ops = 0;
+      for (const doc of creditsSnap.docs) {
+        batch.delete(doc.ref); ops++; summary.credits++;
+        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+
+      // 2. Notifications de l'utilisateur
+      const notifSnap = await db.collection('notifications').where('userId', '==', userId).get();
+      for (const doc of notifSnap.docs) {
+        batch.delete(doc.ref); ops++; summary.notifications++;
+        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+
+      // 3. Clôturer ses annonces (conservées pour audit mais plus visibles)
+      const propsSnap = await db.collection('properties').where('ownerId', '==', userId).get();
+      const nowIso = new Date().toISOString();
+      for (const doc of propsSnap.docs) {
+        const st = (doc.data().status || '');
+        if (st === 'Actif' || st === 'En attente') {
+          batch.update(doc.ref, {
+            status: 'Rejeté',
+            rejectionReason: 'Compte de l\'annonceur supprimé',
+            updatedAt: nowIso,
+          });
+          ops++; summary.propertiesClosed++;
+          if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+        }
+      }
+
+      // 4. Doc utilisateur
+      if (targetDoc.exists) {
+        batch.delete(targetDoc.ref); ops++; summary.userDoc = true;
+      }
+      if (ops > 0) await batch.commit();
+
+      // 5. Compte Firebase Auth (ignorer si déjà absent)
+      try {
+        await admin.auth().deleteUser(userId);
+        summary.authDeleted = true;
+      } catch (e) {
+        if (e.code !== 'auth/user-not-found') {
+          console.error('deleteUserAccount: échec suppression Auth:', e.message);
+        }
+      }
+
+      // 6. Journal d'audit
+      await db.collection('audit_logs').doc(`user_delete_${Date.now()}`).set({
+        id: `user_delete_${Date.now()}`,
+        action: 'delete_user_account',
+        targetUserId: userId,
+        targetUserName: (targetData && targetData.name) || '(inconnu)',
+        targetUserPhone: (targetData && targetData.phone) || '',
+        adminId,
+        summary,
+        createdAt: nowIso,
+      });
+
+      console.log(`deleteUserAccount: ${userId} supprimé par ${adminId}`, summary);
+      return res.json({ success: true, summary });
+    } catch (err) {
+      console.error('deleteUserAccount error:', err);
+      return res.status(500).json({ error: 'Erreur interne lors de la suppression du compte' });
+    }
+  }
+);

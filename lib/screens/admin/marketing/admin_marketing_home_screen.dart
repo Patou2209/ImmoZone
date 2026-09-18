@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../core/utils/error_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
@@ -178,7 +179,7 @@ class _StatsTabState extends State<_StatsTab> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppTheme.errorColor));
+          SnackBar(content: Text(ErrorHelper.friendly(e)), backgroundColor: AppTheme.errorColor));
     }
   }
 
@@ -519,7 +520,7 @@ class _ParrainsTabState extends State<_ParrainsTab> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+          content: Text(ErrorHelper.friendly(e), style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
         ));
       }
@@ -563,7 +564,7 @@ class _ParrainsTabState extends State<_ParrainsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppTheme.errorColor));
+          SnackBar(content: Text(ErrorHelper.friendly(e)), backgroundColor: AppTheme.errorColor));
       return;
     }
     if (!mounted) return;

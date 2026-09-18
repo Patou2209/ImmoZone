@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import 'package:provider/provider.dart';
 import '../../../models/property_model.dart';
 import '../../../providers/property_provider.dart';
@@ -715,7 +716,7 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
       if (mounted) {
         setState(() => _boostLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur : $e',
+          content: Text(ErrorHelper.friendly(e),
               style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
         ));
@@ -783,7 +784,7 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
       if (mounted) {
         setState(() => _boostLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur : $e', style: const TextStyle(fontFamily: 'Poppins')),
+          content: Text(ErrorHelper.friendly(e), style: const TextStyle(fontFamily: 'Poppins')),
           backgroundColor: AppTheme.errorColor,
         ));
       }
@@ -869,7 +870,7 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
       // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('⛔ ${e.toString().replaceFirst('Exception: ', '')}'),
+          content: Text('⛔ ${ErrorHelper.friendly(e)}'),
           backgroundColor: AppTheme.errorColor,
           duration: const Duration(seconds: 6),
         ));

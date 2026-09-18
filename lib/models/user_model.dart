@@ -1,3 +1,5 @@
+import '../core/utils/text_formatter.dart';
+
 class UserModel {
   final String id;
   final String name;
@@ -144,7 +146,10 @@ class UserModel {
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       id: map['id'] ?? '',
-      name: map['name'] ?? '',
+      // Normalisation Title Case à la lecture : les noms saisis en MAJUSCULES
+      // ou en minuscules s'affichent partout avec la première lettre en
+      // majuscule et le reste en minuscules (ex: "NGANDU kalala" → "Ngandu Kalala").
+      name: TextFormatter.toTitleCase(map['name'] ?? ''),
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
       role: map['role'] ?? 'demandeur',

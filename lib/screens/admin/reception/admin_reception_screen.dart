@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_image.dart';
@@ -60,7 +61,7 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
       _snackOk('✅ Annonce approuvée et publiée pour $days jours');
     } catch (e) {
       // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
-      _snackErr('⛔ ${e.toString().replaceFirst('Exception: ', '')}');
+      _snackErr('⛔ ${ErrorHelper.friendly(e)}');
     }
     _load();
   }

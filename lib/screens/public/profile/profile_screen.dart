@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/utils/share_helper.dart';
+import '../../../core/utils/error_helper.dart';
+import '../../../core/utils/text_formatter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -543,7 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur : $e',
+            content: Text(ErrorHelper.friendly(e),
                 style: const TextStyle(fontFamily: 'Poppins')),
             backgroundColor: AppTheme.errorColor,
             behavior: SnackBarBehavior.floating,
@@ -1024,7 +1026,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur : $e',
+              content: Text(ErrorHelper.friendly(e),
                   style: const TextStyle(fontFamily: 'Poppins')),
               backgroundColor: Colors.red,
             ),
@@ -1204,9 +1206,12 @@ class _ProfileScreenState extends State<ProfileScreen>
             const SizedBox(height: 20),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nom complet',
-                prefixIcon: Icon(Icons.person_outline, color: AppTheme.accentColor),
+              decoration: InputDecoration(
+                // Agence → « Nom de l'agence » (cohérent avec l'inscription)
+                labelText: user.category == AppConstants.categoryAgence
+                    ? 'Nom de l\'agence'
+                    : 'Nom complet',
+                prefixIcon: const Icon(Icons.person_outline, color: AppTheme.accentColor),
               ),
             ),
             const SizedBox(height: 14),
@@ -1224,7 +1229,8 @@ class _ProfileScreenState extends State<ProfileScreen>
               child: ElevatedButton(
                 onPressed: () async {
                   final updated = user.copyWith(
-                    name: nameCtrl.text.trim(),
+                    // Title Case : uniformise les noms dès la saisie
+                    name: TextFormatter.toTitleCase(nameCtrl.text.trim()),
                     phone: phoneCtrl.text.trim(),
                   );
                   await _ds.updateUser(updated);

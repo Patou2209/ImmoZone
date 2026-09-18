@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../core/utils/error_helper.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -311,7 +312,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e',
+        SnackBar(content: Text(ErrorHelper.friendly(e,
+                fallback: 'La mise à jour de l\'annonce a échoué. Veuillez réessayer.'),
             style: const TextStyle(fontFamily: 'Poppins'))),
       );
     } finally {

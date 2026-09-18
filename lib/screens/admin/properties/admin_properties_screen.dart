@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../../core/utils/error_helper.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -184,7 +185,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 // RÈGLE 24H : ré-approbation d'un rejet > 24h refusée
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text('⛔ ${e.toString().replaceFirst('Exception: ', '')}'),
+                    content: Text('⛔ ${ErrorHelper.friendly(e)}'),
                     backgroundColor: AppTheme.errorColor,
                     duration: const Duration(seconds: 6),
                   ),
@@ -593,7 +594,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                                       ));
                                     } catch (e) {
                                       messenger.showSnackBar(SnackBar(
-                                        content: Text('Erreur: $e',
+                                        content: Text(ErrorHelper.friendly(e),
                                             style: const TextStyle(fontFamily: 'Poppins')),
                                         backgroundColor: AppTheme.errorColor,
                                       ));

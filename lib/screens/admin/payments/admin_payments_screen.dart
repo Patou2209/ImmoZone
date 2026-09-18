@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/orange_money_logo.dart';
 import '../../../models/payment_model.dart';
@@ -65,7 +66,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen>
       );
     } catch (e) {
       success = false;
-      message = e.toString().replaceFirst('Exception: ', '');
+      message = ErrorHelper.friendly(e);
     }
     await _load();
     if (!mounted) return;
@@ -382,7 +383,7 @@ class _PaymentTileState extends State<_PaymentTile> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Erreur : $e',
+                    content: Text(ErrorHelper.friendly(e),
                         style: const TextStyle(fontFamily: 'Poppins')),
                     backgroundColor: AppTheme.errorColor,
                     behavior: SnackBarBehavior.floating,

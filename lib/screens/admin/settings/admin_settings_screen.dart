@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/error_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/data_service.dart';
 import '../../../core/constants/app_constants.dart';
@@ -1074,7 +1075,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     } catch (e) {
       setState(() => _isLaunchingPromo = false);
       if (setPromo != null) setPromo(() {});
-      _snackErr('Erreur lors du lancement : $e');
+      _snackErr('Impossible d\'ouvrir le lien. Réessayez.');
     }
   }
 
@@ -1089,7 +1090,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       _snackOk('✅ Promotion suspendue');
     } catch (e) {
       setState(() => _isLaunchingPromo = false);
-      _snackErr('Erreur : $e');
+      _snackErr(ErrorHelper.friendly(e));
     }
   }
 

@@ -197,7 +197,8 @@ class PhoneAuthService {
       case 'app-not-authorized':
         return 'Application non autorisée. Contactez le support.';
       default:
-        return 'Erreur : ${e.message ?? e.code}';
+        // Ne jamais montrer un message/code technique Firebase à l'utilisateur
+        return 'La vérification a échoué. Veuillez réessayer dans un instant.';
     }
   }
 }

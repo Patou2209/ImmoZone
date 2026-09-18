@@ -344,8 +344,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Nom complet (souligné) ───────────────────────────────
-                  authFieldLabel('Nom complet *'),
+                  // ── Nom complet / Nom de l'agence (souligné) ─────────────
+                  // Catégorie « Agence Immobilière » → on demande le nom de
+                  // l'agence plutôt que le nom et prénom de la personne.
+                  authFieldLabel(_selectedCategory == AppConstants.categoryAgence
+                      ? 'Nom de l\'agence *'
+                      : 'Nom complet *'),
                   TextFormField(
                     controller: _nameCtrl,
                     textCapitalization: TextCapitalization.words,
@@ -354,9 +358,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
                     style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
                     decoration: authUnderlineDecoration(
-                        hintText: 'Votre nom et prénom'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Nom requis' : null,
+                        hintText: _selectedCategory == AppConstants.categoryAgence
+                            ? 'Le nom de votre agence'
+                            : 'Votre nom et prénom'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? (_selectedCategory == AppConstants.categoryAgence
+                            ? 'Nom de l\'agence requis'
+                            : 'Nom requis')
+                        : null,
                   ),
                   const SizedBox(height: 20),
 
