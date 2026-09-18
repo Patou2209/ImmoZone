@@ -11,6 +11,9 @@ class AppTheme {
   static const Color primaryDark    = Color(0xFF062A70); // Bleu marine très foncé
   static const Color accentColor    = Color(0xFF0A3A8F); // Même bleu marine
   static const Color orangeColor    = Color(0xFFF06428); // Orange logo (toit)
+  // Bleu EXACT du logo ImmoZone (immeubles + texte "Immo") — extrait du PNG.
+  // À utiliser pour tout texte devant matcher visuellement le logo (slogan).
+  static const Color logoBlue       = Color(0xFF2C5DC6);
 
   // Couleur secondaire (vert Location badge)
   static const Color successColor   = Color(0xFF2E9E5B); // Vert badge Location

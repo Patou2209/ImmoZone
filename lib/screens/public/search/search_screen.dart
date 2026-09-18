@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/share_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../providers/property_provider.dart';
@@ -117,12 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
     await _loadFavorites();
   }
 
-  Future<void> _shareProperty(PropertyModel p) async {
-    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
-    final text = '${p.title} — Réf. $ref\n$link';
-    await SharePlus.instance.share(ShareParams(text: text));
-  }
+  Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
 
   Future<void> _refresh() async {
     if (widget.initialHistorique) {

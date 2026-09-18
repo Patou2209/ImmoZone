@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/share_helper.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -739,12 +740,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String _formatDate(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
 
-  Future<void> _shareProperty(PropertyModel p) async {
-    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
-    final text = '${p.title} — Réf. $ref\n$link';
-    await SharePlus.instance.share(ShareParams(text: text));
-  }
+  Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
 
   Future<void> _confirmDelete(BuildContext ctx, PropertyModel p) async {
     final confirmed = await showDialog<bool>(

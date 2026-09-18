@@ -6,7 +6,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/share_helper.dart';
 import '../../../models/property_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -1270,14 +1270,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   // -------------------------------------------------------------------------
 
   /// Native share sheet — partage le lien web de l'annonce avec titre et référence
-  Future<void> _shareProperty(PropertyModel p) async {
-    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
-    final text = '${p.title} — Réf. $ref\n$link';
-    await SharePlus.instance.share(
-      ShareParams(text: text),
-    );
-  }
+  Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
 
   /// Fullscreen zoom viewer — image centrée, nav prev/next, zoom pinch, compteur
   void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {

@@ -24,6 +24,25 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- ── ANDROID APP LINKS : https://www.immozone.pro/property/* ──
+                 autoVerify=true + assetlinks.json (déjà publié sur
+                 https://www.immozone.pro/.well-known/assetlinks.json avec les
+                 empreintes upload + Play App Signing) → si l'app est installée,
+                 le lien s'ouvre DANS l'app ; sinon il s'ouvre dans le web. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="www.immozone.pro"/>
+                <data android:host="immozone.pro"/>
+                <data android:pathPrefix="/property"/>
+            </intent-filter>
+            <!-- Active la gestion des deep links par le moteur Flutter (GoRouter
+                 route déjà /property/:id vers PropertyDeepLinkScreen). -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

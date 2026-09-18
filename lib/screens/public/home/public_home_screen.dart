@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/share_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
@@ -921,12 +922,7 @@ class _HomeTabState extends State<_HomeTab>
     if (mounted) setState(() => _favorites = f);
   }
 
-  Future<void> _shareProperty(PropertyModel p) async {
-    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
-    final text = '${p.title} — Réf. $ref\n$link';
-    await SharePlus.instance.share(ShareParams(text: text));
-  }
+  Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
 
   // Filtrer les annonces selon mode + categorie + filtres
   // Les annonces vendues/occupees restent visibles pendant 72h

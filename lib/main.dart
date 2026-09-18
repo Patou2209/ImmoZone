@@ -321,7 +321,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            // Slogan entièrement en bleu ImmoZone (une seule couleur)
+            // Slogan dans le bleu EXACT du logo ImmoZone (uniformité visuelle)
             const Text(
               'La 1ère plateforme de l\'immobilier '
               'en RD Congo et au Congo Brazzaville',
@@ -329,7 +329,7 @@ class _SplashScreenState extends State<SplashScreen> {
               maxLines: 2,
               style: TextStyle(
                 fontSize: 12,
-                color: AppTheme.primaryColor,
+                color: AppTheme.logoBlue,
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.w700,
                 height: 1.45,

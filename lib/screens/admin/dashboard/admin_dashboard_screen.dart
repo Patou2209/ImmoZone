@@ -685,7 +685,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   // ── Header ────────────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 50, 20, 28),
+                      // Safe area : le padding top s'adapte à l'encoche
+                      // (min. 50 conservé pour le design d'origine).
+                      padding: EdgeInsets.fromLTRB(20,
+                          MediaQuery.of(context).padding.top + 26 > 50
+                              ? MediaQuery.of(context).padding.top + 26
+                              : 50,
+                          20, 28),
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft, end: Alignment.bottomRight,

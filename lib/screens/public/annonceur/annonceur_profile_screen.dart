@@ -1,11 +1,10 @@
 import 'dart:convert';
-import 'package:share_plus/share_plus.dart';
+import '../../../core/utils/share_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../models/property_model.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../models/user_model.dart';
 import '../../../services/data_service.dart';
 import '../property_detail/property_detail_screen.dart';
@@ -113,12 +112,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
         color: AppTheme.primaryColor, fontFamily: 'Poppins')));
   }
 
-  Future<void> _shareProperty(PropertyModel p) async {
-    final ref = 'IZ${p.id.length >= 4 ? p.id.substring(p.id.length - 4).toUpperCase() : p.id.toUpperCase()}';
-    final link = '${AppConstants.webBaseUrl}/property/${p.id}';
-    final text = '${p.title} — Réf. $ref\n$link';
-    await SharePlus.instance.share(ShareParams(text: text));
-  }
+  Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
 
   void _showFullscreen(String avatarData) {
     showDialog(
