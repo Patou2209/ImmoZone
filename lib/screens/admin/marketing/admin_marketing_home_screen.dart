@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:math' as math;
 import '../../../core/utils/error_helper.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,12 +11,17 @@ import '../../../models/platform_stats_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../services/data_service.dart';
 import '../../../services/csv_export_service.dart';
+import '../../public/home/public_home_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AdminMarketingHomeScreen
-// 2 onglets :
-//   0 — Statistiques plateforme (9 métriques + filtres géo/période + bar chart)
-//   1 — Gestion Parrains (liste + création + stats 5 métriques)
+// 4 onglets :
+//   0 — Dashboard : Statistiques Générales des admins principaux (temps réel,
+//       SANS boutons d'action — lecture seule)
+//   1 — Statistiques plateforme (9 métriques + filtres géo/période + bar chart)
+//   2 — Gestion Parrains (liste + création + stats 5 métriques)
+//   3 — Accueil : ouvre l'accueil public (même pattern que les admins
+//       principaux — Navigator.push, l'onglet courant est conservé)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AdminMarketingHomeScreen extends StatefulWidget {
@@ -33,11 +38,26 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
   final _ds = DataService();
   // Incrémenté à chaque refresh — force la reconstruction des tabs (relance leur _load)
   int _refreshTick = 0;
+  int _lastRealTab = 0; // dernier onglet réel (hors « Accueil »)
 
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 4, vsync: this);
+    // « Accueil » (index 3) n'est PAS un vrai onglet : comme chez les admins
+    // principaux, il OUVRE l'accueil public par-dessus et on revient ensuite
+    // sur l'onglet où on était.
+    _tabCtrl.addListener(() {
+      if (_tabCtrl.indexIsChanging || _tabCtrl.index != 3) {
+        if (_tabCtrl.index != 3) _lastRealTab = _tabCtrl.index;
+        return;
+      }
+      final back = _lastRealTab;
+      _tabCtrl.index = back; // revenir à l'onglet précédent
+      if (!mounted) return;
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const PublicHomeScreen()));
+    });
   }
 
   @override
@@ -88,20 +108,213 @@ class _AdminMarketingHomeScreenState extends State<AdminMarketingHomeScreen>
               fontWeight: FontWeight.w600,
               fontSize: 12),
           tabs: const [
+            Tab(icon: Icon(Icons.dashboard_rounded, size: 18), text: 'Dashboard'),
             Tab(icon: Icon(Icons.bar_chart_rounded, size: 18), text: 'Statistiques'),
             Tab(icon: Icon(Icons.group_add_rounded, size: 18), text: 'Parrains'),
+            Tab(icon: Icon(Icons.home_rounded, size: 18), text: 'Accueil'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabCtrl,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
+          _GeneralStatsTab(key: ValueKey('gstats_$_refreshTick'), ds: _ds),
           _StatsTab(key: ValueKey('stats_$_refreshTick'), ds: _ds),
           _ParrainsTab(key: ValueKey('parrains_$_refreshTick'), ds: _ds),
+          // Placeholder — jamais visible (le tap sur « Accueil » pousse
+          // PublicHomeScreen et revient sur l'onglet précédent)
+          const SizedBox.shrink(),
         ],
       ),
     );
   }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB 0 — Dashboard : Statistiques Générales (miroir des admins principaux,
+// alimentées en TEMPS RÉEL par adminStatsStream — AUCUN bouton d'action)
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _GeneralStatsTab extends StatefulWidget {
+  final DataService ds;
+  const _GeneralStatsTab({super.key, required this.ds});
+
+  @override
+  State<_GeneralStatsTab> createState() => _GeneralStatsTabState();
+}
+
+class _GeneralStatsTabState extends State<_GeneralStatsTab> {
+  Map<String, dynamic> _stats = {};
+  bool _loading = true;
+  StreamSubscription<Map<String, dynamic>>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    // TEMPS RÉEL : même source que le dashboard des admins principaux
+    _sub = widget.ds.adminStatsStream().listen((s) {
+      if (mounted) setState(() { _stats = s; _loading = false; });
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(color: AppTheme.accentColor));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Statistiques Générales',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary, fontFamily: 'Poppins')),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppTheme.successColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 7, height: 7,
+                  decoration: const BoxDecoration(
+                      color: AppTheme.successColor, shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              const Text('Temps réel',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                      color: AppTheme.successColor, fontFamily: 'Poppins')),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (ctx, constraints) {
+          const spacing = 12.0;
+          const cols = 2;
+          final cardW = ((constraints.maxWidth - spacing * (cols - 1)) / cols)
+              .clamp(0.0, 200.0);
+          const cardH = 110.0;
+          final cards = [
+            _statCard('Annonces actives', '${_stats['activeProperties'] ?? 0}',
+                Icons.check_circle_outline, AppTheme.successColor),
+            _statCard('Boosts actifs', '${_stats['boostedProperties'] ?? 0}',
+                Icons.rocket_launch, Colors.purple),
+            _statCard('Annonceurs', '${_stats['annonceurs'] ?? 0}',
+                Icons.home_outlined, AppTheme.primaryColor),
+            _statCard('Visiteurs', '${_stats['demandeurs'] ?? 0}',
+                Icons.visibility_outlined, AppTheme.accentColor),
+          ];
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: cards
+                .map((c) => SizedBox(width: cardW, height: cardH, child: c))
+                .toList(),
+          );
+        }),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _alertCard(
+            '${_stats['pendingPayments'] ?? 0}', 'Paiements à valider',
+            Icons.payment, Colors.orange,
+          )),
+          const SizedBox(width: 12),
+          Expanded(child: _alertCard(
+            '${_stats['pendingReports'] ?? 0}', 'Signalements',
+            Icons.flag, Colors.red,
+          )),
+          const SizedBox(width: 12),
+          Expanded(child: _alertCard(
+            '\$${(_stats['totalRevenue'] ?? 0.0).toStringAsFixed(0)}',
+            'Revenu (USD)',
+            Icons.monetization_on, AppTheme.successColor,
+          )),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _transactionCard('Vente',
+              '${_stats['vente'] ?? 0}', AppTheme.primaryColor)),
+          const SizedBox(width: 12),
+          Expanded(child: _transactionCard('Location',
+              '${_stats['location'] ?? 0}', AppTheme.successColor)),
+          const SizedBox(width: 12),
+          Expanded(child: _transactionCard('Messages',
+              '${_stats['totalMessages'] ?? 0}', AppTheme.warningColor)),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _transactionCard('En attente',
+              '${_stats['pendingProperties'] ?? 0}', AppTheme.warningColor)),
+          const SizedBox(width: 12),
+          Expanded(child: _transactionCard('Vendues/Louées',
+              '${_stats['soldProperties'] ?? 0}', Colors.purple)),
+          const SizedBox(width: 12),
+          Expanded(child: _transactionCard('Utilisateurs',
+              '${_stats['totalUsers'] ?? 0}', AppTheme.primaryColor)),
+        ]),
+        const SizedBox(height: 24),
+      ]),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color) =>
+    Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
+              color: color, fontFamily: 'Poppins')),
+          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontFamily: 'Poppins')),
+        ]),
+      ]),
+    );
+
+  Widget _alertCard(String value, String label, IconData icon, Color color) =>
+    Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color, fontFamily: 'Poppins')),
+        Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontFamily: 'Poppins'),
+            textAlign: TextAlign.center),
+      ]),
+    );
+
+  Widget _transactionCard(String label, String value, Color color) =>
+    Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(children: [
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color, fontFamily: 'Poppins')),
+        Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontFamily: 'Poppins')),
+      ]),
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

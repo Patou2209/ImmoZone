@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -632,20 +633,26 @@ class DataService {
         .where((id) => id.isNotEmpty && !_avatarCache.containsKey(id))
         .toList();
 
-    // Charger les avatars manquants
-    await Future.wait(missingIds.map((id) async {
-      try {
-        final snap = await _usersCol.doc(id).get();
-        if (snap.exists) {
-          final data = snap.data() as Map<String, dynamic>?;
-          _avatarCache[id] = data?['avatar'] as String?;
-        } else {
+    // Charger les avatars manquants — PLAFONNÉ à 4 s : si le réseau est lent,
+    // on affiche les annonces SANS avatar (placeholder) plutôt que de bloquer
+    // toute la liste. Les avatars manquants arriveront au prochain refresh.
+    try {
+      await Future.wait(missingIds.map((id) async {
+        try {
+          final snap = await _usersCol.doc(id).get();
+          if (snap.exists) {
+            final data = snap.data() as Map<String, dynamic>?;
+            _avatarCache[id] = data?['avatar'] as String?;
+          } else {
+            _avatarCache[id] = null;
+          }
+        } catch (_) {
           _avatarCache[id] = null;
         }
-      } catch (_) {
-        _avatarCache[id] = null;
-      }
-    }));
+      })).timeout(const Duration(seconds: 4));
+    } catch (_) {
+      // Timeout → on continue avec ce qu'on a déjà en cache
+    }
 
     // Injecter les avatars dans les PropertyModel
     return props.map((p) => p.ownerId.isNotEmpty
@@ -770,26 +777,68 @@ class DataService {
     'largeurM': p.largeurM,
   };
 
-  Future<List<PropertyModel>> getProperties() async {
+  // ── CACHE PROPERTIES (déduplication + TTL court) ─────────────────────
+  // PERF : la collection properties (avec images base64) était téléchargée
+  // 3-4 fois au démarrage (splash → loadAllProperties, accueil →
+  // loadProperties, getPublicStats → getActiveProperties + getProperties).
+  // Désormais : UNE seule requête partagée. Si un fetch est déjà en cours
+  // (lancé pendant le splash), tous les appels suivants réutilisent la MÊME
+  // future → les annonces commencent à charger PENDANT le spinner, pas après.
+  List<PropertyModel>? _propsCache;
+  DateTime? _propsCacheAt;
+  Future<List<PropertyModel>>? _propsInflight;
+  static const Duration _propsCacheTtl = Duration(seconds: 45);
+
+  /// Invalide le cache annonces — appelé après toute écriture sur properties.
+  void invalidatePropertiesCache() {
+    _propsCache = null;
+    _propsCacheAt = null;
+  }
+
+  /// Fetch UNIQUE de la collection properties, dédupliqué et mis en cache.
+  Future<List<PropertyModel>> _fetchAllProperties({bool forceRefresh = false}) {
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _propsCache != null &&
+        _propsCacheAt != null &&
+        now.difference(_propsCacheAt!) < _propsCacheTtl) {
+      return Future.value(_propsCache!);
+    }
+    // Une requête identique est DÉJÀ en cours → la réutiliser (déduplication)
+    final inflight = _propsInflight;
+    if (inflight != null) return inflight;
+    final future = () async {
+      try {
+        await _ensureFreshToken();
+        final snap = await _propertiesCol.get();
+        final list = snap.docs
+            .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        _propsCache = list;
+        _propsCacheAt = DateTime.now();
+        return list;
+      } finally {
+        _propsInflight = null;
+      }
+    }();
+    _propsInflight = future;
+    return future;
+  }
+
+  Future<List<PropertyModel>> getProperties({bool forceRefresh = false}) async {
     try {
-      await _ensureFreshToken();
-      final snap = await _propertiesCol.get();
-      return snap.docs
-          .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList();
+      return List.of(await _fetchAllProperties(forceRefresh: forceRefresh));
     } catch (e) {
       if (kDebugMode) debugPrint('[DataService.getProperties] Erreur: $e');
       return [];
     }
   }
 
-  Future<List<PropertyModel>> getActiveProperties() async {
+  Future<List<PropertyModel>> getActiveProperties(
+      {bool forceRefresh = false}) async {
     try {
       final now = DateTime.now();
-      final snap = await _propertiesCol.get();
-      final all = snap.docs
-          .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList();
+      final all = await _fetchAllProperties(forceRefresh: forceRefresh);
 
       // ⚠️ FIX expiration : les annonces dont expiresAt est dépassé (isExpired)
       // ne doivent JAMAIS apparaître dans les listes publiques.
@@ -854,11 +903,13 @@ class DataService {
 
   Future<void> addProperty(PropertyModel property) async {
     await _propertiesCol.doc(property.id).set(_propertyToFirestore(property));
+    invalidatePropertiesCache();
   }
 
   Future<void> updateProperty(PropertyModel property) async {
     await _propertiesCol.doc(property.id)
         .set(_propertyToFirestore(property), SetOptions(merge: true));
+    invalidatePropertiesCache();
   }
 
   Future<void> deleteProperty(String id) async {
@@ -881,6 +932,7 @@ class DataService {
       }
     } catch (_) {}
     await _propertiesCol.doc(id).delete();
+    invalidatePropertiesCache();
   }
 
   /// Suppression douce : marque status='Supprimé' + deletedAt, ne supprime pas de Firestore.
@@ -911,6 +963,7 @@ class DataService {
       'deletedAt': now.toIso8601String(),
       'updatedAt': now.toIso8601String(),
     });
+    invalidatePropertiesCache();
   }
 
   /// Restaurer une annonce supprimée (dans les 24 h) → remet status='En attente'.
@@ -932,6 +985,7 @@ class DataService {
       'deletedAt': null,
       'updatedAt': now.toIso8601String(),
     });
+    invalidatePropertiesCache();
     // Notifier l'annonceur
     try {
       final prop = PropertyModel.fromMap(data);
@@ -1013,6 +1067,7 @@ class DataService {
 
     // Écriture UNIQUE et atomique : statut + date d'expiration ensemble
     await _propertiesCol.doc(id).update(update);
+    invalidatePropertiesCache();
 
     // Notifier l'annonceur si l'annonce vient d'être approuvée
     if (status == 'Actif' && prop != null && prop.ownerId.isNotEmpty) {
@@ -1067,6 +1122,7 @@ class DataService {
       'createdAt': now.toIso8601String(),
       'updatedAt': now.toIso8601String(),
     });
+    invalidatePropertiesCache();
   }
 
   /// Incrémente atomiquement le compteur de vues d'une annonce.
@@ -1106,6 +1162,7 @@ class DataService {
       'isRented': rented,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+    invalidatePropertiesCache();
   }
 
   Future<int> clearSoldAndRentedProperties() async {
@@ -1123,6 +1180,7 @@ class DataService {
       for (final id in ids) {
         await _propertiesCol.doc(id).delete();
       }
+      invalidatePropertiesCache();
       return ids.length;
     } catch (_) {
       return 0;
@@ -1144,6 +1202,7 @@ class DataService {
       'boostType': boostType,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+    invalidatePropertiesCache();
   }
 
   /// Retire le boost d'une annonce.
@@ -1155,6 +1214,7 @@ class DataService {
       'boostType': null,
       'updatedAt': DateTime.now().toIso8601String(),
     });
+    invalidatePropertiesCache();
   }
 
   // ─── QUOTAS ─────────────────────────────────────────────────────────────────
@@ -1962,6 +2022,161 @@ class DataService {
       'boostedProperties': props.where((p) => p.isBoostActive).length,
       'freeTrial': isFreeTrial,
     };
+  }
+
+  // ─── STATS ADMIN EN TEMPS RÉEL ───────────────────────────────────────────────
+  // Mêmes calculs que getAdminStats(), mais alimentés par des snapshots()
+  // Firestore → chaque création/validation/suppression met à jour le
+  // dashboard INSTANTANÉMENT, sans pull-to-refresh.
+
+  /// Calcule la map de stats à partir des listes brutes (logique unique,
+  /// partagée entre getAdminStats one-shot et le stream temps réel).
+  Map<String, dynamic> _computeAdminStats({
+    required List<PropertyModel> props,
+    required List<UserModel> users,
+    required int messagesCount,
+    required List<PaymentModel> payments,
+    required int pendingReportsCount,
+    required List<Map<String, dynamic>> refunds,
+    required Map<String, dynamic> settings,
+  }) {
+    final resetDateStr = settings['revenue_reset_date'] as String?;
+    final resetDate =
+        resetDateStr != null ? DateTime.tryParse(resetDateStr) : null;
+
+    final confirmedPayments = payments.where((p) => p.isConfirmed);
+    final revenuePayments = resetDate != null
+        ? confirmedPayments.where((p) => p.createdAt.isAfter(resetDate))
+        : confirmedPayments;
+    final grossRevenue = revenuePayments.fold(0.0, (sum, p) => sum + p.amount);
+
+    double totalRefunded = 0.0;
+    for (final r in refunds) {
+      if (r['status'] != 'confirmed') continue;
+      if (resetDate != null) {
+        final created = DateTime.tryParse(r['createdAt'] as String? ?? '');
+        if (created == null || !created.isAfter(resetDate)) continue;
+      }
+      totalRefunded += ((r['amount'] as num?) ?? 0).toDouble();
+    }
+    final revenue = grossRevenue - totalRefunded;
+
+    final trulyActive = props.where((p) =>
+        p.status == 'Actif' && !p.isExpired && !p.isSold && !p.isRented).toList();
+
+    return {
+      'totalProperties': props.length,
+      'activeProperties': trulyActive.length,
+      'pendingProperties': props.where((p) => p.status == 'En attente').length,
+      'soldProperties': props.where((p) => p.isSold || p.isRented).length,
+      'suspendedProperties': props.where((p) => p.status == 'Suspendu').length,
+      'expiredProperties': props.where((p) =>
+          p.status == 'Expire' || p.status == 'Expiré' ||
+          (p.status == 'Actif' && p.isExpired)).length,
+      'rejectedProperties': props.where((p) =>
+          p.status == 'Rejeté' || p.status == 'Rejete').length,
+      'totalUsers': users.where((u) => u.role != 'admin').length,
+      'annonceurs': users.where((u) => u.role == 'annonceur').length,
+      'demandeurs': users.where((u) => u.role == 'demandeur').length,
+      'totalMessages': messagesCount,
+      'vente': trulyActive.where((p) => p.transactionType == 'Vente').length,
+      'location':
+          trulyActive.where((p) => p.transactionType == 'Location').length,
+      'totalRevenue': revenue,
+      'grossRevenue': grossRevenue,
+      'totalRefunded': totalRefunded,
+      'revenueResetDate': resetDateStr,
+      'pendingPayments':
+          payments.where((p) => p.status == 'awaiting_manual').length,
+      'pendingReports': pendingReportsCount,
+      'boostedProperties': props.where((p) => p.isBoostActive).length,
+      'freeTrial': isFreeTrial,
+    };
+  }
+
+  /// Stream TEMPS RÉEL des stats admin — combine les snapshots des
+  /// collections properties / users / messages / payments / reports /
+  /// refunds / settings et ré-émet la map complète à chaque changement.
+  Stream<Map<String, dynamic>> adminStatsStream() {
+    final controller = StreamController<Map<String, dynamic>>();
+
+    List<PropertyModel> props = [];
+    List<UserModel> users = [];
+    int messagesCount = 0;
+    List<PaymentModel> payments = [];
+    int pendingReports = 0;
+    List<Map<String, dynamic>> refunds = [];
+    Map<String, dynamic> settings = _defaultSettings();
+    // Émettre seulement quand les sources principales ont livré au moins
+    // une fois (évite un premier rendu à 0 partout).
+    final ready = <String>{};
+    const requiredSources = {'props', 'users', 'payments'};
+
+    void emit(String source) {
+      ready.add(source);
+      if (!requiredSources.every(ready.contains)) return;
+      if (controller.isClosed) return;
+      controller.add(_computeAdminStats(
+        props: props,
+        users: users,
+        messagesCount: messagesCount,
+        payments: payments,
+        pendingReportsCount: pendingReports,
+        refunds: refunds,
+        settings: settings,
+      ));
+    }
+
+    final subs = <StreamSubscription>[
+      _propertiesCol.snapshots().listen((snap) {
+        props = snap.docs
+            .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        emit('props');
+      }, onError: (_) => emit('props')),
+      _usersCol.snapshots().listen((snap) {
+        users = snap.docs
+            .map((d) => UserModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        emit('users');
+      }, onError: (_) => emit('users')),
+      _messagesCol.snapshots().listen((snap) {
+        messagesCount = snap.docs.length;
+        emit('messages');
+      }, onError: (_) {}),
+      _paymentsCol.snapshots().listen((snap) {
+        payments = snap.docs
+            .map((d) => PaymentModel.fromMap(d.data() as Map<String, dynamic>))
+            .toList();
+        emit('payments');
+      }, onError: (_) => emit('payments')),
+      _reportsCol
+          .where('status', isEqualTo: 'pending')
+          .snapshots()
+          .listen((snap) {
+        pendingReports = snap.docs.length;
+        emit('reports');
+      }, onError: (_) {}),
+      _refundsCol.snapshots().listen((snap) {
+        refunds = snap.docs
+            .map((d) => Map<String, dynamic>.from(d.data() as Map))
+            .toList();
+        emit('refunds');
+      }, onError: (_) {}),
+      _settingsDoc.snapshots().listen((snap) {
+        if (snap.exists) {
+          settings = Map<String, dynamic>.from(snap.data() as Map);
+        }
+        emit('settings');
+      }, onError: (_) {}),
+    ];
+
+    controller.onCancel = () async {
+      for (final s in subs) {
+        await s.cancel();
+      }
+    };
+    return controller.stream;
   }
 
   // ─── MESSAGES (USER) ────────────────────────────────────────────────────────

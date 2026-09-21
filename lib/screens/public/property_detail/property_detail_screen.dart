@@ -995,14 +995,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         p.hasElectricity ? 'Oui' : 'Non'),
                     _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24',
                         p.hasWater ? 'Oui' : 'Non'),
-                    if (p.garantieMois != null && p.garantieMois! > 0)
-                      _featureTile(Icons.security_rounded, 'Garantie',
-                          '${p.garantieMois} mois'),
-                    if (p.hasCommission)
-                      _featureTile(Icons.handshake_rounded, 'Commission',
-                          p.commissionPct != null
-                              ? '${p.commissionPct!.toStringAsFixed(0)} % du loyer'
-                              : 'Oui'),
+                    // Garantie et Commission volontairement absentes ici :
+                    // déjà affichées dans le panneau prix/badges en haut.
                   ],
                 ),
 

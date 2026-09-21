@@ -79,14 +79,17 @@ class PropertyProvider extends ChangeNotifier {
     return result;
   }
 
-  Future<void> loadProperties() async {
+  Future<void> loadProperties({bool forceRefresh = false}) async {
     _isLoading = true;
     _historiqueMode = false;
     // Pas de notifyListeners() ici — on n'annonce PAS le début du chargement
     // pour éviter un premier rendu "vide" qui cause le tremblement visuel.
     // On notifie UNE SEULE FOIS quand les données sont prêtes.
+    // PERF : grâce au cache dédupliqué de DataService, si le splash a déjà
+    // lancé le fetch, cet appel se résout instantanément (même requête).
     try {
-      _properties = await _dataService.getActiveProperties();
+      _properties =
+          await _dataService.getActiveProperties(forceRefresh: forceRefresh);
       _applyFilters();
     } catch (e) {
       _error = 'Erreur de chargement';

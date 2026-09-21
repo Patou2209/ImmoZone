@@ -871,12 +871,17 @@ class _HomeTabState extends State<_HomeTab>
 
   /// Charge toutes les données en parallèle et n'appelle setState qu'UNE SEULE
   /// fois à la fin — élimine les 4-6 redraws successifs qui causaient le tremblement.
-  Future<void> _loadAll() async {
+  ///
+  /// PERF : les annonces ont DÉJÀ été chargées pendant le splash (cache
+  /// dédupliqué DataService) → loadProperties() et getPublicStats() se
+  /// résolvent instantanément, l'accueil affiche les annonces sans attendre.
+  /// [force] = true (pull-to-refresh) → re-fetch réel depuis Firestore.
+  Future<void> _loadAll({bool force = false}) async {
     final propProvider = context.read<PropertyProvider>();
 
     // Lancer TOUT en parallèle : annonces + pubs + favoris + stats + prefs
     final results = await Future.wait([
-      propProvider.loadProperties(),                  // [0] notifie le provider
+      propProvider.loadProperties(forceRefresh: force), // [0] notifie le provider
       _ds.getLiveAds(),                               // [1] → List<AdModel>
       _ds.getFavorites(),                             // [2] → List<String>
       _ds.getPublicStats(),                           // [3] → Map<String,dynamic>
@@ -896,8 +901,8 @@ class _HomeTabState extends State<_HomeTab>
     });
   }
 
-  // Conservé pour le pull-to-refresh (onRefresh: _loadAll)
-  Future<void> _loadData() => _loadAll();
+  // Conservé pour le pull-to-refresh — force un vrai re-fetch Firestore
+  Future<void> _loadData() => _loadAll(force: true);
   Future<void> _loadStats() async {
     final s = await _ds.getPublicStats();
     if (mounted) setState(() { _stats = s; _statsLoading = false; });
@@ -1099,7 +1104,7 @@ class _HomeTabState extends State<_HomeTab>
           Expanded(
             child: RefreshIndicator(
               color: AppTheme.accentColor,
-              onRefresh: _loadAll,
+              onRefresh: () => _loadAll(force: true),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(children: [
@@ -1168,8 +1173,15 @@ class _HomeTabState extends State<_HomeTab>
 
                   const SizedBox(height: 8),
 
-                  // Liste ou etat vide
-                  if (displayed.isEmpty)
+                  // Liste, chargement en cours, ou etat vide
+                  if (displayed.isEmpty && provider.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 60),
+                      child: Center(
+                          child: CircularProgressIndicator(
+                              color: AppTheme.accentColor)),
+                    )
+                  else if (displayed.isEmpty)
                     _buildEmptyWithSimilar([])
                   else
                     _buildGridWithAds(context, displayed),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import '../../../core/utils/error_helper.dart';
 import 'package:flutter/material.dart';
@@ -40,11 +41,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   List<PropertyModel> _allProperties = [];
   // ── KPI 3 Matchmaking ────────────────────────────────────────────────
   List<Map<String, dynamic>> _contactLogs = [];
+  // ── Stats TEMPS RÉEL — alimentées par les snapshots Firestore ──────────
+  StreamSubscription<Map<String, dynamic>>? _statsSub;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      // Stats en TEMPS RÉEL : chaque changement Firestore (annonce activée,
+      // paiement validé, nouvel utilisateur…) met à jour les cartes
+      // instantanément, sans pull-to-refresh.
+      _statsSub = _ds.adminStatsStream().listen((s) {
+        if (mounted) setState(() => _stats = s);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _statsSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
