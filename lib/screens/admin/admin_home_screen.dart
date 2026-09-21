@@ -108,8 +108,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFFFFA726),
         unselectedItemColor: Colors.white60,
-        selectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 10),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 10, color: Colors.white60),
+        // fontSize 8.5 : avec 7 onglets, les libellés complets (« Dashboard »,
+        // « Utilisateurs », « Paramètres »…) tiennent sans être coupés
+        selectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 8.5),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 8.5, color: Colors.white60),
         backgroundColor: AppTheme.primaryColor,
         items: [
           const BottomNavigationBarItem(

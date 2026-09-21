@@ -721,36 +721,49 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              // ── Bouton Rafraîchir (à gauche, comme sur les autres pages) ──
-                              Tooltip(
-                                message: 'Rafraîchir',
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: GestureDetector(
-                                    onTap: _load,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                            // Expanded + FittedBox : le titre ne passe plus
+                            // JAMAIS sous les badges de droite (il rétrécit)
+                            Expanded(
+                              child: Row(children: [
+                                // ── Bouton Rafraîchir (à gauche, comme sur les autres pages) ──
+                                Tooltip(
+                                  message: 'Rafraîchir',
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: GestureDetector(
+                                      onTap: _load,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                                        ),
+                                        child: const Icon(Icons.refresh_rounded,
+                                            color: Colors.white, size: 16),
                                       ),
-                                      child: const Icon(Icons.refresh_rounded,
-                                          color: Colors.white, size: 16),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                const Text('Tableau de Bord',
-                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
-                                        color: Colors.white, fontFamily: 'Poppins')),
-                                Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
-                                    style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    const FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text('Tableau de Bord',
+                                          maxLines: 1,
+                                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
+                                              color: Colors.white, fontFamily: 'Poppins')),
+                                    ),
+                                    Text('Bienvenue, ${auth.currentUser?.name.split(' ').first ?? 'Admin'}',
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13, color: Colors.white70, fontFamily: 'Poppins')),
+                                  ]),
+                                ),
+                                const SizedBox(width: 8),
                               ]),
-                            ]),
+                            ),
                             // Badge Admin + bouton Déconnexion
                             Row(mainAxisSize: MainAxisSize.min, children: [
                               // Badge rôle admin — orange pour contraste sur fond bleu
@@ -978,10 +991,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 14),
                             Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('Réinitialiser le CA',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary)),
+                              const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text('Réinitialiser le CA',
+                                    maxLines: 1,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.textPrimary)),
+                              ),
                               Text(
                                 'Revenu actuel : \$${(_stats['totalRevenue'] ?? 0.0).toStringAsFixed(2)}',
                                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1029,10 +1047,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 14),
                             Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                              Text('Remboursement Orange Money',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary)),
+                              // FittedBox : réduit la taille au lieu de couper
+                              // le mot « Remboursement » au milieu sur petit écran
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text('Remboursement Orange Money',
+                                    maxLines: 1,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.textPrimary)),
+                              ),
                               Text(
                                 'Envoyer un montant sur le compte OM d\'un client',
                                 style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1084,10 +1109,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 14),
                             Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                              Text('Historique des paiements',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.textPrimary)),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text('Historique des paiements',
+                                    maxLines: 1,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.textPrimary)),
+                              ),
                               Text(
                                 'Voir tous les paiements et rembourser un paiement Orange Money',
                                 style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1133,9 +1163,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                             const SizedBox(width: 14),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('Effacer annonces vendues',
-                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                      fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                              const FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text('Effacer annonces vendues',
+                                    maxLines: 1,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                        fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                              ),
                               Text(
                                 '${_stats['soldProperties'] ?? 0} annonce(s) marquée(s) vendues/louées',
                                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1587,9 +1622,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     const Icon(Icons.check_circle_rounded, size: 14, color: Colors.white),
                     const SizedBox(width: 5),
-                    Text('Valider & Accorder $credits crédits',
-                        style: const TextStyle(fontFamily: 'Poppins',
-                            fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                    // Flexible + FittedBox : le texte rétrécit au lieu de
+                    // déborder du bouton sur petit écran
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Valider & Accorder $credits crédits',
+                            maxLines: 1,
+                            style: const TextStyle(fontFamily: 'Poppins',
+                                fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ),
+                    ),
                   ]),
                 ),
               )),

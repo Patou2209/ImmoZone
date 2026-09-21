@@ -2814,6 +2814,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   List<PropertyModel> _myProperties = [];
   bool _loading = true;
   int _availableCredits = 0;
+  // Bonus = annonces gratuites restantes (quota bienvenue + quotas promo)
+  int _bonusListings = 0;
   // Filtre actif via les cartes statistiques (null = toutes les annonces)
   String? _statFilter;
   bool _kpiLegendExpanded = false; // légende des KPI (onglet dépliable)
@@ -2834,11 +2836,20 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     setState(() => _loading = true);
     final userId = _ds.currentUserId;
     final credits = await _ds.getUserAvailableCredits(userId);
+    // Bonus : quota de bienvenue restant + quotas promo disponibles
+    int bonus = 0;
+    try {
+      final quota = await _ds.getCurrentQuota(userId);
+      final welcomeLeft = quota.freeQuota - quota.usedFreeQuota;
+      if (welcomeLeft > 0) bonus += welcomeLeft;
+      bonus += await _ds.getAvailablePromoQuotaCount(userId);
+    } catch (_) {}
     final all = await _ds.getUserProperties(userId);
     await _checkAutoDelete(all);
     final updated = await _ds.getUserProperties(userId);
     if (mounted) setState(() {
       _availableCredits = credits;
+      _bonusListings = bonus;
       _myProperties = updated;
       _loading = false;
     });
@@ -3327,6 +3338,60 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                     color: _availableCredits > 0
                                         ? AppTheme.accentColor
                                         : Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ]),
+                      ),
+                      // ── Solde BONUS : annonces gratuites restantes ───────
+                      // (quota de bienvenue + quotas promo) — toujours visible
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _bonusListings > 0
+                              ? AppTheme.successColor.withValues(alpha: 0.10)
+                              : AppTheme.textHint.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _bonusListings > 0
+                                ? AppTheme.successColor.withValues(alpha: 0.5)
+                                : AppTheme.textHint.withValues(alpha: 0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                            Icons.card_giftcard_rounded,
+                            color: _bonusListings > 0
+                                ? AppTheme.successColor
+                                : AppTheme.textHint,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          RichText(
+                            text: TextSpan(
+                              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
+                              children: [
+                                TextSpan(
+                                  text: 'Bonus : ',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: _bonusListings > 0
+                                        ? AppTheme.textSecondary
+                                        : AppTheme.textHint,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text:
+                                      '$_bonusListings annonce${_bonusListings > 1 ? 's' : ''} gratuite${_bonusListings > 1 ? 's' : ''}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    color: _bonusListings > 0
+                                        ? AppTheme.successColor
+                                        : AppTheme.textHint,
                                   ),
                                 ),
                               ],
