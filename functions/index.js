@@ -1630,22 +1630,20 @@ function escHtml(str) {
 // Flux: sendWhatsAppOtp → code 6 chiffres → template WhatsApp → verifyWhatsAppOtp
 //       → custom token Firebase → signInWithCustomToken côté Flutter.
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚠️ TEMPLATE PROVISOIRE (entreprise Meta non vérifiée → catégorie AUTHENTICATION
-//    indisponible) : on utilise le template UTILITY 'immozone_reference' dont la
-//    variable {{1}} porte le code. Après vérification de l'entreprise :
-//    1) créer le template AUTHENTICATION 'immozone_otp' (bouton Copy code)
-//    2) passer templateName: 'immozone_otp' et templateCategory: 'AUTHENTICATION'
+// ✅ Entreprise SEBELY SARLU vérifiée chez Meta (22 sep 2026) → template officiel
+//    AUTHENTICATION 'immozone_auth' (French, bouton Copier le code) actif.
+//    L'ancien template UTILITY 'immozone_reference' reste en secours si besoin.
 // ═══════════════════════════════════════════════════════════════════════════════
 const WHATSAPP_CONFIG = {
   apiHost: 'graph.facebook.com',
   apiVersion: 'v21.0',
   phoneNumberId: '1344165878774630',      // Numéro Immozone +243 982 527 498
   wabaId: '1604739647744226',
-  templateName: 'immozone_reference',     // → 'immozone_otp' après vérif entreprise
+  templateName: 'immozone_auth',          // template AUTHENTICATION approuvé (22 sep 2026)
   templateLanguage: 'fr',
   // 'UTILITY'        → code injecté dans la variable {{1}} du BODY
   // 'AUTHENTICATION' → code dans BODY {{1}} + paramètre du bouton Copy code
-  templateCategory: 'UTILITY',
+  templateCategory: 'AUTHENTICATION',
   otpLength: 6,
   otpTtlMinutes: 5,
   maxVerifyAttempts: 5,
