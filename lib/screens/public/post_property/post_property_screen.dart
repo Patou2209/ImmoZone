@@ -161,7 +161,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 color: AppTheme.accentColor, size: 18),
             const SizedBox(width: 8),
             const Expanded(
-              child: Text('Tarification — Appartement / flat',
+              child: Text('Tarification — Appartement / Flat',
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12,
@@ -461,7 +461,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       }
     }
     // Chambres & SDB obligatoires pour Maison, Villa et Appartement/Flat
-    final requiresRooms = _selectedType == 'Maison' || _selectedType == 'Villa' || _selectedType == 'Appartement / flat';
+    final requiresRooms = _selectedType == 'Maison / Villa' || _selectedType == 'Appartement / Flat';
     if (requiresRooms) {
       if (_bedroomsCtrl.text.trim().isEmpty || int.tryParse(_bedroomsCtrl.text.trim()) == null) {
         _err('Nombre de chambres requis pour ce type de bien'); return false;
@@ -652,9 +652,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       'Chambre d\'hôtel', 'Salle de fêtes', 'Salle polyvalente', 'Espace funéraire',
     ];
     if (_selectedTransaction == 'Location' && !noGarantieTypes.contains(_selectedType)) {
-      final isResidentiel = _selectedType == 'Maison' ||
-          _selectedType == 'Villa' ||
-          _selectedType == 'Appartement / flat';
+      final isResidentiel = _selectedType == 'Maison / Villa' ||
+          _selectedType == 'Appartement / Flat';
       _garantieMois = isResidentiel ? 3 : 6;
       _hasCommission = true;
       _commissionPctCtrl.text = '100';
@@ -1610,7 +1609,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     final fields = <Widget>[];
 
     // ── Maison & Appartement / flat ─────────────────────────────────────────
-    if (type == 'Maison' || type == 'Appartement / flat') {
+    if (type == 'Maison / Villa' || type == 'Appartement / Flat') {
       fields.addAll([
         _field(_surfaceCtrl, 'Superficie (m²) — optionnel', Icons.square_foot, '',
             type: TextInputType.number),
@@ -3917,12 +3916,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 desc: 'Votre annonce a été transmise à l\'équipe ImmoZone.',
               ),
               SizedBox(height: 12),
-              _ConfirmStep(
-                icon: Icons.payment_rounded, color: AppTheme.warningColor,
-                title: 'Vérification du paiement', isDone: false,
-                desc: 'Nous vérifions votre paiement Mobile Money (~10 min).',
-              ),
-              SizedBox(height: 12),
+              // Étape « Vérification du paiement » retirée : la vérification
+              // des crédits est automatique dans le système.
               _ConfirmStep(
                 icon: Icons.fact_check_rounded, color: AppTheme.primaryLight,
                 title: 'Modération de l\'annonce', isDone: false,
@@ -3948,7 +3943,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               Icon(Icons.notifications_active_outlined, color: AppTheme.accentColor, size: 20),
               SizedBox(width: 10),
               Expanded(child: Text(
-                'Vous serez notifié(e) par email et WhatsApp dès que votre annonce sera approuvée.',
+                'Vous recevrez une notification une fois l\'annonce approuvée.',
                 style: TextStyle(fontSize: 12, fontFamily: 'Poppins',
                     color: AppTheme.textSecondary, height: 1.5),
               )),

@@ -989,12 +989,15 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     if (p.capacity != null && p.capacity! > 0)
                       _featureTile(Icons.event_seat_rounded, 'Capacite',
                           '${p.capacity} places'),
-                    _featureTile(Icons.local_parking_rounded, 'Parking',
-                        p.hasParking ? 'Oui' : 'Non'),
-                    _featureTile(Icons.electric_bolt_rounded, 'Groupe \u00c9lectrog\u00e8ne',
-                        p.hasElectricity ? 'Oui' : 'Non'),
-                    _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24',
-                        p.hasWater ? 'Oui' : 'Non'),
+                    // Les caractéristiques à « Non » sont volontairement
+                    // MASQUÉES : on ne met pas en évidence les défauts
+                    // d'une annonce — seuls les atouts sont affichés.
+                    if (p.hasParking)
+                      _featureTile(Icons.local_parking_rounded, 'Parking', 'Oui'),
+                    if (p.hasElectricity)
+                      _featureTile(Icons.electric_bolt_rounded, 'Groupe \u00c9lectrog\u00e8ne', 'Oui'),
+                    if (p.hasWater)
+                      _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24', 'Oui'),
                     // Garantie et Commission volontairement absentes ici :
                     // déjà affichées dans le panneau prix/badges en haut.
                   ],

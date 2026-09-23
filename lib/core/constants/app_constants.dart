@@ -46,7 +46,7 @@ class AppConstants {
 
   // ── MODE : filtres par defaut accueil ────────────────────────────────────
   static const String defaultMode        = 'Location';
-  static const String defaultCategory   = 'Maison';
+  static const String defaultCategory   = 'Maison / Villa';
   static const String defaultCountry    = 'Congo (RDC)';
   static const String defaultProvince   = 'Kinshasa'; // Province par défaut (filtre strict)
 
@@ -64,9 +64,8 @@ class AppConstants {
 
   // ── Categories par mode ──────────────────────────────────────────────────
   static const List<String> categoriesLocation = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
@@ -77,9 +76,8 @@ class AppConstants {
   ];
 
   static const List<String> categoriesAchat = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
@@ -91,9 +89,8 @@ class AppConstants {
   ];
 
   static const List<String> categoriesPublication = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
@@ -106,9 +103,8 @@ class AppConstants {
   ];
 
   static const List<String> propertyTypes = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
@@ -127,9 +123,8 @@ class AppConstants {
 
   // ── Filtres avances par categorie ───────────────────────────────────────
   static const List<String> catWithRooms = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
   ];
   static const List<String> catWithBeds = [
     'Chambre d\'hotel',
@@ -142,9 +137,8 @@ class AppConstants {
   ];
   // Superficie OPTIONNELLE pour ces types
   static const List<String> catWithSurfaceOptional = [
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Chambre d\'hôtel',
     'Espace funéraire',
     'Salle polyvalente',
@@ -154,9 +148,8 @@ class AppConstants {
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
-    'Maison',
-    'Villa',
-    'Appartement / flat',
+    'Maison / Villa',
+    'Appartement / Flat',
     'Chambre d\'hôtel',
     'Espace funéraire',
     'Salle polyvalente',

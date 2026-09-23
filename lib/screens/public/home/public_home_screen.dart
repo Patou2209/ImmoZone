@@ -831,6 +831,10 @@ class _HomeTabState extends State<_HomeTab>
   // Stats
   Map<String, dynamic> _stats = {};
   bool _statsLoading = true;
+  // Panneaux stats du pied de page PLIÉS par défaut : seul le titre est
+  // visible, un chevron permet de déplier/replier chaque tableau.
+  bool _dispoExpanded = false;
+  bool _histExpanded = false;
   // Favoris
   List<String> _favorites = [];
   final DataService _ds = DataService();
@@ -1045,7 +1049,6 @@ class _HomeTabState extends State<_HomeTab>
   /// Exceptions : sigles et noms propres courts (ex: "Flat", "/").
   String _displayCategory(String cat) {
     const Map<String, String> _labels = {
-      'Appartement / Flat'       : 'Appartement / flat',
       'Propriété Commerciale'    : 'Propriété commerciale',
       'Propriété Industrielle'   : 'Propriété industrielle',
       'Salle de Fêtes'           : 'Salle de fêtes',
@@ -2529,15 +2532,17 @@ class _HomeTabState extends State<_HomeTab>
         accentIconColor: const Color(0xFFFFA726),     // icône container orange
         title: 'Marché Immobilier — Disponibilités',
         tooltipMsg: 'Cliquez sur une catégorie pour filtrer les annonces',
+        expanded: _dispoExpanded,
+        onToggle: () => setState(() => _dispoExpanded = !_dispoExpanded),
         rows: !_statsLoading ? [
-          _statRow('Maisons en vente',                    _stats['maisonVente'] ?? 0,        AppTheme.accentColor,
-              typeFilter: 'Maison',                   transactionFilter: 'Vente'),
-          _statRow('Maisons en location',                 _stats['maisonLocation'] ?? 0,     const Color(0xFF4FC3F7),
-              typeFilter: 'Maison',                   transactionFilter: 'Location'),
+          _statRow('Maisons / Villas en vente',                    _stats['maisonVente'] ?? 0,        AppTheme.accentColor,
+              typeFilter: 'Maison / Villa',                   transactionFilter: 'Vente'),
+          _statRow('Maisons / Villas en location',                 _stats['maisonLocation'] ?? 0,     const Color(0xFF4FC3F7),
+              typeFilter: 'Maison / Villa',                   transactionFilter: 'Location'),
           _statRow('Appartements en vente',               _stats['appartVente'] ?? 0,        AppTheme.accentColor,
-              typeFilter: 'Appartement / flat',        transactionFilter: 'Vente'),
+              typeFilter: 'Appartement / Flat',        transactionFilter: 'Vente'),
           _statRow('Appartements en location',            _stats['appartLocation'] ?? 0,     const Color(0xFF4FC3F7),
-              typeFilter: 'Appartement / flat',        transactionFilter: 'Location'),
+              typeFilter: 'Appartement / Flat',        transactionFilter: 'Location'),
           _statRow('Bureaux en location',                 _stats['bureauLocation'] ?? 0,     const Color(0xFFA0C4FF),
               typeFilter: 'Bureau',                   transactionFilter: 'Location'),
           _statRow('Bureaux en vente',                    _stats['bureauVente'] ?? 0,        const Color(0xFFA0C4FF),
@@ -2573,15 +2578,17 @@ class _HomeTabState extends State<_HomeTab>
         tooltipMsg: 'Biens vendus ou occupés — cliquez pour voir les annonces',
         headerColor: const Color(0xFFE65100), // orange foncé professionnel
         accentIconColor: AppTheme.primaryColor,
+        expanded: _histExpanded,
+        onToggle: () => setState(() => _histExpanded = !_histExpanded),
         rows: !_statsLoading ? [
-          _statRow('Maisons vendues',                _stats['hist72_maisonVendue'] ?? 0,     Colors.orange.shade300,
-              typeFilter: 'Maison',            transactionFilter: 'Vente',    initialHistorique: true),
-          _statRow('Maisons occupées',               _stats['hist72_maisonOccupee'] ?? 0,    Colors.amber.shade300,
-              typeFilter: 'Maison',            transactionFilter: 'Location', initialHistorique: true),
+          _statRow('Maisons / Villas vendues',                _stats['hist72_maisonVendue'] ?? 0,     Colors.orange.shade300,
+              typeFilter: 'Maison / Villa',            transactionFilter: 'Vente',    initialHistorique: true),
+          _statRow('Maisons / Villas occupées',               _stats['hist72_maisonOccupee'] ?? 0,    Colors.amber.shade300,
+              typeFilter: 'Maison / Villa',            transactionFilter: 'Location', initialHistorique: true),
           _statRow('Appartements vendus',            _stats['hist72_appartVendu'] ?? 0,      Colors.orange.shade300,
-              typeFilter: 'Appartement / flat', transactionFilter: 'Vente',    initialHistorique: true),
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Vente',    initialHistorique: true),
           _statRow('Appartements occupés',           _stats['hist72_appartOccupe'] ?? 0,     Colors.amber.shade300,
-              typeFilter: 'Appartement / flat', transactionFilter: 'Location', initialHistorique: true),
+              typeFilter: 'Appartement / Flat', transactionFilter: 'Location', initialHistorique: true),
           _statRow('Bureaux vendus',                 _stats['hist72_bureauVendu'] ?? 0,      Colors.orange.shade200,
               typeFilter: 'Bureau',            transactionFilter: 'Vente',    initialHistorique: true),
           _statRow('Bureaux occupés',                _stats['hist72_bureauOccupe'] ?? 0,     Colors.amber.shade200,
@@ -2616,6 +2623,8 @@ class _HomeTabState extends State<_HomeTab>
     required String title,
     required String tooltipMsg,
     required List<Widget> rows,
+    required bool expanded,
+    required VoidCallback onToggle,
     Color? headerColor,
     Color? accentIconColor,
     IconData? titleIcon, // petite icône optionnelle affichée à côté du titre
@@ -2629,48 +2638,81 @@ class _HomeTabState extends State<_HomeTab>
         border: Border.all(color: iconColor.withValues(alpha: 0.4)),
       ),
       child: Column(children: [
-        // En-tête
-        Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: iconColor, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
+        // En-tête — cliquable pour déplier/replier le tableau
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
               child: Row(children: [
-                Flexible(
-                  child: Text(title,
-                      style: const TextStyle(fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13, color: Colors.white)),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 18),
                 ),
-                if (titleIcon != null) ...
-                  [const SizedBox(width: 6),
-                   Icon(titleIcon, color: const Color(0xFFFFA726), size: 10)],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Row(children: [
+                    Flexible(
+                      child: Text(title,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13, color: Colors.white)),
+                    ),
+                    if (titleIcon != null) ...
+                      [const SizedBox(width: 6),
+                       Icon(titleIcon, color: const Color(0xFFFFA726), size: 10)],
+                  ]),
+                ),
+                if (_statsLoading)
+                  SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(color: iconColor, strokeWidth: 2))
+                else ...[
+                  if (expanded)
+                    Tooltip(
+                      message: tooltipMsg,
+                      child: Icon(Icons.touch_app_rounded,
+                          color: iconColor.withValues(alpha: 0.8), size: 16),
+                    ),
+                  const SizedBox(width: 8),
+                  // Chevron déplier/replier
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                      ),
+                      child: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
               ]),
             ),
-            if (_statsLoading)
-              SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(color: iconColor, strokeWidth: 2))
-            else
-              Tooltip(
-                message: tooltipMsg,
-                child: Icon(Icons.touch_app_rounded,
-                    color: iconColor.withValues(alpha: 0.8), size: 16),
-              ),
+          ),
+        ),
+        // Contenu affiché uniquement si déplié
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 220),
+          crossFadeState: expanded && !_statsLoading && rows.isNotEmpty
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Column(children: [
+            const Divider(height: 1, color: Colors.white12),
+            ...rows,
+            const SizedBox(height: 8),
           ]),
         ),
-        if (!_statsLoading && rows.isNotEmpty) ...[
-          const Divider(height: 1, color: Colors.white12),
-          ...rows,
-          const SizedBox(height: 8),
-        ],
       ]),
     );
   }

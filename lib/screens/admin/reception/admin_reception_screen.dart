@@ -36,8 +36,12 @@ class _AdminReceptionScreenState extends State<AdminReceptionScreen>
   }
 
   Future<void> _load() async {
+    // PERF : getProperties() sert le cache dédupliqué (TTL 45s) → si les
+    // annonces ont déjà été chargées (splash/accueil/annonces), l'affichage
+    // est instantané. Le spinner ne s'affiche qu'au tout premier chargement.
     setState(() => _isLoading = true);
     final all = await _ds.getProperties();
+    if (!mounted) return;
     setState(() {
       _pending   = all.where((p) => p.status == 'En attente').toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));

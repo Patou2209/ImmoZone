@@ -80,19 +80,19 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
+      // Navbar harmonisée avec les autres écrans admin : thème par défaut
+      // (fond blanc, titre sombre) au lieu du fond bleu avec titre illisible.
       appBar: AppBar(
         title: const Text('Détail Annonce',
             style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
         // Retour + refresh à gauche
         automaticallyImplyLeading: false,
         leadingWidth: 100,
         leading: Row(mainAxisSize: MainAxisSize.min, children: [
           if (Navigator.of(context).canPop())
-            const BackButton(color: Colors.white),
+            const BackButton(),
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Rafraîchir',
             onPressed: _refresh,
           ),
@@ -199,6 +199,9 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
             // ── Modération ─────────────────────────────────────────────────
             _sectionTitle('Actions de modération'),
             const SizedBox(height: 12),
+            // Seuls Approuver / Rejeter sont proposés ici : « Marquer vendu »
+            // et « Supprimer » n'ont pas leur place dans l'écran de validation
+            // (ils restent accessibles depuis la liste Gestion des Annonces).
             Wrap(
               spacing: 10, runSpacing: 10,
               children: [
@@ -208,11 +211,6 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
                 if (_property.status != 'Rejeté')
                   _actionBtn(context, 'Rejeter', Icons.cancel_outlined,
                       AppTheme.errorColor, () => _changeStatus(context, 'Rejeté')),
-                if (_property.status != 'Vendu')
-                  _actionBtn(context, 'Marquer vendu', Icons.sell_outlined,
-                      AppTheme.primaryColor, () => _changeStatus(context, 'Vendu')),
-                _actionBtn(context, 'Supprimer', Icons.delete_outline,
-                    Colors.red.shade800, () => _deleteProperty(context)),
               ],
             ),
             const SizedBox(height: 40),
@@ -878,130 +876,4 @@ class _AdminPropertyDetailScreenState extends State<AdminPropertyDetailScreen> {
     }
   }
 
-  Future<void> _deleteProperty(BuildContext context) async {
-    final isActive = _property.status == 'Actif';
-    final confirmCtrl = TextEditingController();
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.errorColor.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.delete_forever, color: AppTheme.errorColor, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Suppression définitive',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                      fontSize: 16, color: AppTheme.textPrimary)),
-            ),
-          ]),
-          content: Column(mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (isActive)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
-                  SizedBox(width: 8),
-                  Expanded(child: Text(
-                    'Annonce ACTIVE — visible par tous les utilisateurs. Sa suppression est définitive et irréversible.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFFE65100),
-                        fontFamily: 'Poppins', height: 1.4),
-                  )),
-                ]),
-              )
-            else
-              const Text('Cette action est définitive et irréversible.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary,
-                      fontFamily: 'Poppins')),
-            if (isActive) ...[
-              const SizedBox(height: 14),
-              const Text('Tapez SUPPRIMER pour confirmer :',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary, fontFamily: 'Poppins')),
-              const SizedBox(height: 8),
-              TextField(
-                controller: confirmCtrl,
-                onChanged: (_) => setStateDialog(() {}),
-                style: const TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                    fontWeight: FontWeight.w600, color: AppTheme.errorColor),
-                decoration: InputDecoration(
-                  hintText: 'SUPPRIMER',
-                  hintStyle: const TextStyle(color: AppTheme.textHint, fontFamily: 'Poppins'),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: confirmCtrl.text == 'SUPPRIMER'
-                          ? AppTheme.errorColor : AppTheme.dividerColor, width: 1.5),
-                  ),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.errorColor, width: 2)),
-                  filled: true, fillColor: Colors.white,
-                ),
-              ),
-            ],
-          ]),
-          actions: [
-            TextButton(
-              onPressed: () { confirmCtrl.dispose(); Navigator.pop(ctx, false); },
-              child: const Text('Annuler',
-                  style: TextStyle(fontFamily: 'Poppins', color: AppTheme.textSecondary)),
-            ),
-            ElevatedButton.icon(
-              onPressed: isActive
-                  ? (confirmCtrl.text == 'SUPPRIMER'
-                      ? () { confirmCtrl.dispose(); Navigator.pop(ctx, true); }
-                      : null)
-                  : () { confirmCtrl.dispose(); Navigator.pop(ctx, true); },
-              icon: const Icon(Icons.delete_forever, size: 16),
-              label: const Text('Supprimer définitivement',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.red.shade200,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirm == true && context.mounted) {
-      await context.read<PropertyProvider>().deleteProperty(_property.id);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(children: [
-            const Icon(Icons.delete_forever, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(
-              'Annonce "${_property.title}" supprimée définitivement',
-              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12),
-              overflow: TextOverflow.ellipsis,
-            )),
-          ]),
-          backgroundColor: AppTheme.errorColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 3),
-        ));
-        Navigator.pop(context);
-      }
-    }
-  }
 }

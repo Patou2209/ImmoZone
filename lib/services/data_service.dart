@@ -888,6 +888,17 @@ class DataService {
     }
   }
 
+  /// Stream TEMPS RÉEL du nombre d'annonces « En attente ».
+  /// Utilisé pour le badge de notifications sur la bottom nav admin :
+  /// le compteur se met à jour automatiquement dès qu'une annonce est
+  /// soumise, approuvée ou rejetée — sans rafraîchissement manuel.
+  Stream<int> pendingPropertiesCountStream() {
+    return _propertiesCol
+        .where('status', isEqualTo: 'En attente')
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  }
+
   /// Récupère une annonce par son identifiant depuis Firestore.
   /// Effectue un accès direct au document (plus fiable que la liste
   /// pour les documents contenant de grandes images base64).
@@ -1644,8 +1655,8 @@ class DataService {
 
     return {
       // ── Disponibilités (annonces actives NON vendues/occupées) ─────────────
-      'maisonVente':       props.where((p) => p.type == 'Maison' && p.transactionType == 'Vente').length,
-      'maisonLocation':    props.where((p) => p.type == 'Maison' && p.transactionType == 'Location').length,
+      'maisonVente':       props.where((p) => p.type == 'Maison / Villa' && p.transactionType == 'Vente').length,
+      'maisonLocation':    props.where((p) => p.type == 'Maison / Villa' && p.transactionType == 'Location').length,
       'appartVente':       props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Vente').length,
       'appartLocation':    props.where((p) => p.type.contains('Appartement') && p.transactionType == 'Location').length,
       'bureauLocation':    props.where((p) => p.type == 'Bureau' && p.transactionType == 'Location').length,
@@ -1661,8 +1672,8 @@ class DataService {
       'totalActif':        props.length,
 
       // ── Historique 3 jours (72h) — miroir COMPLET des cat\u00e9gories actives ───
-      'hist72_maisonVendue':        recentes.where((p) => p.type == 'Maison' && p.isSold).length,
-      'hist72_maisonOccupee':       recentes.where((p) => p.type == 'Maison' && p.isRented).length,
+      'hist72_maisonVendue':        recentes.where((p) => p.type == 'Maison / Villa' && p.isSold).length,
+      'hist72_maisonOccupee':       recentes.where((p) => p.type == 'Maison / Villa' && p.isRented).length,
       'hist72_appartVendu':         recentes.where((p) => p.type.contains('Appartement') && p.isSold).length,
       'hist72_appartOccupe':        recentes.where((p) => p.type.contains('Appartement') && p.isRented).length,
       'hist72_bureauVendu':         recentes.where((p) => p.type == 'Bureau' && p.isSold).length,

@@ -936,7 +936,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Row(children: [
                                   const Text('Mode Free Trial',
-                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13.5,
                                           fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                                   const SizedBox(width: 8),
                                   if (_isFreeTrial)
@@ -991,15 +991,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 14),
                             Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text('Réinitialiser le CA',
-                                    maxLines: 1,
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.textPrimary)),
-                              ),
+                              const Text('Réinitialiser le CA',
+                                  maxLines: 2,
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
                               Text(
                                 'Revenu actuel : \$${(_stats['totalRevenue'] ?? 0.0).toStringAsFixed(2)}',
                                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1049,15 +1045,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start, children: const [
                               // FittedBox : réduit la taille au lieu de couper
                               // le mot « Remboursement » au milieu sur petit écran
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text('Remboursement Orange Money',
-                                    maxLines: 1,
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.textPrimary)),
-                              ),
+                              Text('Remboursement Orange Money',
+                                  maxLines: 2,
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
                               Text(
                                 'Envoyer un montant sur le compte OM d\'un client',
                                 style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1109,15 +1101,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 14),
                             Expanded(child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start, children: const [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text('Historique des paiements',
-                                    maxLines: 1,
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppTheme.textPrimary)),
-                              ),
+                              Text('Historique des paiements',
+                                  maxLines: 2,
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.textPrimary)),
                               Text(
                                 'Voir tous les paiements et rembourser un paiement Orange Money',
                                 style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
@@ -1163,14 +1151,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                             const SizedBox(width: 14),
                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text('Effacer annonces vendues',
-                                    maxLines: 1,
-                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
-                                        fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                              ),
+                              const Text('Effacer annonces vendues',
+                                  maxLines: 2,
+                                  style: TextStyle(fontFamily: 'Poppins', fontSize: 13.5,
+                                      fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                               Text(
                                 '${_stats['soldProperties'] ?? 0} annonce(s) marquée(s) vendues/louées',
                                 style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,

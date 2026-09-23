@@ -31,10 +31,23 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    await context.read<PropertyProvider>().loadAllProperties();
+    // PERF : afficher IMMÉDIATEMENT les annonces déjà en mémoire
+    // (cache DataService / provider chargé au splash) au lieu de faire
+    // patienter l'admin sur un spinner, puis rafraîchir en arrière-plan.
+    final provider = context.read<PropertyProvider>();
+    final cached = provider.properties;
+    if (cached.isNotEmpty) {
+      setState(() {
+        _allProperties = cached;
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = true);
+    }
+    await provider.loadAllProperties();
+    if (!mounted) return;
     setState(() {
-      _allProperties = context.read<PropertyProvider>().properties;
+      _allProperties = provider.properties;
       _isLoading = false;
     });
   }

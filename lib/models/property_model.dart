@@ -244,9 +244,25 @@ class PropertyModel {
     'deletedAt': deletedAt?.toIso8601String(),
   };
 
+  /// FUSION DES CATÉGORIES : les anciennes annonces en base portent les
+  /// types « Maison », « Villa » ou « Appartement / flat ». Elles sont
+  /// normalisées vers les nouvelles catégories fusionnées « Maison / Villa »
+  /// et « Appartement / Flat » pour que filtres, stats et affichage restent
+  /// cohérents sans migration Firestore.
+  static String normalizeType(String t) {
+    final low = t.trim().toLowerCase();
+    if (low == 'maison' || low == 'villa' || low == 'maison / villa') {
+      return 'Maison / Villa';
+    }
+    if (low.contains('appartement') || low.contains('flat')) {
+      return 'Appartement / Flat';
+    }
+    return t;
+  }
+
   factory PropertyModel.fromMap(Map<String, dynamic> m) => PropertyModel(
     id: m['id'] ?? '', title: m['title'] ?? '',
-    description: m['description'] ?? '', type: m['type'] ?? '',
+    description: m['description'] ?? '', type: normalizeType(m['type'] ?? ''),
     transactionType: m['transactionType'] ?? '',
     price: (m['price'] ?? 0).toDouble(), currency: m['currency'] ?? 'USD',
     country: m['country'] ?? 'Congo (RDC)',

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -25,6 +26,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _currentIndex = 0;
   int _pendingCount = 0;
   final _ds = DataService();
+  StreamSubscription<int>? _pendingSub;
 
   // Rôle courant (lu depuis SharedPreferences)
   String get _currentRole => _ds.currentUserRole;
@@ -37,7 +39,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadPendingCount();
+      _startPendingStream();
       // Si on arrive ici sans SplashScreen (refresh direct sur /admin),
       // déclencher checkAuth() en arrière-plan.
       final auth = context.read<AuthProvider>();
@@ -47,10 +49,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     });
   }
 
-  Future<void> _loadPendingCount() async {
+  /// Badge notifications TEMPS RÉEL : le compteur d'annonces « En attente »
+  /// est alimenté par un snapshot Firestore — mise à jour instantanée
+  /// dès qu'une annonce est soumise/approuvée/rejetée, sans action admin.
+  void _startPendingStream() {
     if (_isAdminFinancier || _isAdminServiceClient || _isAdminMarketing) return; // pas besoin
-    final pending = await _ds.getPendingProperties();
-    if (mounted) setState(() => _pendingCount = pending.length);
+    _pendingSub = _ds.pendingPropertiesCountStream().listen((count) {
+      if (mounted && count != _pendingCount) {
+        setState(() => _pendingCount = count);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pendingSub?.cancel();
+    super.dispose();
   }
 
   // ── Admin Financier — écran unique ──────────────────────────────────────
@@ -103,7 +117,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             return;
           }
           setState(() => _currentIndex = i);
-          if (i == 1) _loadPendingCount();
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFFFFA726),
