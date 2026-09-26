@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'web_storage_helper.dart' if (dart.library.io) 'web_storage_helper_stub.dart' as ws;
@@ -173,8 +174,65 @@ class ImmoZoneApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // ── UX GLOBAL (v1.4.6) : retour haptique sur CHAQUE tap ────────────
+        // Petite vibration à chaque clic (tap court sans déplacement =
+        // pas de vibration pendant le scroll). L'utilisateur sent que son
+        // clic a été pris en compte, plus besoin de cliquer plusieurs fois.
+        builder: (context, child) =>
+            _GlobalTapFeedback(child: child ?? const SizedBox.shrink()),
         routerConfig: _router,
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// _GlobalTapFeedback — retour haptique global sur chaque tap (v1.4.6)
+// Un Listener transparent au-dessus de toute l'app : à chaque tap COURT et
+// SANS déplacement (donc pas pendant un scroll/swipe), déclenche une petite
+// vibration système (HapticFeedback.selectionClick — discrète).
+// Zéro impact sur les gestes : le Listener n'intercepte rien, il écoute.
+// ═══════════════════════════════════════════════════════════════════════════
+class _GlobalTapFeedback extends StatefulWidget {
+  final Widget child;
+  const _GlobalTapFeedback({required this.child});
+
+  @override
+  State<_GlobalTapFeedback> createState() => _GlobalTapFeedbackState();
+}
+
+class _GlobalTapFeedbackState extends State<_GlobalTapFeedback> {
+  Offset? _downPosition;
+  DateTime? _downTime;
+
+  void _onPointerDown(PointerDownEvent e) {
+    _downPosition = e.position;
+    _downTime = DateTime.now();
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    final down = _downPosition;
+    final time = _downTime;
+    _downPosition = null;
+    _downTime = null;
+    if (down == null || time == null) return;
+
+    // Tap court (< 350 ms) et quasi immobile (< 12 px) → c'est un CLIC,
+    // pas un scroll ni un appui long.
+    final moved = (e.position - down).distance;
+    final elapsed = DateTime.now().difference(time).inMilliseconds;
+    if (moved < 12 && elapsed < 350) {
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: _onPointerDown,
+      onPointerUp: _onPointerUp,
+      child: widget.child,
     );
   }
 }

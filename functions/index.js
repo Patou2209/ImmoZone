@@ -1600,6 +1600,27 @@ exports.propertyPreview = onRequest(async (req, res) => {
   <link rel="manifest" href="/manifest.json">
 </head>
 <body>
+  <!-- ── PRIORITÉ APP (v1.4.6) ─────────────────────────────────────────────
+       Sur Android, tente d'abord d'ouvrir l'application ImmoZone via
+       intent:// (fonctionne aussi depuis le navigateur intégré de WhatsApp,
+       qui court-circuite les App Links). Si l'app n'est pas installée,
+       browser_fallback_url ramène sur cette même page avec ?web=1
+       (le paramètre empêche une boucle infinie) et le site web se charge. -->
+  <script>
+    (function () {
+      try {
+        var isAndroid = /Android/i.test(navigator.userAgent || '');
+        var params = new URLSearchParams(window.location.search);
+        if (isAndroid && !params.has('web')) {
+          var path = window.location.pathname; // /property/<id>
+          var fallback = window.location.origin + path + '?web=1';
+          window.location.href = 'intent://www.immozone.pro' + path +
+            '#Intent;scheme=https;package=com.immozone.estate;' +
+            'S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
+        }
+      } catch (e) { /* navigateur exotique → web normal */ }
+    })();
+  </script>
   <script src="/flutter_bootstrap.js" async></script>
 </body>
 </html>`;

@@ -1638,6 +1638,9 @@ class _HomeTabState extends State<_HomeTab>
                     fontSize: 12, color: AppTheme.textSecondary),
                 prefixIcon: Icon(Icons.search_rounded,
                     color: AppTheme.primaryColor, size: 22),
+                // filled: false → empêche le fond gris CARRÉ hérité du thème
+                // (le radius est porté par le Container parent, fond blanc)
+                filled: false,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -2709,23 +2712,6 @@ class _HomeTabState extends State<_HomeTab>
                               fontWeight: FontWeight.w700,
                               fontSize: 13, color: Colors.white)),
                     ),
-                    if (totalCount != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35)),
-                        ),
-                        child: Text('$totalCount',
-                            style: const TextStyle(fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12.5, color: Colors.white)),
-                      ),
-                    ],
                     if (titleIcon != null) ...
                       [const SizedBox(width: 6),
                        Icon(titleIcon, color: const Color(0xFFFFA726), size: 10)],
@@ -2735,6 +2721,24 @@ class _HomeTabState extends State<_HomeTab>
                   SizedBox(width: 16, height: 16,
                       child: CircularProgressIndicator(color: iconColor, strokeWidth: 2))
                 else ...[
+                  // Nombre total ALIGNÉ À DROITE, juste avant le chevron
+                  if (totalCount != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                      child: Text('$totalCount',
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5, color: Colors.white)),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (expanded)
                     Tooltip(
                       message: tooltipMsg,
