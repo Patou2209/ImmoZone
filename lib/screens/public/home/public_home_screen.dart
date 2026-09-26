@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,7 @@ import '../../../core/widgets/ad_banner_card.dart';
 import '../../../core/widgets/recharge_form_widget.dart';
 import '../../../models/ad_model.dart';
 import '../../../services/data_service.dart';
+import '../../../services/phone_auth_service.dart';
 import '../../../models/property_model.dart';
 import '../../../models/user_model.dart';
 import '../../../models/app_notification_model.dart';
@@ -1044,21 +1046,51 @@ class _HomeTabState extends State<_HomeTab>
   String _normalize(String s) =>
       s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-  /// Convertit un nom de catégorie en étiquette respectant la grammaire française :
-  /// seul le premier mot prend une majuscule, les suivants sont en minuscules.
-  /// Exceptions : sigles et noms propres courts (ex: "Flat", "/").
+  /// Étiquette d'affichage des catégories (chips accueil) — PLURIEL + « & ».
+  /// Les valeurs INTERNES (Firestore, filtres, stats) restent au singulier.
   String _displayCategory(String cat) {
     const Map<String, String> _labels = {
-      'Propriété Commerciale'    : 'Propriété commerciale',
-      'Propriété Industrielle'   : 'Propriété industrielle',
-      'Salle de Fêtes'           : 'Salle de fêtes',
-      'Espace Funéraire'         : 'Espace funéraire',
-      'Salle Polyvalente'        : 'Salle polyvalente',
-      'Chambre d\'hôtel'         : 'Chambre d\'hôtel',
-      'Terrain à bâtir'          : 'Terrain à bâtir',
+      'Maison / Villa'           : 'Maisons & Villas',
+      'Appartement / Flat'       : 'Appartements & Flats',
+      'Chambre d\'hôtel'         : 'Chambres d\'hôtel',
+      'Bureau'                   : 'Bureaux',
+      'Propriété commerciale'    : 'Propriétés commerciales',
+      'Propriété industrielle'   : 'Propriétés industrielles',
+      'Salle de fêtes'           : 'Salles de fête',
+      'Salle polyvalente'        : 'Salles polyvalentes',
+      'Espace funéraire'         : 'Espaces funéraires',
+      'Concession'               : 'Concessions',
+      'Terrain à bâtir'          : 'Terrains à bâtir',
+      // Anciennes graphies (sécurité)
+      'Propriété Commerciale'    : 'Propriétés commerciales',
+      'Propriété Industrielle'   : 'Propriétés industrielles',
+      'Salle de Fêtes'           : 'Salles de fête',
+      'Espace Funéraire'         : 'Espaces funéraires',
+      'Salle Polyvalente'        : 'Salles polyvalentes',
     };
     return _labels[cat] ?? cat;
   }
+
+  /// Couleur douce (pastel) propre à chaque catégorie pour les chips.
+  /// [0] = fond non sélectionné, [1] = bordure/texte, [2] = fond sélectionné.
+  static const Map<String, List<Color>> _categoryColors = {
+    'Maison / Villa'         : [Color(0xFFE8EEF9), Color(0xFF3D5A99), Color(0xFF3D5A99)],
+    'Appartement / Flat'     : [Color(0xFFE6F3F0), Color(0xFF2E7D6B), Color(0xFF2E7D6B)],
+    'Chambre d\'hôtel'       : [Color(0xFFFBEAF0), Color(0xFFA84A68), Color(0xFFA84A68)],
+    'Bureau'                 : [Color(0xFFEDEAF7), Color(0xFF5E4B8B), Color(0xFF5E4B8B)],
+    'Propriété commerciale'  : [Color(0xFFFDF1E3), Color(0xFFB0722A), Color(0xFFB0722A)],
+    'Propriété industrielle' : [Color(0xFFE7EEF0), Color(0xFF44707E), Color(0xFF44707E)],
+    'Salle de fêtes'         : [Color(0xFFF6EAF6), Color(0xFF8A4E8F), Color(0xFF8A4E8F)],
+    'Salle polyvalente'      : [Color(0xFFEAF2E7), Color(0xFF5A7D4E), Color(0xFF5A7D4E)],
+    // Espaces funéraires : gris pâle, texte foncé lisible
+    'Espace funéraire'       : [Color(0xFFEFEFEF), Color(0xFF5F6368), Color(0xFF75797E)],
+    'Concession'             : [Color(0xFFFBF3E1), Color(0xFF9A7B2E), Color(0xFF9A7B2E)],
+    'Terrain à bâtir'        : [Color(0xFFEDF3E4), Color(0xFF6B8244), Color(0xFF6B8244)],
+  };
+
+  List<Color> _catColors(String cat) =>
+      _categoryColors[cat] ??
+      const [Color(0xFFF0F2F7), AppTheme.textSecondary, AppTheme.primaryColor];
 
   bool get _hasCatRooms => AppConstants.catWithRooms.any(
       (c) => _normalize(c) == _normalize(_selectedCategory));
@@ -1192,7 +1224,8 @@ class _HomeTabState extends State<_HomeTab>
                   // Voir plus
                   if (hasMore) _buildVoirPlus(filtered.length, effectiveDisplay),
 
-                  // Stats footer
+                  // Stats footer (marge pour ne pas coller à la dernière annonce)
+                  const SizedBox(height: 12),
                   _buildStatsFooter(),
                   const SizedBox(height: 20),
                 ]),
@@ -1572,16 +1605,22 @@ class _HomeTabState extends State<_HomeTab>
           const SizedBox(height: 16),
 
           // ══ BARRE DE RECHERCHE GLOBALE (dans le hero, avant les filtres) ══
+          // v1.4.5 : bordure BIEN VISIBLE + fond blanc franc (le shadow seul
+          // rendait le champ presque invisible sur le dégradé du hero).
           Container(
-            height: 48,
+            height: 50,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppTheme.primaryColor.withValues(alpha: 0.55),
+                width: 1.6,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
@@ -1596,7 +1635,7 @@ class _HomeTabState extends State<_HomeTab>
               decoration: const InputDecoration(
                 hintText: 'Recherche par mots-clés, type, ville, annonceur...',
                 hintStyle: TextStyle(fontFamily: 'Poppins',
-                    fontSize: 12, color: AppTheme.textHint),
+                    fontSize: 12, color: AppTheme.textSecondary),
                 prefixIcon: Icon(Icons.search_rounded,
                     color: AppTheme.primaryColor, size: 22),
                 border: InputBorder.none,
@@ -1676,6 +1715,7 @@ class _HomeTabState extends State<_HomeTab>
             itemBuilder: (_, i) {
               final cat = _currentCategories[i];
               final selected = cat == _selectedCategory;
+              final colors = _catColors(cat); // [fond, bordure/texte, fond sélectionné]
               return MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
                 onTap: () => setState(() {
                   _selectedCategory = cat;
@@ -1686,19 +1726,21 @@ class _HomeTabState extends State<_HomeTab>
                   duration: const Duration(milliseconds: 180),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
                   decoration: BoxDecoration(
-                    color: selected ? AppTheme.primaryColor : Colors.transparent,
+                    color: selected ? colors[2] : colors[0],
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
-                      color: selected ? AppTheme.primaryColor : const Color(0xFFCDD4E4),
-                      width: 1.5,
+                      color: selected
+                          ? colors[2]
+                          : colors[1].withValues(alpha: 0.45),
+                      width: 1.3,
                     ),
                   ),
                   child: Text(_displayCategory(cat),
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                         fontSize: 12,
-                        color: selected ? Colors.white : AppTheme.textSecondary,
+                        color: selected ? Colors.white : colors[1],
                       )),
                 ),
               ));
@@ -2530,7 +2572,8 @@ class _HomeTabState extends State<_HomeTab>
       _buildStatsCard(
         icon: Icons.store_rounded,
         accentIconColor: const Color(0xFFFFA726),     // icône container orange
-        title: 'Marché Immobilier — Disponibilités',
+        title: 'Disponibilités',
+        totalCount: _statsLoading ? null : (_stats['totalActif'] ?? 0),
         tooltipMsg: 'Cliquez sur une catégorie pour filtrer les annonces',
         expanded: _dispoExpanded,
         onToggle: () => setState(() => _dispoExpanded = !_dispoExpanded),
@@ -2574,7 +2617,8 @@ class _HomeTabState extends State<_HomeTab>
       // ── Tableau 2 : Historique 3 jours ──────────────────────────────────────
       _buildStatsCard(
         icon: Icons.history_rounded,
-        title: 'Historique des 3 derniers jours',
+        title: 'Historique des transactions (3 derniers jours)',
+        totalCount: _statsLoading ? null : (_stats['hist72_total'] ?? 0),
         tooltipMsg: 'Biens vendus ou occupés — cliquez pour voir les annonces',
         headerColor: const Color(0xFFE65100), // orange foncé professionnel
         accentIconColor: AppTheme.primaryColor,
@@ -2628,6 +2672,7 @@ class _HomeTabState extends State<_HomeTab>
     Color? headerColor,
     Color? accentIconColor,
     IconData? titleIcon, // petite icône optionnelle affichée à côté du titre
+    int? totalCount,     // nombre total affiché dans le header (visible même plié)
   }) {
     final Color iconColor = accentIconColor ?? AppTheme.accentColor;
     return Container(
@@ -2664,6 +2709,23 @@ class _HomeTabState extends State<_HomeTab>
                               fontWeight: FontWeight.w700,
                               fontSize: 13, color: Colors.white)),
                     ),
+                    if (totalCount != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35)),
+                        ),
+                        child: Text('$totalCount',
+                            style: const TextStyle(fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5, color: Colors.white)),
+                      ),
+                    ],
                     if (titleIcon != null) ...
                       [const SizedBox(width: 6),
                        Icon(titleIcon, color: const Color(0xFFFFA726), size: 10)],
@@ -4500,9 +4562,23 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
               const SizedBox(height: 16),
               _infoRow(Icons.person_rounded, 'Nom', user?.name ?? '—'),
               const Divider(height: 20),
-              _infoRow(Icons.email_rounded, 'Email', user?.email ?? '—'),
-              const Divider(height: 20),
-              _infoRow(Icons.phone_rounded, 'Téléphone', user?.phone ?? '—'),
+              Row(children: [
+                Expanded(child: _infoRow(
+                    Icons.phone_rounded, 'Téléphone', user?.phone ?? '—')),
+                TextButton.icon(
+                  onPressed: user == null ? null : () => _showChangePhoneSheet(auth),
+                  icon: const Icon(Icons.edit_rounded, size: 14),
+                  label: const Text('Modifier',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5,
+                          fontWeight: FontWeight.w600)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ]),
               const Divider(height: 20),
               _infoRow(Icons.business_center_rounded, 'Catégorie',
                   user?.category ?? '—'),
@@ -4528,5 +4604,438 @@ class _UserReglagesScreenState extends State<UserReglagesScreen> {
               fontSize: 12, color: AppTheme.textPrimary),
           overflow: TextOverflow.ellipsis)),
     ]);
+  }
+
+  // ── Modification du numéro de téléphone (OTP WhatsApp au NOUVEAU numéro) ──
+  void _showChangePhoneSheet(AuthProvider auth) {
+    final user = auth.currentUser;
+    if (user == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChangePhoneSheet(
+        user: user,
+        onChanged: (String newE164) async {
+          final updated = user.copyWith(phone: newE164);
+          auth.updateCurrentUserLocally(updated);
+          try { await _ds.saveSessionDirectly(updated); } catch (_) {}
+          if (mounted) {
+            setState(() {});
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Numéro modifié : $newE164',
+                  style: const TextStyle(fontFamily: 'Poppins')),
+              backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+        },
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// _ChangePhoneSheet — Bottom sheet en 2 étapes :
+//   Étape 1 : numéro actuel (pré-rempli, VERROUILLÉ) + nouveau numéro
+//             → sendWhatsAppOtp(NOUVEAU numéro)
+//   Étape 2 : saisie du code 6 chiffres reçu sur le NOUVEAU numéro
+//             → Cloud Function changePhoneNumber (vérif + maj Auth/Firestore)
+// ═════════════════════════════════════════════════════════════════════════════
+class _ChangePhoneSheet extends StatefulWidget {
+  final UserModel user;
+  final Future<void> Function(String newE164) onChanged;
+  const _ChangePhoneSheet({required this.user, required this.onChanged});
+
+  @override
+  State<_ChangePhoneSheet> createState() => _ChangePhoneSheetState();
+}
+
+class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
+  static const String _kChangePhoneUrl =
+      'https://us-central1-immozone-d9a68.cloudfunctions.net/changePhoneNumber';
+
+  final PhoneAuthService _phoneAuth = PhoneAuthService();
+  final TextEditingController _newPhoneCtrl = TextEditingController();
+  final TextEditingController _codeCtrl = TextEditingController();
+
+  int _step = 1;            // 1 = numéros, 2 = code OTP
+  bool _busy = false;
+  String? _error;
+  String _pendingMsisdn = ''; // 243XXXXXXXXX du nouveau numéro
+  int _resendCooldown = 0;
+  Timer? _cooldownTimer;
+
+  @override
+  void dispose() {
+    _cooldownTimer?.cancel();
+    _newPhoneCtrl.dispose();
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _resendCooldown = 60);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      if (_resendCooldown <= 1) {
+        t.cancel();
+        setState(() => _resendCooldown = 0);
+      } else {
+        setState(() => _resendCooldown--);
+      }
+    });
+  }
+
+  // ── Étape 1 → envoi de l'OTP au NOUVEAU numéro ────────────────────────────
+  Future<void> _sendOtp() async {
+    final raw = _newPhoneCtrl.text.trim();
+    if (raw.isEmpty) {
+      setState(() => _error = 'Entrez votre nouveau numéro.');
+      return;
+    }
+    final msisdn = PhoneAuthService.normalizeToWa(raw);
+    if (!RegExp(r'^243[0-9]{9}$').hasMatch(msisdn)) {
+      setState(() => _error =
+          'Numéro invalide. Format : 0XXXXXXXXX ou +243XXXXXXXXX');
+      return;
+    }
+    final currentMsisdn =
+        PhoneAuthService.normalizeToWa(widget.user.phone);
+    if (msisdn == currentMsisdn) {
+      setState(() => _error = 'Ce numéro est déjà celui de votre compte.');
+      return;
+    }
+
+    setState(() { _busy = true; _error = null; });
+    await _phoneAuth.verifyPhoneNumber(
+      phoneNumber: msisdn,
+      onCodeSent: (_, __) {
+        if (!mounted) return;
+        setState(() {
+          _pendingMsisdn = msisdn;
+          _step = 2;
+          _busy = false;
+        });
+        _startCooldown();
+      },
+      onAutoVerified: (_) {},
+      onFailed: (e) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = PhoneAuthService.mapPhoneAuthError(e);
+        });
+      },
+      onTimeout: (_) {},
+    );
+  }
+
+  // ── Étape 2 → vérification via Cloud Function changePhoneNumber ───────────
+  Future<void> _confirmCode() async {
+    final code = _codeCtrl.text.trim();
+    if (code.length != 6) {
+      setState(() => _error = 'Entrez le code à 6 chiffres reçu sur WhatsApp.');
+      return;
+    }
+    setState(() { _busy = true; _error = null; });
+    try {
+      final resp = await http
+          .post(
+            Uri.parse(_kChangePhoneUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'userId': widget.user.id,
+              'newPhone': _pendingMsisdn,
+              'code': code,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      if (resp.statusCode == 200 && body['success'] == true) {
+        final newE164 = (body['phone'] ?? '+$_pendingMsisdn').toString();
+        await widget.onChanged(newE164);
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = (body['error'] ?? 'Vérification impossible. Réessayez.')
+              .toString();
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = 'Erreur réseau. Vérifiez votre connexion.';
+        });
+      }
+    }
+  }
+
+  InputDecoration _fieldDeco({required String hint, Widget? prefix}) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+          fontFamily: 'Poppins', fontSize: 12.5, color: AppTheme.textHint),
+      prefixIcon: prefix,
+      filled: true,
+      fillColor: const Color(0xFFF4F6FB),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.4),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.phone_android_rounded,
+                    color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Modifier mon numéro de téléphone',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 15,
+                        color: AppTheme.textPrimary)),
+              ),
+            ]),
+            const SizedBox(height: 18),
+
+            if (_step == 1) ...[
+              // ── Numéro actuel (pré-rempli, verrouillé) ──────────────────
+              const Text('Numéro actuel',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary)),
+              const SizedBox(height: 6),
+              TextField(
+                controller:
+                    TextEditingController(text: widget.user.phone),
+                enabled: false,
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 13.5, color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600),
+                decoration: _fieldDeco(
+                  hint: '',
+                  prefix: const Icon(Icons.lock_rounded,
+                      size: 17, color: AppTheme.textHint),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // ── Nouveau numéro ────────────────────────────────────────────
+              const Text('Nouveau numéro',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _newPhoneCtrl,
+                keyboardType: TextInputType.phone,
+                autofocus: true,
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 13.5, color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w600),
+                decoration: _fieldDeco(
+                  hint: 'Ex : 0812345678 ou +243812345678',
+                  prefix: const Icon(Icons.phone_rounded,
+                      size: 17, color: AppTheme.primaryColor),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(children: [
+                const Icon(Icons.info_outline_rounded,
+                    size: 14, color: AppTheme.textHint),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Un code de vérification sera envoyé par WhatsApp au NOUVEAU numéro.',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                ),
+              ]),
+            ] else ...[
+              // ── Étape 2 : code OTP ────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF25D366).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.chat_rounded,
+                      color: Color(0xFF1DA851), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Code envoyé par WhatsApp au +$_pendingMsisdn',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: Color(0xFF1DA851)),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _codeCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontSize: 22, fontWeight: FontWeight.w800,
+                    letterSpacing: 10, color: AppTheme.textPrimary),
+                decoration: _fieldDeco(hint: '● ● ● ● ● ●')
+                    .copyWith(counterText: ''),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: (_busy || _resendCooldown > 0)
+                      ? null
+                      : () {
+                          _codeCtrl.clear();
+                          _sendOtp();
+                        },
+                  child: Text(
+                    _resendCooldown > 0
+                        ? 'Renvoyer le code (${_resendCooldown}s)'
+                        : 'Renvoyer le code',
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.25)),
+                ),
+                child: Text(_error!,
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 11.5, color: Colors.red,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ],
+
+            const SizedBox(height: 18),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          if (_step == 2) {
+                            setState(() { _step = 1; _error = null; });
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textSecondary,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(_step == 2 ? 'Retour' : 'Annuler',
+                      style: const TextStyle(fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w600, fontSize: 13)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _busy
+                      ? null
+                      : (_step == 1 ? _sendOtp : _confirmCode),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _busy
+                      ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          _step == 1
+                              ? 'Recevoir le code WhatsApp'
+                              : 'Confirmer le changement',
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
   }
 }

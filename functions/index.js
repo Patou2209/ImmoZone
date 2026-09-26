@@ -1846,6 +1846,121 @@ exports.verifyWhatsAppOtp = onRequest(
 );
 
 /**
+ * changePhoneNumber — POST {userId, newPhone, code}
+ * Modification du numéro de téléphone d'un utilisateur (depuis ses Réglages).
+ * Flux côté app : sendWhatsAppOtp(newPhone) → l'utilisateur reçoit le code sur
+ * le NOUVEAU numéro → l'app appelle cette fonction avec le code.
+ *   1. Vérifie le code OTP (hash) stocké pour le NOUVEAU numéro
+ *   2. Refuse si le nouveau numéro est déjà utilisé par un autre compte
+ *   3. Met à jour Firebase Auth (phoneNumber + email virtuel si applicable)
+ *   4. Met à jour le doc Firestore users/{userId} (champ phone)
+ *   5. Met à jour ownerPhone sur toutes ses annonces (cohérence des contacts)
+ */
+exports.changePhoneNumber = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
+    try {
+      const { userId, newPhone, code } = req.body || {};
+      if (!userId || !newPhone || !code) {
+        return res.status(400).json({ error: 'Paramètres requis: userId, newPhone, code' });
+      }
+
+      const msisdn = waNormalizeMsisdn(newPhone);
+      if (!/^243[0-9]{9}$/.test(msisdn)) {
+        return res.status(400).json({ error: 'Numéro invalide. Format attendu: 0XXXXXXXXX ou +243XXXXXXXXX' });
+      }
+      const e164 = '+' + msisdn;
+
+      // ── 1. Vérifier le code OTP envoyé au NOUVEAU numéro ────────────────────
+      const otpRef = db.collection('whatsapp_otp').doc(msisdn);
+      const otpSnap = await otpRef.get();
+      if (!otpSnap.exists) return res.status(400).json({ error: 'Aucun code demandé pour ce numéro.' });
+      const d = otpSnap.data();
+      if (d.verified) return res.status(400).json({ error: 'Code déjà utilisé. Demandez-en un nouveau.' });
+      if (new Date(d.expiresAt).getTime() < Date.now()) {
+        return res.status(400).json({ error: 'Code expiré. Demandez-en un nouveau.' });
+      }
+      if ((d.attempts || 0) >= WHATSAPP_CONFIG.maxVerifyAttempts) {
+        return res.status(429).json({ error: 'Trop de tentatives. Demandez un nouveau code.' });
+      }
+      if (hashOtp(String(code).trim(), msisdn) !== d.codeHash) {
+        await otpRef.update({ attempts: admin.firestore.FieldValue.increment(1) });
+        const remaining = WHATSAPP_CONFIG.maxVerifyAttempts - (d.attempts || 0) - 1;
+        return res.status(400).json({ error: 'Code incorrect.', attemptsRemaining: remaining });
+      }
+
+      // ── 2. Charger le user + vérifier collision numéro ───────────────────────
+      const userRef = db.collection('users').doc(userId);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) return res.status(404).json({ error: 'Compte introuvable.' });
+      const userData = userSnap.data();
+      const oldPhone = String(userData.phone || '');
+
+      if (waNormalizeMsisdn(oldPhone) === msisdn) {
+        return res.status(400).json({ error: 'Ce numéro est déjà celui de votre compte.' });
+      }
+
+      // Collision Firestore : un autre compte utilise déjà ce numéro ?
+      const dupSnap = await db.collection('users').where('phone', '==', e164).limit(1).get();
+      if (!dupSnap.empty && dupSnap.docs[0].id !== userId) {
+        return res.status(409).json({ error: 'Ce numéro est déjà utilisé par un autre compte.' });
+      }
+      // Collision Firebase Auth
+      try {
+        const authDup = await admin.auth().getUserByPhoneNumber(e164);
+        if (authDup && authDup.uid !== userId) {
+          return res.status(409).json({ error: 'Ce numéro est déjà utilisé par un autre compte.' });
+        }
+      } catch (e) { /* user-not-found = OK, numéro libre */ }
+
+      // Code valide → usage unique
+      await otpRef.update({ verified: true, verifiedAt: new Date().toISOString(), usedFor: `changePhone:${userId}` });
+
+      // ── 3. Mettre à jour Firebase Auth (non bloquant si compte Auth absent) ──
+      try {
+        const authUser = await admin.auth().getUser(userId);
+        const updates = { phoneNumber: e164 };
+        // Comptes phone+password : email virtuel 243XXXXXXXXX@immozone.app
+        if ((authUser.email || '').endsWith('@immozone.app')) {
+          updates.email = `${msisdn}@immozone.app`;
+        }
+        await admin.auth().updateUser(userId, updates);
+      } catch (e) {
+        console.warn(`changePhoneNumber: maj Auth ignorée pour ${userId}: ${e.message}`);
+      }
+
+      // ── 4. Mettre à jour le doc Firestore ─────────────────────────────────────
+      await userRef.update({
+        phone: e164,
+        phoneChangedAt: new Date().toISOString(),
+        previousPhone: oldPhone,
+      });
+
+      // ── 5. Mettre à jour ownerPhone sur ses annonces (batch, max 400) ─────────
+      try {
+        const propsSnap = await db.collection('properties')
+          .where('ownerId', '==', userId).limit(400).get();
+        if (!propsSnap.empty) {
+          const batch = db.batch();
+          propsSnap.docs.forEach((doc) => batch.update(doc.ref, { ownerPhone: e164 }));
+          await batch.commit();
+          console.log(`changePhoneNumber: ownerPhone maj sur ${propsSnap.size} annonces de ${userId}`);
+        }
+      } catch (e) {
+        console.warn(`changePhoneNumber: maj annonces ignorée: ${e.message}`);
+      }
+
+      console.log(`changePhoneNumber: ${userId} — ${oldPhone} → ${e164}`);
+      return res.json({ success: true, phone: e164 });
+    } catch (err) {
+      console.error('changePhoneNumber error:', err);
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
+);
+
+/**
  * deleteUserAccount — POST {userId, adminId}
  * Suppression COMPLÈTE d'un compte utilisateur (admin uniquement) :
  *   1. Doc Firestore users/{userId}

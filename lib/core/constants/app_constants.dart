@@ -63,16 +63,20 @@ class AppConstants {
   ];
 
   // ── Categories par mode ──────────────────────────────────────────────────
+  // Ordre imposé (v1.4.5) : Maisons & Villas, Appartements & Flats,
+  // Chambres d'hôtel, Bureaux, Propriétés commerciales, Propriétés
+  // industrielles, Salles de fête, Salles polyvalentes, Espaces funéraires.
+  // (Valeurs INTERNES inchangées — le pluriel/& est géré à l'affichage.)
   static const List<String> categoriesLocation = [
     'Maison / Villa',
     'Appartement / Flat',
+    'Chambre d\'hôtel',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
     'Salle de fêtes',
-    'Chambre d\'hôtel',
-    'Espace funéraire',
     'Salle polyvalente',
+    'Espace funéraire',
   ];
 
   static const List<String> categoriesAchat = [
@@ -84,36 +88,36 @@ class AppConstants {
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
-    'Espace funéraire',
     'Salle polyvalente',
+    'Espace funéraire',
   ];
 
   static const List<String> categoriesPublication = [
     'Maison / Villa',
     'Appartement / Flat',
+    'Chambre d\'hôtel',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
-    'Chambre d\'hôtel',
-    'Espace funéraire',
     'Salle polyvalente',
+    'Espace funéraire',
   ];
 
   static const List<String> propertyTypes = [
     'Maison / Villa',
     'Appartement / Flat',
+    'Chambre d\'hôtel',
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
-    'Chambre d\'hôtel',
-    'Espace funéraire',
     'Salle polyvalente',
+    'Espace funéraire',
   ];
 
   static const List<String> transactionTypes = [

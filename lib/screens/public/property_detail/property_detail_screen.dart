@@ -974,7 +974,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   runSpacing: 10,
                   children: [
                     _featureTile(Icons.category_outlined, 'Type', p.type),
-                    _featureTile(Icons.swap_horiz_rounded, 'Transaction', p.transactionType),
                     if (p.surface != null)
                       _featureTile(Icons.square_foot_rounded, 'Surface',
                           '${p.surface!.toInt()} m\u00b2'),
