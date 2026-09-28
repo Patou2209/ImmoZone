@@ -1567,6 +1567,30 @@ exports.propertyPreview = onRequest(async (req, res) => {
     const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
+  <!-- ── PRIORITÉ APP — EXÉCUTÉ EN TOUT PREMIER (v1.4.7) ───────────────────
+       Ce script est le PREMIER élément du <head> : la redirection vers
+       l'application (intent://) part avant tout rendu de la page, ce qui
+       supprime le « flash » du site web visible avant la bascule.
+       window.location.replace() n'ajoute pas d'entrée dans l'historique.
+       Si l'app n'est pas installée, browser_fallback_url ramène sur cette
+       même page avec ?web=1 et le site web se charge normalement. -->
+  <script>
+    (function () {
+      try {
+        var isAndroid = /Android/i.test(navigator.userAgent || '');
+        var params = new URLSearchParams(window.location.search);
+        window.__openInApp = false;
+        if (isAndroid && !params.has('web')) {
+          window.__openInApp = true;
+          var path = window.location.pathname; // /property/<id>
+          var fallback = window.location.origin + path + '?web=1';
+          window.location.replace('intent://www.immozone.pro' + path +
+            '#Intent;scheme=https;package=com.immozone.estate;' +
+            'S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end');
+        }
+      } catch (e) { window.__openInApp = false; /* navigateur exotique → web normal */ }
+    })();
+  </script>
   <base href="/">
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
@@ -1599,29 +1623,18 @@ exports.propertyPreview = onRequest(async (req, res) => {
   <title>${escHtml(title)}</title>
   <link rel="manifest" href="/manifest.json">
 </head>
-<body>
-  <!-- ── PRIORITÉ APP (v1.4.6) ─────────────────────────────────────────────
-       Sur Android, tente d'abord d'ouvrir l'application ImmoZone via
-       intent:// (fonctionne aussi depuis le navigateur intégré de WhatsApp,
-       qui court-circuite les App Links). Si l'app n'est pas installée,
-       browser_fallback_url ramène sur cette même page avec ?web=1
-       (le paramètre empêche une boucle infinie) et le site web se charge. -->
+<body style="margin:0;background:#ffffff">
+  <!-- flutter_bootstrap.js n'est chargé QUE si on reste sur le web
+       (pas de redirection app déclenchée) : pendant la bascule vers l'app,
+       la page reste blanche et vide — aucun rendu du site n'est visible. -->
   <script>
-    (function () {
-      try {
-        var isAndroid = /Android/i.test(navigator.userAgent || '');
-        var params = new URLSearchParams(window.location.search);
-        if (isAndroid && !params.has('web')) {
-          var path = window.location.pathname; // /property/<id>
-          var fallback = window.location.origin + path + '?web=1';
-          window.location.href = 'intent://www.immozone.pro' + path +
-            '#Intent;scheme=https;package=com.immozone.estate;' +
-            'S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
-        }
-      } catch (e) { /* navigateur exotique → web normal */ }
-    })();
+    if (!window.__openInApp) {
+      var s = document.createElement('script');
+      s.src = '/flutter_bootstrap.js';
+      s.async = true;
+      document.body.appendChild(s);
+    }
   </script>
-  <script src="/flutter_bootstrap.js" async></script>
 </body>
 </html>`;
 

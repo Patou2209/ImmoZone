@@ -26,7 +26,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 5, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
@@ -52,11 +52,23 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
     });
   }
 
+  /// Une annonce est « expirée » : statut Expire/Expiré (Cloud Function) OU
+  /// date d'expiration dépassée — hors En attente / Rejeté / Supprimé / fermées.
+  bool _isExpiredProp(PropertyModel p) =>
+      p.status != 'Supprimé' && p.status != 'En attente' &&
+      p.status != 'Rejeté' && p.status != 'Rejete' && !p.isMarkedClosed &&
+      (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired);
+
   List<PropertyModel> _filtered(String status) {
     return _allProperties.where((p) {
       // L'onglet 'Tous' n'affiche PAS les supprimés (ils ont leur propre onglet)
       if (status == 'Tous') {
         if (p.status == 'Supprimé') return false;
+      } else if (status == 'Expiré') {
+        if (!_isExpiredProp(p)) return false;
+      } else if (status == 'Actif') {
+        // Les actifs dont la date est dépassée vont dans l'onglet Expirés
+        if (p.status != 'Actif' || _isExpiredProp(p)) return false;
       } else {
         if (p.status != status) return false;
       }
@@ -130,6 +142,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                   Tab(text: 'Tous (${_filtered('Tous').length})'),
                   Tab(text: 'En attente (${_filtered('En attente').length})'),
                   Tab(text: 'Actifs (${_filtered('Actif').length})'),
+                  Tab(text: 'Expirés (${_filtered('Expiré').length})'),
                   Tab(text: 'Rejetés (${_filtered('Rejeté').length})'),
                   Tab(text: 'Supprimés (${_filteredDeleted().length})'),
                 ],
@@ -146,6 +159,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 _buildList('Tous'),
                 _buildList('En attente'),
                 _buildList('Actif'),
+                _buildList('Expiré'),
                 _buildList('Rejeté'),
                 _buildDeletedList(),
               ],

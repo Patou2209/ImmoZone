@@ -991,8 +991,8 @@ class _HomeTabState extends State<_HomeTab>
       if (_commune != null && _commune!.isNotEmpty &&
           !_normalize(p.commune).contains(_normalize(_commune!))) return false;
 
-      // Recherche texte multi-mots : chaque mot doit trouver une correspondance
-      // dans au moins un champ — "Location maison Lemba" / "NGANDU BENA" → OR logique
+      // Recherche texte multi-mots : CHAQUE mot doit trouver une correspondance
+      // — "appartement Kisenso" → uniquement les appartements DE Kisenso (ET logique)
       if (isTextSearch) {
         final keywords = _searchQuery.toLowerCase().trim().split(RegExp(r'\s+'));
         final searchable = [
@@ -1002,9 +1002,9 @@ class _HomeTabState extends State<_HomeTab>
           // ← recherche par nom d'annonceur
           p.ownerName, p.ownerPhone,
         ].map((s) => s.toLowerCase()).join(' ');
-        // Au moins un mot-clé doit matcher (OR logique)
-        final anyMatch = keywords.any((kw) => kw.isNotEmpty && searchable.contains(kw));
-        if (!anyMatch) return false;
+        // Tous les mots-clés doivent matcher (ET logique)
+        final allMatch = keywords.every((kw) => kw.isEmpty || searchable.contains(kw));
+        if (!allMatch) return false;
       }
 
       // Filtres prix
@@ -1633,7 +1633,7 @@ class _HomeTabState extends State<_HomeTab>
               style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                   color: AppTheme.textPrimary),
               decoration: const InputDecoration(
-                hintText: 'Recherche par mots-clés, type, ville, annonceur...',
+                hintText: 'Recherche (exemple : maison Lemba)',
                 hintStyle: TextStyle(fontFamily: 'Poppins',
                     fontSize: 12, color: AppTheme.textSecondary),
                 prefixIcon: Icon(Icons.search_rounded,
