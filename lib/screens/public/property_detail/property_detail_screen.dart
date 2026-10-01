@@ -936,7 +936,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               fontFamily: 'Poppins')),
                     ]),
                     const SizedBox(height: 3),
-                    Text(_formatDate(p.createdAt),
+                    Text('Date de publication : ${_formatDate(p.createdAt)}',
                         style: const TextStyle(
                             fontSize: 11,
                             color: AppTheme.textHint,
@@ -991,12 +991,14 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     // Les caractéristiques à « Non » sont volontairement
                     // MASQUÉES : on ne met pas en évidence les défauts
                     // d'une annonce — seuls les atouts sont affichés.
+                    // Présentées sans valeur « Oui » : la simple présence de
+                    // l'étiquette signifie que la caractéristique existe.
                     if (p.hasParking)
-                      _featureTile(Icons.local_parking_rounded, 'Parking', 'Oui'),
+                      _featureTile(Icons.local_parking_rounded, 'Parking', ''),
                     if (p.hasElectricity)
-                      _featureTile(Icons.electric_bolt_rounded, 'Groupe \u00c9lectrog\u00e8ne', 'Oui'),
+                      _featureTile(Icons.electric_bolt_rounded, 'Groupe \u00c9lectrog\u00e8ne', ''),
                     if (p.hasWater)
-                      _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24', 'Oui'),
+                      _featureTile(Icons.security_rounded, 'S\u00e9curit\u00e9 24h/24', ''),
                     // Garantie et Commission volontairement absentes ici :
                     // déjà affichées dans le panneau prix/badges en haut.
                   ],
@@ -1432,15 +1434,23 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 14, color: AppTheme.accentColor),
         const SizedBox(width: 5),
-        Text('$label: ',
-            style: const TextStyle(
-                fontSize: 10, color: AppTheme.textHint, fontFamily: 'Poppins')),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Poppins',
-                color: AppTheme.textPrimary)),
+        // Sans valeur → l'étiquette seule, mise en évidence (ex. « Parking »)
+        Text(value.isEmpty ? label : '$label: ',
+            style: value.isEmpty
+                ? const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                    color: AppTheme.textPrimary)
+                : const TextStyle(
+                    fontSize: 10, color: AppTheme.textHint, fontFamily: 'Poppins')),
+        if (value.isNotEmpty)
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Poppins',
+                  color: AppTheme.textPrimary)),
       ]),
     );
   }

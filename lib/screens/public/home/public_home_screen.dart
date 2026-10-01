@@ -847,6 +847,10 @@ class _HomeTabState extends State<_HomeTab>
   int _adRotationIndex = 0;
   static const _kAdRotKey = 'ad_rotation_index';
 
+  // ── Défilement des chips catégories via flèches ──────────────────────
+  final ScrollController _catScrollCtrl = ScrollController();
+  Timer? _catAutoScrollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -866,8 +870,70 @@ class _HomeTabState extends State<_HomeTab>
 
   @override
   void dispose() {
+    _catAutoScrollTimer?.cancel();
+    _catScrollCtrl.dispose();
     _modeCtrl.dispose();
     super.dispose();
+  }
+
+  /// Short press : glisse d'UN pas (≈ largeur d'une chip) — la chip suivante
+  /// encore masquée vient prendre la place de celle affichée à l'extrémité.
+  void _scrollCatsBy(double delta) {
+    if (!_catScrollCtrl.hasClients) return;
+    final target = (_catScrollCtrl.offset + delta)
+        .clamp(0.0, _catScrollCtrl.position.maxScrollExtent);
+    _catScrollCtrl.animateTo(target,
+        duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+  }
+
+  /// Long press : glissement continu LENT (≈75 px/s) pour pouvoir s'arrêter
+  /// précisément sur le type de propriété voulu. S'arrête au relâchement.
+  void _startCatAutoScroll(double direction) {
+    _catAutoScrollTimer?.cancel();
+    _catAutoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!_catScrollCtrl.hasClients) return;
+      final next = (_catScrollCtrl.offset + direction * 1.2)
+          .clamp(0.0, _catScrollCtrl.position.maxScrollExtent);
+      _catScrollCtrl.jumpTo(next);
+      if (next == 0.0 || next == _catScrollCtrl.position.maxScrollExtent) {
+        _catAutoScrollTimer?.cancel();
+      }
+    });
+  }
+
+  void _stopCatAutoScroll() {
+    _catAutoScrollTimer?.cancel();
+    _catAutoScrollTimer = null;
+  }
+
+  /// Petite flèche discrète de défilement des chips (design sobre : cercle
+  /// gris très pâle, icône bleue atténuée, 26 px — non gênante).
+  Widget _catArrow({required bool left}) {
+    return GestureDetector(
+      onTap: () => _scrollCatsBy(left ? -130 : 130),
+      onLongPressStart: (_) => _startCatAutoScroll(left ? -1 : 1),
+      onLongPressEnd: (_) => _stopCatAutoScroll(),
+      onLongPressCancel: _stopCatAutoScroll,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: 26,
+          height: 26,
+          margin: EdgeInsets.only(left: left ? 10 : 4, right: left ? 4 : 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F4FA),
+            shape: BoxShape.circle,
+            border: Border.all(
+                color: AppTheme.primaryColor.withValues(alpha: 0.15)),
+          ),
+          child: Icon(
+            left ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+            size: 19,
+            color: AppTheme.primaryColor.withValues(alpha: 0.65),
+          ),
+        ),
+      ),
+    );
   }
 
   List<String> get _currentCategories =>
@@ -1710,9 +1776,13 @@ class _HomeTabState extends State<_HomeTab>
         padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
         child: SizedBox(
           height: 38,
-          child: ListView.separated(
+          child: Row(children: [
+            _catArrow(left: true),
+            Expanded(
+              child: ListView.separated(
+            controller: _catScrollCtrl,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             itemCount: _currentCategories.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
@@ -1748,7 +1818,10 @@ class _HomeTabState extends State<_HomeTab>
                 ),
               ));
             },
-          ),
+              ),
+            ),
+            _catArrow(left: false),
+          ]),
         ),
       ),
 
