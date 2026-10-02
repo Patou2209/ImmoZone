@@ -923,8 +923,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       ],
                     ],
                     ], // ferme le bloc else du prix appartement both
-                  ]),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+
+                    // Vues + date de publication — SOUS les badges (garantie…)
+                    const SizedBox(height: 8),
                     Row(children: [
                       const Icon(Icons.visibility_outlined,
                           size: 14, color: AppTheme.textHint),

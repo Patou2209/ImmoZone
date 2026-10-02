@@ -906,8 +906,9 @@ class _HomeTabState extends State<_HomeTab>
     _catAutoScrollTimer = null;
   }
 
-  /// Petite flèche discrète de défilement des chips (design sobre : cercle
-  /// gris très pâle, icône bleue atténuée, 26 px — non gênante).
+  /// Chevron de défilement des chips — même style que la galerie photo du
+  /// détail d'annonce : cercle noir semi-transparent, chevron blanc, superposé
+  /// au contenu (tout autour reste transparent).
   Widget _catArrow({required bool left}) {
     return GestureDetector(
       onTap: () => _scrollCatsBy(left ? -130 : 130),
@@ -919,17 +920,14 @@ class _HomeTabState extends State<_HomeTab>
         child: Container(
           width: 26,
           height: 26,
-          margin: EdgeInsets.only(left: left ? 10 : 4, right: left ? 4 : 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFF1F4FA),
+            color: Colors.black.withValues(alpha: 0.35),
             shape: BoxShape.circle,
-            border: Border.all(
-                color: AppTheme.primaryColor.withValues(alpha: 0.15)),
           ),
           child: Icon(
             left ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
             size: 19,
-            color: AppTheme.primaryColor.withValues(alpha: 0.65),
+            color: Colors.white,
           ),
         ),
       ),
@@ -1776,13 +1774,13 @@ class _HomeTabState extends State<_HomeTab>
         padding: const EdgeInsets.fromLTRB(0, 10, 0, 0),
         child: SizedBox(
           height: 38,
-          child: Row(children: [
-            _catArrow(left: true),
-            Expanded(
-              child: ListView.separated(
+          // Stack : les chevrons FLOTTENT par-dessus les chips (zone autour
+          // 100 % transparente — aucun masquage du type de propriété dessous).
+          child: Stack(children: [
+            ListView.separated(
             controller: _catScrollCtrl,
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: _currentCategories.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
@@ -1818,9 +1816,12 @@ class _HomeTabState extends State<_HomeTab>
                 ),
               ));
             },
-              ),
             ),
-            _catArrow(left: false),
+            // Chevrons superposés — même style que la galerie photo du détail
+            Positioned(left: 4, top: 0, bottom: 0,
+                child: Center(child: _catArrow(left: true))),
+            Positioned(right: 4, top: 0, bottom: 0,
+                child: Center(child: _catArrow(left: false))),
           ]),
         ),
       ),
@@ -3410,32 +3411,39 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     }
 
     final user = auth.currentUser;
-    // ── Catégorisation des annonces (mutuellement exclusives) ──────────────
-    // Actives    : statut Actif, non fermées, date d'expiration NON dépassée
-    // En attente : statut 'En attente' (y compris renouvellements en validation)
-    // Fermées    : marquées vendues / occupées
-    // Rejetées   : statut 'Rejeté' (admin écrit avec accent) ou legacy 'Rejete'
-    // Expirées   : date dépassée ou statut Expire/Expiré (hors attente/fermées)
-    final actives  = _myProperties.where((p) =>
-        p.status == 'Actif' && !p.isMarkedClosed && !p.isExpired).toList();
-    final pending  = _myProperties.where((p) => p.status == 'En attente').toList();
-    final closed   = _myProperties.where((p) => p.isMarkedClosed).toList();
-    final rejected = _myProperties.where((p) =>
-        p.status == 'Rejeté' || p.status == 'Rejete').toList();
-    final expired  = _myProperties.where((p) =>
-        !p.isMarkedClosed && p.status != 'En attente' &&
-        p.status != 'Rejeté' && p.status != 'Rejete' &&
+    // ── Catégorisation EXHAUSTIVE en cascade ───────────────────────────
+    // Les annonces 'Supprimé' (soft delete admin) sont EXCLUES du dashboard.
+    // Chaque annonce visible tombe dans EXACTEMENT UNE catégorie — le total
+    // est donc toujours ÉGAL à la somme des cartes (plus d'incohérence).
+    // Ordre : Fermées → En attente → Rejetées → Expirées → Actives (le reste).
+    final visibleProps = _myProperties
+        .where((p) => p.status != 'Supprimé')
+        .toList();
+    final closed   = visibleProps.where((p) =>
+        p.isMarkedClosed ||
+        p.status == 'Vendu' || p.status == 'En location').toList();
+    final pending  = visibleProps.where((p) =>
+        !closed.contains(p) && p.status == 'En attente').toList();
+    final rejected = visibleProps.where((p) =>
+        !closed.contains(p) &&
+        (p.status == 'Rejeté' || p.status == 'Rejete')).toList();
+    final expired  = visibleProps.where((p) =>
+        !closed.contains(p) && !pending.contains(p) && !rejected.contains(p) &&
         (p.status == 'Expire' || p.status == 'Expiré' || p.isExpired)).toList();
+    // Actives = tout le reste (statut Actif non expiré, legacy Publié…)
+    final actives  = visibleProps.where((p) =>
+        !closed.contains(p) && !pending.contains(p) &&
+        !rejected.contains(p) && !expired.contains(p)).toList();
 
     // ── Liste affichée selon le filtre actif (carte stat cliquée) ──────────
     final List<PropertyModel> displayed = switch (_statFilter) {
-      'all'      => _myProperties,
+      'all'      => visibleProps,
       'actives'  => actives,
       'pending'  => pending,
       'closed'   => closed,
       'rejected' => rejected,
       'expired'  => expired,
-      _          => _myProperties,
+      _          => visibleProps,
     };
     final String filterLabel = switch (_statFilter) {
       'all'      => 'Toutes les annonces',
@@ -3609,7 +3617,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                   // Statistiques rapides — CLIQUABLES (filtrent la liste)
                   Row(children: [
-                    _statCard('Toutes les annonces', _myProperties.length,
+                    _statCard('Toutes les annonces', visibleProps.length,
                         Icons.apps_rounded,
                         AppTheme.primaryColor, filterKey: 'all'),
                     const SizedBox(width: 8),
@@ -3659,7 +3667,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   Row(children: [
                     Expanded(
                       child: _sectionTitle(_statFilter == null
-                          ? 'Mes annonces (${_myProperties.length})'
+                          ? 'Mes annonces (${visibleProps.length})'
                           : 'Mes annonces — $filterLabel (${displayed.length})'),
                     ),
                     if (_statFilter != null)
@@ -3678,7 +3686,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ]),
                   const SizedBox(height: 12),
 
-                  if (_myProperties.isEmpty)
+                  if (visibleProps.isEmpty)
                     _buildEmpty()
                   else if (_statFilter != null && displayed.isEmpty)
                     Padding(
@@ -3782,9 +3790,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             child: Column(children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(height: 4),
+              // Police réduite et non grasse : évite le retour à la ligne
+              // vertical quand les compteurs atteignent 2-3 chiffres.
               Text('$count',
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800,
-                      fontSize: 18, color: color)),
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500,
+                      fontSize: 13, color: color)),
             ]),
           ),
         ),

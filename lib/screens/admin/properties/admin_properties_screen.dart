@@ -61,14 +61,24 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
 
   List<PropertyModel> _filtered(String status) {
     return _allProperties.where((p) {
-      // L'onglet 'Tous' n'affiche PAS les supprimés (ils ont leur propre onglet)
+      // Répartition EXHAUSTIVE : chaque annonce appartient à EXACTEMENT UN
+      // onglet (En attente / Actifs / Expirés / Rejetés / Supprimés), et
+      // 'Tous' les inclut TOUS → le total est toujours ÉGAL à la somme.
       if (status == 'Tous') {
-        if (p.status == 'Supprimé') return false;
+        // tout inclure (y compris Supprimés) — cohérence du compteur
       } else if (status == 'Expiré') {
         if (!_isExpiredProp(p)) return false;
       } else if (status == 'Actif') {
-        // Les actifs dont la date est dépassée vont dans l'onglet Expirés
-        if (p.status != 'Actif' || _isExpiredProp(p)) return false;
+        // Catégorie de rattrapage : tout ce qui n'est ni en attente, ni
+        // rejeté, ni supprimé, ni expiré (couvre aussi les statuts legacy
+        // Vendu / En location / Suspendu / Publié…)
+        if (p.status == 'En attente' || p.status == 'Rejeté' ||
+            p.status == 'Rejete' || p.status == 'Supprimé' ||
+            _isExpiredProp(p)) {
+          return false;
+        }
+      } else if (status == 'Rejeté') {
+        if (p.status != 'Rejeté' && p.status != 'Rejete') return false;
       } else {
         if (p.status != status) return false;
       }
