@@ -120,7 +120,7 @@ class _AdminAdsScreenState extends State<AdminAdsScreen> {
         const SizedBox(width: 5),
         Text(label,
             style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                fontWeight: FontWeight.w700, color: color)),
+                fontWeight: FontWeight.w500, color: color)),
       ]),
     );
   }
@@ -374,12 +374,6 @@ class _AdTile extends StatelessWidget {
             const SizedBox(width: 14),
             _miniStat(Icons.visibility_rounded, '${ad.impressions}', 'vues',
                 AppTheme.accentColor),
-            const SizedBox(width: 8),
-            if (ad.impressions > 0) ...[
-              Text('CTR ${ad.ctr.toStringAsFixed(1)}%',
-                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
-                      color: AppTheme.textHint, fontWeight: FontWeight.w600)),
-            ],
             const Spacer(),
             // Bouton éditer
             MouseRegion(cursor: SystemMouseCursors.click, child: GestureDetector(
@@ -430,7 +424,7 @@ class _AdTile extends StatelessWidget {
       const SizedBox(width: 3),
       Text('$val $label',
           style: TextStyle(fontFamily: 'Poppins', fontSize: 10,
-              fontWeight: FontWeight.w700, color: color)),
+              fontWeight: FontWeight.w500, color: color)),
     ]);
   }
 

@@ -850,6 +850,23 @@ class _HomeTabState extends State<_HomeTab>
   // ── Défilement des chips catégories via flèches ──────────────────────
   final ScrollController _catScrollCtrl = ScrollController();
   Timer? _catAutoScrollTimer;
+  // Visibilité des chevrons : éclipsés quand il n'y a plus rien à défiler
+  bool _catCanScrollLeft = false;
+  bool _catCanScrollRight = true;
+
+  /// Recalcule la visibilité des chevrons selon la position de défilement.
+  void _updateCatArrows() {
+    if (!_catScrollCtrl.hasClients) return;
+    final pos = _catScrollCtrl.position;
+    final canLeft = pos.pixels > 2;
+    final canRight = pos.pixels < pos.maxScrollExtent - 2;
+    if (canLeft != _catCanScrollLeft || canRight != _catCanScrollRight) {
+      setState(() {
+        _catCanScrollLeft = canLeft;
+        _catCanScrollRight = canRight;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -863,9 +880,15 @@ class _HomeTabState extends State<_HomeTab>
           _resetFilters(clearSearch: false); // garde le texte de recherche au changement de mode
           _displayCount = 4;
         });
+        // Nouvelle liste de catégories → réévaluer les chevrons
+        WidgetsBinding.instance.addPostFrameCallback((_) => _updateCatArrows());
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAll());
+    _catScrollCtrl.addListener(_updateCatArrows);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAll();
+      _updateCatArrows();
+    });
   }
 
   @override
@@ -908,26 +931,35 @@ class _HomeTabState extends State<_HomeTab>
 
   /// Chevron de défilement des chips — même style que la galerie photo du
   /// détail d'annonce : cercle noir semi-transparent, chevron blanc, superposé
-  /// au contenu (tout autour reste transparent).
+  /// au contenu. MÊME HAUTEUR que les chips catégories (38 px), et s'ÉCLIPSE
+  /// automatiquement quand il n'y a plus rien à défiler de ce côté.
   Widget _catArrow({required bool left}) {
-    return GestureDetector(
-      onTap: () => _scrollCatsBy(left ? -130 : 130),
-      onLongPressStart: (_) => _startCatAutoScroll(left ? -1 : 1),
-      onLongPressEnd: (_) => _stopCatAutoScroll(),
-      onLongPressCancel: _stopCatAutoScroll,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.35),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            left ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
-            size: 19,
-            color: Colors.white,
+    final visible = left ? _catCanScrollLeft : _catCanScrollRight;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: GestureDetector(
+          onTap: () => _scrollCatsBy(left ? -130 : 130),
+          onLongPressStart: (_) => _startCatAutoScroll(left ? -1 : 1),
+          onLongPressEnd: (_) => _stopCatAutoScroll(),
+          onLongPressCancel: _stopCatAutoScroll,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.35),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                left ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                size: 26,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
       ),

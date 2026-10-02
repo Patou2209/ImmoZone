@@ -1437,33 +1437,48 @@ exports.expireProperties = onSchedule(
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // PURGE 72h : suppression DÉFINITIVE des biens marqués vendus/occupés
-    // depuis plus de 72 heures (3 jours). Pendant les 72h le bien reste visible
-    // (badge "Vendu"/"Occupé" + tableau Historique), puis il est totalement
-    // retiré du système.
+    // PURGE 72h : suppression DÉFINITIVE de toutes les annonces SORTIES du
+    // circuit actif depuis plus de 72 heures (3 jours) :
+    //   • vendues / occupées (isSold / isRented)
+    //   • rejetées  (status 'Rejeté' / 'Rejete')
+    //   • expirées  (status 'Expire' / 'Expiré')
+    // Pendant les 72h l'annonce reste visible (badge + possibilité de
+    // renouveler une expirée), puis elle est totalement retirée du système
+    // pour libérer de l'espace.
     // ═════════════════════════════════════════════════════════════════════════
     try {
       const cutoffIso = new Date(now.getTime() - 72 * 3600 * 1000).toISOString();
 
-      const [soldSnap, rentedSnap] = await Promise.all([
-        db.collection('properties').where('isSold', '==', true).get(),
-        db.collection('properties').where('isRented', '==', true).get(),
-      ]);
+      const [soldSnap, rentedSnap, rejSnap, rej2Snap, expSnap, exp2Snap] =
+        await Promise.all([
+          db.collection('properties').where('isSold', '==', true).get(),
+          db.collection('properties').where('isRented', '==', true).get(),
+          db.collection('properties').where('status', '==', 'Rejeté').get(),
+          db.collection('properties').where('status', '==', 'Rejete').get(),
+          db.collection('properties').where('status', '==', 'Expire').get(),
+          db.collection('properties').where('status', '==', 'Expiré').get(),
+        ]);
 
-      // Fusion + déduplication (un doc peut matcher les deux requêtes)
+      // Fusion + déduplication (un doc peut matcher plusieurs requêtes)
       const toCheck = new Map();
-      soldSnap.forEach((d) => toCheck.set(d.id, d));
-      rentedSnap.forEach((d) => toCheck.set(d.id, d));
+      [soldSnap, rentedSnap, rejSnap, rej2Snap, expSnap, exp2Snap]
+        .forEach((s) => s.forEach((d) => toCheck.set(d.id, d)));
 
       const delBatch = db.batch();
       const deleted = [];
 
       toCheck.forEach((doc) => {
         const data = doc.data();
-        // Dates stockées en ISO-8601 → comparaison lexicale valide.
-        // Si updatedAt absent, on utilise createdAt ; si aucune date, on ignore
-        // (sera réparé au prochain marquage/màj).
-        const ref = data.updatedAt || data.createdAt;
+        // Point de départ du compte à rebours 72h :
+        //   fermées  → updatedAt (moment du marquage vendu/occupé)
+        //   rejetées → updatedAt (moment du rejet admin)
+        //   expirées → updatedAt (moment du passage en Expire) ou expiresAt
+        // Dates ISO-8601 → comparaison lexicale valide. Sans aucune date,
+        // on ignore (sera réparé à la prochaine mise à jour du doc).
+        const isExpiredDoc = data.status === 'Expire' || data.status === 'Expiré';
+        const ref = data.updatedAt ||
+            (isExpiredDoc ? data.expiresAt : null) ||
+            data.createdAt;
         if (!ref) return;
         if (ref <= cutoffIso) {
           delBatch.delete(doc.ref);
@@ -1474,18 +1489,21 @@ exports.expireProperties = onSchedule(
       if (deleted.length > 0) {
         await delBatch.commit();
 
-        // Notifier chaque annonceur que son annonce vendue/occupée a été retirée
+        // Notifier chaque annonceur que son annonce a été retirée
         for (const { id, data } of deleted) {
           try {
             if (!data.ownerId) continue;
-            const label = data.isSold ? 'vendue' : 'occupée';
+            const label = data.isSold ? 'vendue'
+              : data.isRented ? 'occupée'
+              : (data.status === 'Rejeté' || data.status === 'Rejete') ? 'rejetée'
+              : 'expirée';
             const notifId = `notif_purge_${id}_${Date.now()}`;
             await db.collection('notifications').doc(notifId).set({
               id: notifId,
               userId: data.ownerId,
               type: 'info',
               title: 'Annonce retirée',
-              body: `Votre annonce "${data.title || ''}" marquée ${label} a été retirée du système ` +
+              body: `Votre annonce "${data.title || ''}" ${label} a été retirée du système ` +
                     `après le délai de 72 heures, conformément aux règles de la plateforme.`,
               propertyId: id,
               propertyTitle: data.title || '',
@@ -1498,7 +1516,7 @@ exports.expireProperties = onSchedule(
         }
       }
 
-      console.log(`[expireProperties] 🗑️ Purge 72h — ${deleted.length} bien(s) vendu(s)/occupé(s) supprimé(s) définitivement (${toCheck.size} vérifié(s))`);
+      console.log(`[expireProperties] 🗑️ Purge 72h — ${deleted.length} annonce(s) vendue(s)/occupée(s)/rejetée(s)/expirée(s) supprimée(s) définitivement (${toCheck.size} vérifiée(s))`);
     } catch (purgeErr) {
       console.error('[expireProperties] Purge 72h exception:', purgeErr);
     }

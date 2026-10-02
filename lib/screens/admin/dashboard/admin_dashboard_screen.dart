@@ -65,34 +65,49 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    // ── Chargement PROGRESSIF en 2 phases ─────────────────────────────────
+    // Phase 1 (rapide) : stats + annonces en attente + paiements manuels →
+    //   le dashboard S'AFFICHE immédiatement avec les cartes principales.
+    // Phase 2 (arrière-plan) : paiements/users/annonces/logs pour les KPI
+    //   détaillés → les sections se complètent sans bloquer l'écran.
+    // Avant : spinner plein écran jusqu'à la fin des 8 requêtes (= la plus
+    // lente dictait tout). Après : affichage dès la phase 1 (~3 requêtes).
     final provider = context.read<PropertyProvider>();
-    // ── Chargement PARALLÈLE de toutes les données (au lieu de séquentiel)
-    //    → temps de chargement = la requête la plus lente, pas la somme.
-    final results = await Future.wait([
+
+    // Si on a déjà des données (pull-to-refresh), ne pas remettre le spinner
+    if (_stats.isEmpty) setState(() => _isLoading = true);
+
+    final essentials = await Future.wait([
       provider.getStats(),               // 0
       provider.getPendingProperties(),   // 1
       _ds.getPendingManualPayments(),    // 2
-      _ds.getPayments(),                 // 3 — paiements confirmés pour KPI
-      _ds.getUsers(),                    // 4 — users pour KPI 2
-      _ds.getProperties(),               // 5 — properties pour KPI 2
-      _ds.getContactLogs(),              // 6 — logs de contact pour KPI 3
-      _ds.getConfirmedRefunds(),         // 7 — remboursements pour Recette KPI
     ]);
     if (!mounted) return;
-    final allPayments = results[3] as List<PaymentModel>;
     setState(() {
-      _stats = results[0] as Map<String, dynamic>;
-      _pendingProps = results[1] as List<PropertyModel>;
-      _pendingPayments = results[2] as List<PaymentModel>;
+      _stats = essentials[0] as Map<String, dynamic>;
+      _pendingProps = essentials[1] as List<PropertyModel>;
+      _pendingPayments = essentials[2] as List<PaymentModel>;
+      _isFreeTrial = _ds.isFreeTrial;
+      _isLoading = false; // ← dashboard visible dès maintenant
+    });
+
+    // Phase 2 — KPI secondaires (non bloquants)
+    final secondary = await Future.wait([
+      _ds.getPayments(),                 // 0 — paiements confirmés pour KPI
+      _ds.getUsers(),                    // 1 — users pour KPI 2
+      _ds.getProperties(),               // 2 — properties pour KPI 2
+      _ds.getContactLogs(),              // 3 — logs de contact pour KPI 3
+      _ds.getConfirmedRefunds(),         // 4 — remboursements pour Recette KPI
+    ]);
+    if (!mounted) return;
+    final allPayments = secondary[0] as List<PaymentModel>;
+    setState(() {
       _confirmedPayments = allPayments.where((p) => p.isConfirmed).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      _allUsers = results[4] as List<UserModel>;
-      _allProperties = results[5] as List<PropertyModel>;
-      _contactLogs = results[6] as List<Map<String, dynamic>>;
-      _confirmedRefunds = results[7] as List<Map<String, dynamic>>;
-      _isFreeTrial = _ds.isFreeTrial;
-      _isLoading = false;
+      _allUsers = secondary[1] as List<UserModel>;
+      _allProperties = secondary[2] as List<PropertyModel>;
+      _contactLogs = secondary[3] as List<Map<String, dynamic>>;
+      _confirmedRefunds = secondary[4] as List<Map<String, dynamic>>;
     });
   }
 
