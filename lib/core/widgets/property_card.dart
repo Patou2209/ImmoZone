@@ -60,8 +60,12 @@ class PropertyCard extends StatelessWidget {
 
   // Card dimensions
   static const double _cardWidth   = 400;
-  static const double _cardHeight  = 450;
+  static const double _cardHeight  = 460;
   static const double _cardRadius  = 18;
+  // Répartition image/description : 62/38 → plus d'air pour les chips
+  // caractéristiques (Ch./SDB) qui étaient coupées sur certains téléphones.
+  static const double _imageRatio  = 0.62;
+  static const double _descRatio   = 0.38;
 
   // ── Avatar annonceur : photo base64 ou initiale ──────────────────────────
   // [size] est déterminé dans build() via MediaQuery : 60px si ≤768px, 80px sinon.
@@ -73,8 +77,11 @@ class PropertyCard extends StatelessWidget {
       try {
         final b64 = avatarData.contains(',') ? avatarData.split(',').last : avatarData;
         final bytes = base64Decode(b64);
+        // cacheWidth : décoder l'avatar à sa taille d'affichage (x3 pour les
+        // écrans haute densité) au lieu de la pleine résolution → RAM réduite.
         inner = Image.memory(bytes, width: size, height: size,
             fit: BoxFit.cover,
+            cacheWidth: (size * 3).round(),
             errorBuilder: (_, __, ___) => _initialsAvatar(size));
       } catch (_) {
         inner = _initialsAvatar(size);
@@ -128,7 +135,13 @@ class PropertyCard extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final double avatarSize = screenWidth <= 768 ? 60.0 : 80.0;
 
-    return MouseRegion(
+    // MediaQuery.withClampedTextScaling : sur les téléphones avec police
+    // système agrandie, les textes de la carte débordaient et les chips
+    // Ch./SDB devenaient invisibles (coupées par le ClipRRect). On limite
+    // l'agrandissement à ×1.1 à l'intérieur de la carte uniquement.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.1,
+      child: MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap,
@@ -161,7 +174,7 @@ class PropertyCard extends StatelessWidget {
                           top: Radius.circular(_cardRadius)),
                       child: PropertyImage(
                         src: property.mainImage,
-                        height: _cardHeight * 0.65,
+                        height: _cardHeight * _imageRatio,
                         width: double.infinity,
                         fit: BoxFit.cover,
                       ),
@@ -353,14 +366,16 @@ class PropertyCard extends StatelessWidget {
                     ),
                   ]),
 
-                  // ── Description (35% de la hauteur) ─────────────────────
+                  // ── Description (38% de la hauteur) ─────────────────────
                   SizedBox(
-                    height: _cardHeight * 0.35,
+                    height: _cardHeight * _descRatio,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+                      // Espacements CONTRÔLÉS (plus de spaceBetween qui collait
+                      // les chips tout en bas) : Réf → localisation rapprochés,
+                      // chips juste sous la localisation, marge en bas garantie.
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Row 1: Titre LEFT + Prix RIGHT
                           Row(
@@ -382,12 +397,17 @@ class PropertyCard extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    Text(
-                                      'Réf. IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
-                                      style: const TextStyle(
-                                        fontSize: 9, fontWeight: FontWeight.w500,
-                                        color: AppTheme.textHint,
-                                        fontFamily: 'Poppins', letterSpacing: 0.5,
+                                    // 1px de margin haut/bas : crée l'espace
+                                    // entre Titre → Réf → Localisation
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 1),
+                                      child: Text(
+                                        'Réf. IZ${property.id.length >= 4 ? property.id.substring(property.id.length - 4).toUpperCase() : property.id.toUpperCase()}',
+                                        style: const TextStyle(
+                                          fontSize: 9, fontWeight: FontWeight.w500,
+                                          color: AppTheme.textHint,
+                                          fontFamily: 'Poppins', letterSpacing: 0.5,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -457,6 +477,8 @@ class PropertyCard extends StatelessWidget {
                             ],
                           ),
 
+                          const SizedBox(height: 3),
+
                           // Row 2: Localisation
                           Row(children: [
                             const Icon(Icons.location_on,
@@ -474,8 +496,10 @@ class PropertyCard extends StatelessWidget {
                             ),
                           ]),
 
-                          // Row 3: Chips caractéristiques
-                          Wrap(spacing: 6, runSpacing: 6, children: [
+                          const SizedBox(height: 9),
+
+                          // Row 3: Chips caractéristiques (Ch. / SDB / surface)
+                          Wrap(spacing: 8, runSpacing: 6, children: [
                             if (property.bedrooms != null &&
                                 property.bedrooms! > 0)
                               _featureChip(
@@ -504,6 +528,8 @@ class PropertyCard extends StatelessWidget {
                               _featureChip(Icons.single_bed_rounded,
                                   '${property.numberOfBeds} Lit(s)'),
                           ]),
+
+                          const Spacer(),
 
                           // Row 4: Garantie LEFT + clock + vues RIGHT
                           Row(
@@ -578,6 +604,7 @@ class PropertyCard extends StatelessWidget {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -615,17 +642,17 @@ class PropertyCard extends StatelessWidget {
 
   Widget _featureChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
       decoration: BoxDecoration(
         color: const Color(0xFFEFF1F5),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 11, color: AppTheme.accentColor),
-        const SizedBox(width: 3),
+        Icon(icon, size: 13, color: AppTheme.accentColor),
+        const SizedBox(width: 5),
         Text(label, style: const TextStyle(
-          fontSize: 10, color: AppTheme.accentColor,
-          fontWeight: FontWeight.w500, fontFamily: 'Poppins',
+          fontSize: 11, color: AppTheme.accentColor,
+          fontWeight: FontWeight.w600, fontFamily: 'Poppins',
         )),
       ]),
     );

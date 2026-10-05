@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/property_model.dart';
 import '../services/data_service.dart';
@@ -77,6 +78,42 @@ class PropertyProvider extends ChangeNotifier {
       return bEnd.compareTo(aEnd);
     });
     return result;
+  }
+
+  /// ── DÉMARRAGE PROGRESSIF (2 phases) ─────────────────────────────────────
+  /// Phase 1 : catégorie par défaut de l'accueil (Location + Maison / Villa)
+  ///   → requête légère, l'accueil s'affiche immédiatement avec du contenu.
+  /// Phase 2 : collection complète en ARRIÈRE-PLAN → les autres catégories
+  ///   deviennent disponibles quelques secondes plus tard, sans bloquer.
+  /// Indispensable pour rester rapide avec 10 000+ annonces.
+  Future<void> loadPropertiesProgressive() async {
+    _isLoading = true;
+    _historiqueMode = false;
+    try {
+      // Phase 1 — rapide : uniquement Maison / Villa (catégorie par défaut)
+      final priority = await _dataService.getPriorityProperties();
+      if (priority.isNotEmpty) {
+        _properties = priority;
+        _applyFilters();
+        _isLoading = false;
+        notifyListeners(); // l'accueil peut s'afficher MAINTENANT
+      }
+    } catch (_) {}
+    // Phase 2 — ARRIÈRE-PLAN (non attendue par l'appelant) : la future
+    // retournée se termine dès la phase 1 → le splash n'attend jamais le
+    // chargement complet, crucial avec 10 000+ annonces.
+    unawaited(_loadFullInBackground());
+  }
+
+  Future<void> _loadFullInBackground() async {
+    try {
+      _properties = await _dataService.getActiveProperties();
+      _applyFilters();
+    } catch (e) {
+      _error = 'Erreur de chargement';
+    }
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> loadProperties({bool forceRefresh = false}) async {
@@ -289,7 +326,12 @@ class PropertyProvider extends ChangeNotifier {
 
   Future<void> addProperty(PropertyModel property) async {
     await _dataService.addProperty(property);
-    await loadAllProperties();
+    // ⚠️ FIX CRASH PUBLICATION : le rechargement complet de la collection
+    // (docs lourds en base64) se fait en ARRIÈRE-PLAN, sans bloquer la fin
+    // de la publication. L'ancien `await` provoquait un pic mémoire
+    // (photos encodées encore en RAM + téléchargement de toutes les annonces)
+    // → OOM et fermeture de l'app sur téléphones modestes.
+    unawaited(loadAllProperties());
   }
 
   Future<void> updateProperty(PropertyModel property) async {

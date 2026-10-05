@@ -834,6 +834,37 @@ class DataService {
     }
   }
 
+  /// ── DÉMARRAGE PROGRESSIF ──────────────────────────────────────────────────
+  /// Charge UNIQUEMENT la catégorie par défaut de l'accueil (Maison / Villa)
+  /// pour afficher l'écran en quelques centaines de ms, même avec 10 000+
+  /// annonces. La collection complète est ensuite chargée en arrière-plan.
+  /// Requête mono-champ (type ==) → aucun index composite requis.
+  Future<List<PropertyModel>> getPriorityProperties() async {
+    try {
+      final now = DateTime.now();
+      await _ensureFreshToken();
+      final snap = await _propertiesCol
+          .where('type', isEqualTo: 'Maison / Villa')
+          .get();
+      final all = snap.docs
+          .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList();
+      // Même logique de visibilité que getActiveProperties
+      final boosted = all.where((p) =>
+          p.status == 'Actif' && !p.isExpired && p.isBoostActive && !p.isSold && !p.isRented).toList();
+      final normal = all.where((p) =>
+          p.status == 'Actif' && !p.isExpired && !p.isBoostActive && !p.isSold && !p.isRented).toList();
+      final soldOccupied = all.where((p) {
+        if (!(p.isSold || p.isRented)) return false;
+        if (p.updatedAt == null) return false;
+        return now.difference(p.updatedAt!).inHours < AppConstants.soldAutoDeleteHours;
+      }).toList();
+      return enrichWithAvatars([...boosted, ...normal, ...soldOccupied]);
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<PropertyModel>> getActiveProperties(
       {bool forceRefresh = false}) async {
     try {

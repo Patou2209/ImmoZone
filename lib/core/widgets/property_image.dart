@@ -65,6 +65,23 @@ class PropertyImage extends StatelessWidget {
     return child;
   }
 
+  /// PERF : largeur de décodage adaptée à la taille d'affichage réelle.
+  /// Sans cacheWidth, chaque photo base64 (1024px) est décodée à pleine
+  /// résolution pour chaque vignette → mémoire énorme + listes lentes.
+  /// Avec cacheWidth, le moteur décode directement à la taille utile.
+  int _cacheWidthFor(BuildContext context) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    double base;
+    if (width != null && width!.isFinite && width! > 0) {
+      base = width!;
+    } else if (height != null && height!.isFinite && height! > 0) {
+      base = height! * 1.7; // ratio paysage typique des cartes
+    } else {
+      base = MediaQuery.of(context).size.width; // plein écran par défaut
+    }
+    return (base * dpr).round().clamp(64, 1400);
+  }
+
   /// Décode une chaîne base64 en bytes — exécuté dans un Future
   /// pour éviter de bloquer l'UI sur de grandes images.
   static Future<Uint8List?> _decodeBase64(String src) async {
@@ -101,6 +118,7 @@ class PropertyImage extends StatelessWidget {
             width: width,
             height: height,
             fit: fit,
+            cacheWidth: _cacheWidthFor(context),
             gaplessPlayback: true,
             errorBuilder: (_, __, ___) => _placeholder(),
           );
@@ -115,6 +133,7 @@ class PropertyImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: _cacheWidthFor(context),
         errorBuilder: (_, __, ___) => _placeholder(),
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
@@ -134,6 +153,7 @@ class PropertyImage extends StatelessWidget {
             width: width,
             height: height,
             fit: fit,
+            cacheWidth: _cacheWidthFor(context),
             errorBuilder: (_, __, ___) => _placeholder(),
           ));
         }

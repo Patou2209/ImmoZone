@@ -23,6 +23,13 @@ import 'screens/public/property_detail/property_deep_link_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── PERF/STABILITÉ : plafonner le cache d'images décodées ──────────────
+  // Les photos d'annonces sont stockées en base64 et décodées en bitmaps.
+  // Par défaut Flutter garde jusqu'à 100 MB de bitmaps en RAM → sur les
+  // téléphones modestes, l'OS tue l'app (fermetures « systématiques »).
+  // 48 MB suffit largement avec cacheWidth (vignettes décodées petites).
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 48 << 20; // 48 MB
+
   // ── URL propres sans # pour le deep-linking web (/property/:id) ──────────
   usePathUrlStrategy();
 
@@ -284,25 +291,29 @@ class _SplashScreenState extends State<SplashScreen> {
         auth.checkAuth(),
         Future.delayed(const Duration(seconds: 10)),
       ]);
-      // Lancer le chargement des propriétés (non bloquant pour la navigation)
-      // loadProperties() = annonces ACTIVES + avatars — exactement ce que
-      // l'accueil affiche → il n'aura AUCUN nouveau fetch à faire.
-      propProvider.loadProperties().ignore();
+      // Lancer le chargement PROGRESSIF (non bloquant pour la navigation) :
+      // phase 1 = catégorie par défaut (Maison / Villa) → accueil immediat ;
+      // phase 2 = toutes les annonces en arrière-plan.
+      propProvider.loadPropertiesProgressive().ignore();
     } else {
       // ── MOBILE : on affiche notre propre splash Flutter (logo + slogan).
-      // Durée GARANTIE de 5 s pour laisser le temps de lire le slogan
+      // Durée GARANTIE de 4 s pour laisser le temps de lire le slogan
       // (Future.wait = on attend le timer ET le travail), avec plafond 10 s
       // si le réseau est lent (Future.any = on n'attend pas indéfiniment).
-      // PERF : loadProperties() (annonces ACTIVES + avatars) est EXACTEMENT
-      // ce que l'accueil affiche — le chargement se fait PENDANT les 5 s du
-      // spinner et l'accueil s'affiche instantanément à l'arrivée (le cache
-      // dédupliqué de DataService évite tout re-fetch).
+      // ⚠️ loadPropertiesProgressive() est lancé AVANT l'attente ci-dessous →
+      // le chargement de la catégorie prioritaire (Maison / Villa) se fait
+      // PENDANT les 4 s du splash.
+      // PERF : chargement PROGRESSIF pendant le splash — phase 1 (catégorie
+      // par défaut Maison / Villa, requête légère) donne un accueil immediat ;
+      // phase 2 (collection complète) continue en arrière-plan APRÈS la
+      // navigation — indispensable quand il y aura 10 000+ annonces.
+      final propsFuture = propProvider.loadPropertiesProgressive();
       await Future.wait([
-        Future.delayed(const Duration(seconds: 5)), // minimum incompressible
+        Future.delayed(const Duration(seconds: 4)), // minimum incompressible
         Future.any([
           Future.wait([
             auth.checkAuth(),
-            propProvider.loadProperties(),
+            propsFuture, // terminé dès que possible, plafonné ci-dessous
           ]),
           Future.delayed(const Duration(seconds: 10)), // plafond réseau lent
         ]),

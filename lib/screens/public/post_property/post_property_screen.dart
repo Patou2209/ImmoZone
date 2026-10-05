@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, compute;
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
@@ -87,12 +87,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   String _pricePeriod = 'mensuel';
 
   // ── Étape 2 — Images ──────────────────────────────────────────────────────
-  // Photo principale (obligatoire) + 3 photos obligatoires + 6 optionnelles = max 10
-  static const int _maxSecondaryRequired = 3;   // obligatoires
-  static const int _maxOptionalPhotos    = 6;   // facultatives
-  static const int _maxTotalPhotos       = 10;  // 1 + 3 + 6
+  // Photo principale (obligatoire) + 1 photo obligatoire + 8 optionnelles = max 10
+  static const int _maxSecondaryRequired = 1;   // obligatoire
+  static const int _maxOptionalPhotos    = 8;   // facultatives
+  static const int _maxTotalPhotos       = 10;  // 1 + 1 + 8
   XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
-  final List<XFile> _secondaryPhotos = []; // 3 obligatoires + 6 optionnelles (max 9)
+  final List<XFile> _secondaryPhotos = []; // 1 obligatoire + 8 optionnelles (max 9)
   final ImagePicker _picker = ImagePicker();
   // ── Bytes pour le web (XFile.path = blob URL, inutilisable sur web) ─────
   Uint8List? _webMainPhotoBytes;
@@ -726,24 +726,21 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           totalBytes += bytes.length;
         }
       } else {
-        // ── Mobile/Desktop : lire depuis le chemin fichier ──────────────────
+        // FIX CRASH : l'ancien code lisait + encodait jusqu'a 10 photos en
+        // base64 sur le thread UI -> pic memoire + gel -> Android tuait l'app
+        // ("se ferme systematiquement"). compute() deporte lecture + encodage
+        // dans un isolate separe ; la memoire intermediaire est liberee a la
+        // fin de l'isolate et l'UI reste fluide.
         final allPhotos = [
           if (_mainPhoto != null) _mainPhoto!,
           ..._secondaryPhotos,
         ];
-        for (final xfile in allPhotos) {
-          if (totalBytes >= maxDocBytes) break;
-          try {
-            final bytes = await File(xfile.path).readAsBytes();
-            if (totalBytes + bytes.length > maxDocBytes) break;
-            final b64 = base64Encode(bytes);
-            final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
-            images.add('data:image/$ext;base64,$b64');
-            totalBytes += bytes.length;
-          } catch (_) {
-            // Photo ignorée si lecture échoue
-          }
-        }
+        final encoded = await compute(encodePhotosToDataUris, <String, dynamic>{
+          'paths': allPhotos.map((x) => x.path).toList(),
+          'names': allPhotos.map((x) => x.name).toList(),
+          'maxBytes': maxDocBytes,
+        });
+        images.addAll(encoded);
       }
       // URLs réseau (mode test / sample) conservées telles quelles
       images.addAll(_imageUrls);
@@ -2219,14 +2216,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ÉTAPE 2 — Photos du bien (1 principale + 3 obligatoires + 6 optionnelles)
+  // ÉTAPE 2 — Photos du bien (1 principale + 1 obligatoire + 8 optionnelles)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep2() {
     final bool hasSampleUrls = _imageUrls.isNotEmpty;
     final int total = hasSampleUrls
         ? _imageUrls.length
         : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length;
-    final int required = _maxSecondaryRequired + 1; // 4 photos minimum
+    final int required = _maxSecondaryRequired + 1; // 2 photos minimum
     final bool complete = total >= required;
 
     return SingleChildScrollView(
@@ -2247,7 +2244,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Icon(Icons.info_outline, color: AppTheme.accentColor, size: 18),
             SizedBox(width: 10),
             Expanded(child: Text(
-              "1 photo principale + 3 obligatoires + jusqu'à 6 optionnelles (10 max).",
+              "1 photo principale + 1 obligatoire + jusqu'à 8 optionnelles (10 max).",
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor),
             )),
           ]),
@@ -2397,7 +2394,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
         const SizedBox(height: 24),
 
-        // ── SECTION 2 : 3 photos obligatoires ────────────────────────────────
+        // ── SECTION 2 : 1 photo obligatoire ────────────────────────────────
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2405,11 +2402,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               color: AppTheme.primaryColor.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text('2–4', style: TextStyle(color: Colors.white,
+            child: const Text('2', style: TextStyle(color: Colors.white,
                 fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
           ),
           const SizedBox(width: 10),
-          const Text('Photos obligatoires',
+          const Text('Photo obligatoire',
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 14, color: AppTheme.textPrimary)),
           const Spacer(),
@@ -2423,7 +2420,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         ]),
         const SizedBox(height: 10),
 
-        // Grille 3 slots obligatoires
+        // Grille des slots obligatoires (+ spacers pour conserver
+        // la largeur 1/3 même avec un seul slot obligatoire)
         Row(children: List.generate(_maxSecondaryRequired, (i) {
           final hasUrl  = hasSampleUrls && _imageUrls.length > (i + 1);
           final hasFile = !hasSampleUrls && i < _secondaryPhotos.length;
@@ -2539,7 +2537,10 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               ),
             ),
           );
-        })),
+        })
+          // Spacers : garder le slot obligatoire à 1/3 de largeur
+          ..addAll(List.generate(3 - _maxSecondaryRequired,
+              (_) => const Expanded(child: SizedBox.shrink())))),
 
         // Bouton ajouter photo obligatoire
         if (!hasSampleUrls && _mainPhoto != null && _secondaryPhotos.length < _maxSecondaryRequired) ...([
@@ -2589,7 +2590,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 color: Colors.green.shade700,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text('5–10', style: TextStyle(color: Colors.white,
+              child: const Text('3–10', style: TextStyle(color: Colors.white,
                   fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
             ),
             const SizedBox(width: 10),
@@ -4395,4 +4396,30 @@ class _PostPropertyAvatarMenu extends StatelessWidget {
             fontWeight: FontWeight.w600, fontSize: 13, color: Colors.red)),
       ]),
     );
+}
+
+
+/// Fonction TOP-LEVEL executee dans un isolate separe via compute().
+/// Lit chaque photo depuis son chemin, l'encode en base64 data-URI et
+/// s'arrete des que la limite de taille du document Firestore est atteinte.
+/// Doit etre top-level (pas une methode) pour etre utilisable par compute().
+List<String> encodePhotosToDataUris(Map<String, dynamic> args) {
+  final paths = (args['paths'] as List).cast<String>();
+  final names = (args['names'] as List).cast<String>();
+  final maxBytes = args['maxBytes'] as int;
+  final images = <String>[];
+  int totalBytes = 0;
+  for (int i = 0; i < paths.length; i++) {
+    if (totalBytes >= maxBytes) break;
+    try {
+      final bytes = File(paths[i]).readAsBytesSync();
+      if (totalBytes + bytes.length > maxBytes) break;
+      final ext = names[i].toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+      images.add('data:image/$ext;base64,${base64Encode(bytes)}');
+      totalBytes += bytes.length;
+    } catch (_) {
+      // Photo ignoree si lecture echoue
+    }
+  }
+  return images;
 }
