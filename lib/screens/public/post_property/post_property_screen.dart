@@ -87,12 +87,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   String _pricePeriod = 'mensuel';
 
   // ── Étape 2 — Images ──────────────────────────────────────────────────────
-  // Photo principale (obligatoire) + 1 photo obligatoire + 8 optionnelles = max 10
-  static const int _maxSecondaryRequired = 1;   // obligatoire
-  static const int _maxOptionalPhotos    = 8;   // facultatives
-  static const int _maxTotalPhotos       = 10;  // 1 + 1 + 8
+  // Photo principale (obligatoire) + 2 photos obligatoires + 7 optionnelles = max 10
+  static const int _maxSecondaryRequired = 2;   // obligatoires
+  static const int _maxOptionalPhotos    = 7;   // facultatives
+  static const int _maxTotalPhotos       = 10;  // 1 + 2 + 7
   XFile? _mainPhoto;          // photo principale (position [0] dans finalImages)
-  final List<XFile> _secondaryPhotos = []; // 1 obligatoire + 8 optionnelles (max 9)
+  final List<XFile> _secondaryPhotos = []; // 2 obligatoires + 7 optionnelles (max 9)
   final ImagePicker _picker = ImagePicker();
   // ── Bytes pour le web (XFile.path = blob URL, inutilisable sur web) ─────
   Uint8List? _webMainPhotoBytes;
@@ -2216,14 +2216,14 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ÉTAPE 2 — Photos du bien (1 principale + 1 obligatoire + 8 optionnelles)
+  // ÉTAPE 2 — Photos du bien (1 principale + 2 obligatoires + 7 optionnelles)
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildStep2() {
     final bool hasSampleUrls = _imageUrls.isNotEmpty;
     final int total = hasSampleUrls
         ? _imageUrls.length
         : (_mainPhoto != null ? 1 : 0) + _secondaryPhotos.length;
-    final int required = _maxSecondaryRequired + 1; // 2 photos minimum
+    final int required = _maxSecondaryRequired + 1; // 3 photos minimum
     final bool complete = total >= required;
 
     return SingleChildScrollView(
@@ -2244,7 +2244,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             Icon(Icons.info_outline, color: AppTheme.accentColor, size: 18),
             SizedBox(width: 10),
             Expanded(child: Text(
-              "1 photo principale + 1 obligatoire + jusqu'à 8 optionnelles (10 max).",
+              "1 photo principale + 2 obligatoires + jusqu'à 7 optionnelles (10 max).",
               style: TextStyle(fontSize: 12, fontFamily: 'Poppins', color: AppTheme.accentColor),
             )),
           ]),
@@ -2394,7 +2394,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
 
         const SizedBox(height: 24),
 
-        // ── SECTION 2 : 1 photo obligatoire ────────────────────────────────
+        // ── SECTION 2 : 2 photos obligatoires ──────────────────────────────
         Row(children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -2402,11 +2402,11 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
               color: AppTheme.primaryColor.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(6),
             ),
-            child: const Text('2', style: TextStyle(color: Colors.white,
+            child: const Text('2–3', style: TextStyle(color: Colors.white,
                 fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
           ),
           const SizedBox(width: 10),
-          const Text('Photo obligatoire',
+          const Text('Photos obligatoires',
               style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 14, color: AppTheme.textPrimary)),
           const Spacer(),
@@ -2590,7 +2590,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 color: Colors.green.shade700,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Text('3–10', style: TextStyle(color: Colors.white,
+              child: const Text('4–10', style: TextStyle(color: Colors.white,
                   fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 13)),
             ),
             const SizedBox(width: 10),

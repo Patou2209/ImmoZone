@@ -499,7 +499,7 @@ class PropertyCard extends StatelessWidget {
                           const SizedBox(height: 9),
 
                           // Row 3: Chips caractéristiques (Ch. / SDB / surface)
-                          Wrap(spacing: 8, runSpacing: 6, children: [
+                          Wrap(spacing: 14, runSpacing: 6, children: [
                             if (property.bedrooms != null &&
                                 property.bedrooms! > 0)
                               _featureChip(
@@ -640,22 +640,16 @@ class PropertyCard extends StatelessWidget {
     return '${(diff.inDays / 365).floor()}an';
   }
 
+  // Chips épurées : icône + texte uniquement, sans fond
   Widget _featureChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFF1F5),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 13, color: AppTheme.accentColor),
-        const SizedBox(width: 5),
-        Text(label, style: const TextStyle(
-          fontSize: 11, color: AppTheme.accentColor,
-          fontWeight: FontWeight.w600, fontFamily: 'Poppins',
-        )),
-      ]),
-    );
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: AppTheme.accentColor),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(
+        fontSize: 11, color: AppTheme.accentColor,
+        fontWeight: FontWeight.w600, fontFamily: 'Poppins',
+      )),
+    ]);
   }
 
   Color _getCategoryColor(String category) {
