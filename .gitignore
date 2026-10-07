@@ -67,3 +67,4 @@ ios/Flutter/Flutter.podspec
 # Flutter pub cache
 .pub-cache/
 .pub/
+*.apk
