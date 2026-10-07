@@ -980,7 +980,13 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                               p.type == 'Concession agricole & Ferme')
                           ? _featureTile(Icons.landscape_outlined, 'Superficie',
                               '${p.surface!.toStringAsFixed(p.surface! == p.surface!.truncateToDouble() ? 0 : 2)} ha')
-                          : _featureTile(Icons.square_foot_rounded, 'Surface',
+                          : _featureTile(
+                              Icons.square_foot_rounded,
+                              // « Espace » pour commerciale/industrielle
+                              (p.type == 'Propriété commerciale' ||
+                                      p.type == 'Propriété industrielle')
+                                  ? 'Espace'
+                                  : 'Surface',
                               '${p.surface!.toInt()} m\u00b2'),
                     if (p.bedrooms != null && p.bedrooms! > 0)
                       _featureTile(Icons.bed_outlined, 'Chambres', '${p.bedrooms}'),

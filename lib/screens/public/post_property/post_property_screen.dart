@@ -473,7 +473,13 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     // Superficie obligatoire pour Bureau, Propriété Commerciale, Propriété Industrielle
     if (AppConstants.catWithSurfaceRequired.contains(_selectedType)) {
       if (_surfaceCtrl.text.trim().isEmpty || double.tryParse(_surfaceCtrl.text.trim()) == null) {
-        _err('La superficie (m²) est obligatoire pour ce type de bien'); return false;
+        // « Espace » pour commerciale/industrielle, « Superficie » pour Bureau
+        final isEspace = _selectedType == 'Propriété commerciale' ||
+            _selectedType == 'Propriété industrielle';
+        _err(isEspace
+            ? 'L\'espace (m²) est obligatoire pour ce type de bien'
+            : 'La superficie (m²) est obligatoire pour ce type de bien');
+        return false;
       }
     }
     // Superficie en hectares obligatoire pour Concession et Concession agricole & Ferme
@@ -1668,7 +1674,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     else if (type == 'Propriété commerciale' ||
         type == 'Propriété industrielle') {
       fields.addAll([
-        _field(_surfaceCtrl, 'Superficie (m²) *', Icons.square_foot, '0',
+        // « Espace » (et non « Superficie ») pour commerciale/industrielle
+        _field(_surfaceCtrl, 'Espace (m²) *', Icons.square_foot, '0',
             type: TextInputType.number),
         yesNoToggle('Parking', Icons.local_parking_rounded, _hasParking,
             (v) => setState(() => _hasParking = v)),
@@ -1680,8 +1687,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       ]);
     }
 
-    // ── Concession agricole & Ferme — mêmes paramètres que Propriété
-    // commerciale, sauf Superficie en HECTARES au lieu de m² ─────────────────
+    // ── Concession agricole & Ferme — Superficie en HECTARES uniquement
+    // (pas de Parking / Groupe Électrogène / Sécurité : sans objet) ────────
     else if (type == 'Concession agricole & Ferme') {
       fields.addAll([
         _field(_hectaresCtrl, 'Superficie (ha) *', Icons.landscape_outlined, '0',
@@ -1689,13 +1696,6 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             suffix: const Text('ha',
                 style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                     color: AppTheme.accentColor, fontSize: 13))),
-        yesNoToggle('Parking', Icons.local_parking_rounded, _hasParking,
-            (v) => setState(() => _hasParking = v)),
-        yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
-            (v) => setState(() => _hasElectricity = v)),
-        if (isLocationTx)
-          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
-              (v) => setState(() => _hasWater = v)),
       ]);
     }
 
