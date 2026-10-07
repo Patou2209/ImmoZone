@@ -106,11 +106,30 @@ class PropertyProvider extends ChangeNotifier {
   }
 
   Future<void> _loadFullInBackground() async {
-    try {
-      _properties = await _dataService.getActiveProperties();
-      _applyFilters();
-    } catch (e) {
-      _error = 'Erreur de chargement';
+    // ⚠️ FIX premier démarrage : juste après l'installation, la toute
+    // première requête Firestore peut échouer ou revenir vide (token App
+    // Check / réseau pas encore prêts). Avant, on concluait « aucune
+    // annonce » définitivement → écran vide jusqu'au refresh manuel.
+    // Désormais : jusqu'à 3 tentatives (backoff 2s/4s) avant de conclure,
+    // et le spinner reste affiché (isLoading=true) pendant les retries.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final all = await _dataService.getActiveProperties(
+            forceRefresh: attempt > 0);
+        if (all.isNotEmpty) {
+          _properties = all;
+          _applyFilters();
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+      } catch (_) {}
+      // Résultat vide ou erreur. Si la phase 1 a déjà fourni du contenu,
+      // on le garde tel quel (pas de retry inutile).
+      if (_properties.isNotEmpty) break;
+      if (attempt < 2) {
+        await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
+      }
     }
     _isLoading = false;
     notifyListeners();
@@ -125,9 +144,21 @@ class PropertyProvider extends ChangeNotifier {
     // PERF : grâce au cache dédupliqué de DataService, si le splash a déjà
     // lancé le fetch, cet appel se résout instantanément (même requête).
     try {
-      _properties =
+      var list =
           await _dataService.getActiveProperties(forceRefresh: forceRefresh);
-      _applyFilters();
+      // ⚠️ FIX premier démarrage : résultat vide = possible échec réseau
+      // transitoire (token App Check pas prêt juste après l'installation).
+      // Une retenue forcée avant de conclure « aucune annonce ».
+      if (list.isEmpty) {
+        await Future.delayed(const Duration(seconds: 2));
+        list = await _dataService.getActiveProperties(forceRefresh: true);
+      }
+      // Ne JAMAIS écraser du contenu déjà affiché (phase 1 du progressif)
+      // par une liste vide issue d'un échec.
+      if (list.isNotEmpty || _properties.isEmpty) {
+        _properties = list;
+        _applyFilters();
+      }
     } catch (e) {
       _error = 'Erreur de chargement';
     }

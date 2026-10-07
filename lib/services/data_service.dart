@@ -846,9 +846,18 @@ class DataService {
       // ⚠️ FIX : inclure les types LEGACY ('Maison' sans « / Villa ») encore
       // présents en base — la requête stricte 'Maison / Villa' ne ramenait
       // qu'une seule annonce et l'accueil semblait vide.
-      final snap = await _propertiesCol
-          .where('type', whereIn: ['Maison / Villa', 'Maison', 'Maison/Villa'])
-          .get();
+      // Filet de sécurité : si whereIn échoue (réseau/première requête après
+      // install), on retombe sur la requête d'égalité simple.
+      QuerySnapshot snap;
+      try {
+        snap = await _propertiesCol
+            .where('type', whereIn: ['Maison / Villa', 'Maison', 'Maison/Villa'])
+            .get();
+      } catch (_) {
+        snap = await _propertiesCol
+            .where('type', isEqualTo: 'Maison / Villa')
+            .get();
+      }
       final all = snap.docs
           .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
           .toList();
