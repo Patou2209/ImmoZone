@@ -976,8 +976,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   children: [
                     _featureTile(Icons.category_outlined, 'Type', p.type),
                     if (p.surface != null)
-                      _featureTile(Icons.square_foot_rounded, 'Surface',
-                          '${p.surface!.toInt()} m\u00b2'),
+                      (p.type == 'Concession' ||
+                              p.type == 'Concession agricole & Ferme')
+                          ? _featureTile(Icons.landscape_outlined, 'Superficie',
+                              '${p.surface!.toStringAsFixed(p.surface! == p.surface!.truncateToDouble() ? 0 : 2)} ha')
+                          : _featureTile(Icons.square_foot_rounded, 'Surface',
+                              '${p.surface!.toInt()} m\u00b2'),
                     if (p.bedrooms != null && p.bedrooms! > 0)
                       _featureTile(Icons.bed_outlined, 'Chambres', '${p.bedrooms}'),
                     if (p.bathrooms != null && p.bathrooms! > 0)

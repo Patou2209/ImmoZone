@@ -74,6 +74,7 @@ class AppConstants {
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
+    'Concession agricole & Ferme',
     'Salle de fêtes',
     'Salle polyvalente',
     'Espace funéraire',
@@ -85,6 +86,7 @@ class AppConstants {
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
+    'Concession agricole & Ferme',
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
@@ -99,6 +101,7 @@ class AppConstants {
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
+    'Concession agricole & Ferme',
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
@@ -113,6 +116,7 @@ class AppConstants {
     'Bureau',
     'Propriété commerciale',
     'Propriété industrielle',
+    'Concession agricole & Ferme',
     'Concession',
     'Terrain à bâtir',
     'Salle de fêtes',
@@ -163,9 +167,10 @@ class AppConstants {
     'Espace funéraire',
     'Salle polyvalente',
   ];
-  // Superficie en hectares (ha) pour Concession
+  // Superficie en hectares (ha) pour Concession et Concessions agricoles & Fermes
   static const List<String> catWithHectares = [
     'Concession',
+    'Concession agricole & Ferme',
   ];
   // Dimensions L×l pour Terrain à bâtir
   static const List<String> catWithDimensions = [

@@ -508,7 +508,9 @@ class PropertyCard extends StatelessWidget {
                                 property.bathrooms! > 0)
                               _featureChip(
                                   Icons.bathtub, '${property.bathrooms} SDB'),
-                            if (property.type == 'Concession' &&
+                            if ((property.type == 'Concession' ||
+                                    property.type ==
+                                        'Concession agricole & Ferme') &&
                                 property.surface != null)
                               _featureChip(
                                   Icons.landscape_outlined,

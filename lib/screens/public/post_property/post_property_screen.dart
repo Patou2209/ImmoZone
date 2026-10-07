@@ -476,6 +476,12 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
         _err('La superficie (m²) est obligatoire pour ce type de bien'); return false;
       }
     }
+    // Superficie en hectares obligatoire pour Concession et Concession agricole & Ferme
+    if (AppConstants.catWithHectares.contains(_selectedType)) {
+      if (_hectaresCtrl.text.trim().isEmpty || double.tryParse(_hectaresCtrl.text.trim()) == null) {
+        _err('La superficie (ha) est obligatoire pour ce type de bien'); return false;
+      }
+    }
     // Dimensions obligatoires pour Terrain à bâtir
     if (_selectedType == 'Terrain à bâtir') {
       if (_longueurCtrl.text.trim().isEmpty || double.tryParse(_longueurCtrl.text.trim()) == null) {
@@ -1655,11 +1661,34 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // ── Propriété Commerciale & Industrielle ────────────────────────────────
-    else if (type == 'Propriété Commerciale' ||
-        type == 'Propriété Industrielle') {
+    // ⚠️ FIX : comparaison avec la BONNE casse ('commerciale'/'industrielle'
+    // en minuscules comme dans AppConstants.propertyTypes) — l'ancienne casse
+    // 'Commerciale'/'Industrielle' ne matchait jamais → le champ Superficie
+    // n'apparaissait pas alors que la validation l'exigeait (blocage étape 1).
+    else if (type == 'Propriété commerciale' ||
+        type == 'Propriété industrielle') {
       fields.addAll([
         _field(_surfaceCtrl, 'Superficie (m²) *', Icons.square_foot, '0',
             type: TextInputType.number),
+        yesNoToggle('Parking', Icons.local_parking_rounded, _hasParking,
+            (v) => setState(() => _hasParking = v)),
+        yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,
+            (v) => setState(() => _hasElectricity = v)),
+        if (isLocationTx)
+          yesNoToggle('Sécurité 24h/24', Icons.security_rounded, _hasWater,
+              (v) => setState(() => _hasWater = v)),
+      ]);
+    }
+
+    // ── Concession agricole & Ferme — mêmes paramètres que Propriété
+    // commerciale, sauf Superficie en HECTARES au lieu de m² ─────────────────
+    else if (type == 'Concession agricole & Ferme') {
+      fields.addAll([
+        _field(_hectaresCtrl, 'Superficie (ha) *', Icons.landscape_outlined, '0',
+            type: TextInputType.number,
+            suffix: const Text('ha',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
+                    color: AppTheme.accentColor, fontSize: 13))),
         yesNoToggle('Parking', Icons.local_parking_rounded, _hasParking,
             (v) => setState(() => _hasParking = v)),
         yesNoToggle('Groupe Électrogène/Panneau Solaire', Icons.electric_bolt_rounded, _hasElectricity,

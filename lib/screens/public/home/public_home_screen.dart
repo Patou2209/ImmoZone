@@ -1156,6 +1156,7 @@ class _HomeTabState extends State<_HomeTab>
       'Salle polyvalente'        : 'Salles polyvalentes',
       'Espace funéraire'         : 'Espaces funéraires',
       'Concession'               : 'Concessions',
+      'Concession agricole & Ferme' : 'Concessions agricoles & Fermes',
       'Terrain à bâtir'          : 'Terrains à bâtir',
       // Anciennes graphies (sécurité)
       'Propriété Commerciale'    : 'Propriétés commerciales',
@@ -1181,6 +1182,7 @@ class _HomeTabState extends State<_HomeTab>
     // Espaces funéraires : gris pâle, texte foncé lisible
     'Espace funéraire'       : [Color(0xFFEFEFEF), Color(0xFF5F6368), Color(0xFF75797E)],
     'Concession'             : [Color(0xFFFBF3E1), Color(0xFF9A7B2E), Color(0xFF9A7B2E)],
+    'Concession agricole & Ferme' : [Color(0xFFE9F4E3), Color(0xFF4E7D3A), Color(0xFF4E7D3A)],
     'Terrain à bâtir'        : [Color(0xFFEDF3E4), Color(0xFF6B8244), Color(0xFF6B8244)],
   };
 
@@ -2202,8 +2204,9 @@ class _HomeTabState extends State<_HomeTab>
         Builder(builder: (ctx) {
           final noEquip = _selectedCategory == 'Terrain \u00e0 b\u00e2tir' ||
               _selectedCategory == 'Concession' ||
-              _selectedCategory == 'Propri\u00e9t\u00e9 Commerciale' ||
-              _selectedCategory == 'Propri\u00e9t\u00e9 Industrielle';
+              _selectedCategory == 'Concession agricole & Ferme' ||
+              _selectedCategory == 'Propri\u00e9t\u00e9 commerciale' ||
+              _selectedCategory == 'Propri\u00e9t\u00e9 industrielle';
           if (noEquip) return const SizedBox.shrink();
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const SizedBox(height: 12),
