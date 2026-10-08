@@ -239,8 +239,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // ── Réinitialiser le chiffre d'affaire ────────────────────────────────────
   Future<void> _showDirectRefundDialog() async {
-    final phoneCtrl = TextEditingController();
-    final buyerPhoneCtrl = TextEditingController();
+    // Indicatif +243 pré-rempli — l'admin n'a qu'à compléter le numéro.
+    // (La normalisation retire déjà le '+' et gère le 0 national.)
+    final phoneCtrl = TextEditingController(text: '+243 ');
+    final buyerPhoneCtrl = TextEditingController(text: '+243 ');
     final amountCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();

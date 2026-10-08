@@ -258,6 +258,23 @@ async function creditUserAfterPayment(paymentId) {
     expiresAt: null,
   });
 
+  // 🆕 Notification IN-APP : compte crédité (visible dans la cloche de l'app,
+  // même sans FCM). Idempotente comme le crédit (créée une seule fois).
+  try {
+    const notifId = `notif_credit_${paymentId}`;
+    await db.collection('notifications').doc(notifId).set({
+      id: notifId,
+      userId: payment.userId,
+      type: 'success',
+      title: '✅ Compte crédité',
+      body: `${creditsQty} crédit(s) ajouté(s) à votre compte suite à votre paiement Orange Money. Merci !`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (nErr) {
+    console.warn(`[creditUser] Notification in-app failed:`, nErr.message);
+  }
+
   console.log(`[creditUser] ✅ ${creditsQty} crédits attribués à ${payment.userId}`);
 }
 
@@ -922,6 +939,26 @@ exports.refundOrangePayment = onRequest(
         });
 
         const totalRevokedPay = revokedList.reduce((s, r) => s + (r.remaining || 0), 0);
+
+        // 🆕 Notification IN-APP à l'acheteur : crédits révoqués + remboursement
+        if (!isFailed && payment.userId) {
+          try {
+            const notifId = `notif_refund_${refundId}`;
+            await db.collection('notifications').doc(notifId).set({
+              id: notifId,
+              userId: payment.userId,
+              type: 'info',
+              title: '💸 Remboursement effectué',
+              body: `Votre achat de ${refundAmount} ${creditBody.currency} a été remboursé au ${msisdn}. ` +
+                    `${totalRevokedPay} crédit(s) ont été retiré(s) de votre compte.`,
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            });
+          } catch (nErr) {
+            console.warn('[refund] Notification in-app failed:', nErr.message);
+          }
+        }
+
         res.status(200).json({
           success: !isFailed,
           refundId,
@@ -1170,6 +1207,26 @@ exports.directOrangeCredit = onRequest(
         // ⚠️ FIX message: compter les CRÉDITS révoqués (somme des remaining),
         // pas le nombre de documents (1 doc peut contenir 33 crédits).
         const totalCreditsRevoked = revokedList.reduce((s, r) => s + (r.remaining || 0), 0);
+
+        // 🆕 Notification IN-APP à l'acheteur : crédits révoqués + remboursement
+        if (!isFailed && matched.data.userId) {
+          try {
+            const notifId = `notif_refund_${refundId}`;
+            await db.collection('notifications').doc(notifId).set({
+              id: notifId,
+              userId: matched.data.userId,
+              type: 'info',
+              title: '💸 Remboursement effectué',
+              body: `Votre achat de ${creditAmount} ${env.currency} a été remboursé au ${msisdn}. ` +
+                    `${totalCreditsRevoked} crédit(s) ont été retiré(s) de votre compte.`,
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            });
+          } catch (nErr) {
+            console.warn('[directRefund] Notification in-app failed:', nErr.message);
+          }
+        }
+
         res.status(200).json({
           success: !isFailed,
           refundId,

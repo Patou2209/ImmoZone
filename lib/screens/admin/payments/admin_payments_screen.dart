@@ -418,8 +418,9 @@ class _PaymentTileState extends State<_PaymentTile> {
   // AVANT d'envoyer l'argent.
   void _showRefundDialog(BuildContext context) {
     final reasonCtrl = TextEditingController();
-    final refundPhoneCtrl = TextEditingController();
-    final buyerPhoneCtrl = TextEditingController();
+    // Indicatif +243 pré-rempli — l'admin n'a qu'à compléter le numéro.
+    final refundPhoneCtrl = TextEditingController(text: '+243 ');
+    final buyerPhoneCtrl = TextEditingController(text: '+243 ');
     final amountCtrl = TextEditingController();
     final refundFormKey = GlobalKey<FormState>();
     final payment = widget.payment;

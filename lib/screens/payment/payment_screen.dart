@@ -57,7 +57,9 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   final _ds = DataService();
-  final _phoneCtrl = TextEditingController();
+  // Indicatif +243 pré-rempli — l'utilisateur n'a qu'à compléter son numéro.
+  // normalizeMsisdn gère déjà '+243 081...' → '24381...' correctement.
+  final _phoneCtrl = TextEditingController(text: '+243 ');
   final _refCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
 
@@ -261,14 +263,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // PAIEMENT MANUEL (M-Pesa, Airtel — inchangé)
   // ─────────────────────────────────────────────────────────────────────────────
   Future<void> _initiateManualPayment() async {
-    if (_phoneCtrl.text.trim().isEmpty) {
-      _showMsg('Veuillez entrer votre numéro de téléphone', isError: true);
+    // Normalisation intelligente : supprime le 0 national saisi par habitude.
+    // ⚠️ Avec l'indicatif +243 pré-rempli, un champ « non vide » peut ne
+    // contenir QUE l'indicatif → on valide sur le numéro normalisé complet.
+    final phone = PhoneUtils.normalizeMsisdn(_phoneCtrl.text);
+    if (phone.isEmpty || phone.length < 9) {
+      _showMsg('Veuillez entrer votre numéro de téléphone complet', isError: true);
       return;
     }
     setState(() => _isLoading = true);
-
-    // Normalisation intelligente : supprime le 0 national saisi par habitude
-    final phone = PhoneUtils.normalizeMsisdn(_phoneCtrl.text);
 
     final paymentId = 'pay_${DateTime.now().millisecondsSinceEpoch}';
     final orderId = 'ord_${DateTime.now().millisecondsSinceEpoch}';
