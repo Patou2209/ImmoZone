@@ -3321,6 +3321,25 @@ class DataService {
       );
       await _creditsCol.doc(commissionCredit.id).set(commissionCredit.toMap());
 
+      // 🆕 Notifier le parrain : sa commission de parrainage a été créditée.
+      // Idempotente : même id que le crédit (ref_<parrainId>_<paymentId>).
+      try {
+        final filleulName = filleulData['name'] as String? ?? '';
+        await addNotification(AppNotification(
+          id: 'notif_ref_${parrainId}_$paymentId',
+          userId: parrainId,
+          type: 'paiement',
+          title: '🎉 Commission de parrainage',
+          body: 'Vous avez reçu $creditsQty crédit${creditsQty > 1 ? 's' : ''} '
+              'de commission suite à la 1ère recharge de votre filleul'
+              '${filleulName.isNotEmpty ? ' $filleulName' : ''}. Merci de faire '
+              'connaître ImmoZone !',
+          createdAt: DateTime.now(),
+        ));
+      } catch (nErr) {
+        if (kDebugMode) debugPrint('[Parrainage] notif error: $nErr');
+      }
+
       if (kDebugMode) {
         debugPrint('[Parrainage] Commission $creditsQty crédits attribuée à $parrainId pour filleul $filleulId');
       }
