@@ -2391,6 +2391,19 @@ class DataService {
             body: 'Vous avez reçu $totalCredits crédit${totalCredits > 1 ? 's' : ''}, valable 30 jours.$bonusMsg',
             createdAt: DateTime.now(),
           ));
+
+          // 🆕 Commission de parrainage (1ère recharge du filleul).
+          // Était prévue depuis confirmPayment() (jamais appelé → code mort) ;
+          // branchée ici, au seul endroit où la recharge est réellement validée.
+          try {
+            await applyUserReferralCommission(
+              filleulId: payment.userId,
+              creditsQty: qty,
+              paymentId: paymentId,
+            );
+          } catch (e) {
+            if (kDebugMode) debugPrint('[validatePaymentManually] parrainage: $e');
+          }
         }
       } else {
         await _paymentsCol.doc(paymentId).update({
