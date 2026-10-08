@@ -113,6 +113,14 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
           final bo = (b['icon'] == 'orange') ? 0 : 1;
           return ao.compareTo(bo);
         });
+      // Orange Money PRÉ-SÉLECTIONNÉ par défaut (paiement automatique).
+      // L'utilisateur peut toujours choisir un autre moyen en le sélectionnant.
+      if (_selectedMethod == null && _methods.isNotEmpty) {
+        _selectedMethod = _methods.firstWhere(
+          _isOrange,
+          orElse: () => _methods.first,
+        );
+      }
       _loading = false;
     });
   }
