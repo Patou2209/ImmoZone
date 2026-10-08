@@ -68,3 +68,4 @@ ios/Flutter/Flutter.podspec
 .pub-cache/
 .pub/
 *.apk
+*.aab
