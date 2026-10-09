@@ -766,7 +766,7 @@ class _AlertsTabState extends State<_AlertsTab> {
                               Text(n.body,
                                   style: TextStyle(
                                       fontFamily: 'Poppins', fontSize: 12,
-                                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                                      fontWeight: FontWeight.w400,
                                       color: n.type == 'rejet'
                                           ? AppTheme.errorColor
                                           : (unread

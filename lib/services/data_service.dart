@@ -2423,8 +2423,10 @@ class DataService {
           id: 'notif_payrej_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
           userId: payment.userId,
           type: 'rejet',
-          title: 'Paiement rejeté',
-          body: 'Votre demande de paiement a été rejetée.'
+          title: 'Paiement non validé',
+          body: 'La transaction indiquée n\'a pas été retrouvée. '
+              'Votre compte n\'a pas été crédité. '
+              'Pour toute assistance, contactez le service client.'
               '${note != null ? '\nMotif : $note' : ''}',
           createdAt: DateTime.now(),
         ));
