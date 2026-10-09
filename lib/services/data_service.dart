@@ -1004,7 +1004,7 @@ class DataService {
             userId: prop.ownerId,
             type: 'suppression',
             title: 'Annonce supprimée',
-            body: 'Votre annonce "${prop.title}" a été supprimée.\nMotif : $reason\n⚠️ Cette suppression est définitive et non remboursable.',
+            body: 'Votre annonce "${prop.title}" a été supprimée.\nMotif : $reason\nCette suppression est définitive et non remboursable.',
             propertyId: prop.id,
             propertyTitle: prop.title,
             createdAt: now,
@@ -1048,7 +1048,7 @@ class DataService {
           id: 'notif_restore_${prop.id}_${now.millisecondsSinceEpoch}',
           userId: prop.ownerId,
           type: 'restauration',
-          title: '🔄 Annonce restaurée',
+          title: 'Annonce restaurée',
           body: 'Votre annonce "${prop.title}" a été restaurée et est à nouveau en cours de révision.',
           propertyId: prop.id,
           propertyTitle: prop.title,
@@ -1444,7 +1444,7 @@ class DataService {
       id: 'notif_approved_${prop.id}_${DateTime.now().millisecondsSinceEpoch}',
       userId: prop.ownerId,
       type: 'approbation',
-      title: '✅ Annonce approuvée et en ligne !',
+      title: 'Annonce approuvée et en ligne !',
       body: 'Félicitations ! Votre annonce "${prop.title}" a été approuvée par notre équipe et est maintenant visible en ligne.',
       propertyId: prop.id,
       propertyTitle: prop.title,
@@ -2394,8 +2394,8 @@ class DataService {
           await addNotification(AppNotification(
             id: 'notif_pay_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: payment.userId,
-            type: 'paiement',
-            title: 'Recharge confirmée ✓',
+            type: 'success',
+            title: 'Recharge confirmée',
             body: 'Vous avez reçu $totalCredits crédit${totalCredits > 1 ? 's' : ''}, valable 30 jours.$bonusMsg$amountMsg$refMsg',
             createdAt: DateTime.now(),
           ));
@@ -2422,7 +2422,7 @@ class DataService {
         await addNotification(AppNotification(
           id: 'notif_payrej_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
           userId: payment.userId,
-          type: 'paiement',
+          type: 'rejet',
           title: 'Paiement rejeté',
           body: 'Votre demande de paiement a été rejetée.'
               '${note != null ? '\nMotif : $note' : ''}',
@@ -2510,8 +2510,8 @@ class DataService {
       await addNotification(AppNotification(
         id: 'notif_refund_${refundId ?? paymentId}',
         userId: buyerId,
-        type: 'paiement',
-        title: '💸 Remboursement effectué',
+        type: 'remboursement',
+        title: 'Remboursement effectué',
         body: 'Votre achat de $amtStr $currency a été remboursé au '
             '$refundPhoneNumber.\n'
             '$creditsRevoked crédit${creditsRevoked > 1 ? 's ont été révoqués' : ' a été révoqué'} de votre compte.',
@@ -2819,7 +2819,7 @@ class DataService {
             id: 'notif_refund_${propertyId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: ownerId,
             type: 'approbation',
-            title: '💰 Crédits restitués',
+            title: 'Crédits restitués',
             body: notifBody,
             propertyId: propertyId,
             propertyTitle: data['title'] as String? ?? '',
@@ -3411,8 +3411,8 @@ class DataService {
         await addNotification(AppNotification(
           id: 'notif_ref_${parrainId}_$paymentId',
           userId: parrainId,
-          type: 'paiement',
-          title: '🎉 Commission de parrainage',
+          type: 'success',
+          title: 'Commission de parrainage',
           body: 'Vous avez reçu $creditsQty crédit${creditsQty > 1 ? 's' : ''} '
               'de commission suite à la 1ère recharge de votre filleul'
               '${filleulName.isNotEmpty ? ' $filleulName' : ''}. Merci de faire '

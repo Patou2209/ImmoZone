@@ -595,6 +595,11 @@ class _AlertsTabState extends State<_AlertsTab> {
       case 'rejet': return Icons.cancel_rounded;
       case 'suppression': return Icons.delete_forever_rounded;
       case 'approbation': return Icons.check_circle_rounded;
+      case 'success': return Icons.check_circle_rounded;
+      case 'remboursement': return Icons.currency_exchange_rounded;
+      case 'restauration': return Icons.restore_rounded;
+      case 'promo': return Icons.local_offer_rounded;
+      case 'paiement': return Icons.account_balance_wallet_rounded;
       default: return Icons.info_rounded;
     }
   }
@@ -604,6 +609,8 @@ class _AlertsTabState extends State<_AlertsTab> {
       case 'rejet': return AppTheme.errorColor;
       case 'suppression': return Colors.deepOrange;
       case 'approbation': return AppTheme.successColor;
+      case 'success': return AppTheme.successColor;
+      case 'remboursement': return Colors.deepOrange;
       default: return AppTheme.accentColor;
     }
   }
@@ -760,9 +767,11 @@ class _AlertsTabState extends State<_AlertsTab> {
                                   style: TextStyle(
                                       fontFamily: 'Poppins', fontSize: 12,
                                       fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-                                      color: unread
-                                          ? AppTheme.textPrimary
-                                          : AppTheme.textSecondary,
+                                      color: n.type == 'rejet'
+                                          ? AppTheme.errorColor
+                                          : (unread
+                                              ? AppTheme.textPrimary
+                                              : AppTheme.textSecondary),
                                       height: 1.4)),
                               const SizedBox(height: 6),
                               Text(_timeAgo(n.createdAt),

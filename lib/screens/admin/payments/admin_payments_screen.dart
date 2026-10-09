@@ -329,13 +329,16 @@ class _PaymentTileState extends State<_PaymentTile> {
                 ]),
                 if (payment.transactionReference != null) ...[
                   const SizedBox(height: 4),
-                  Row(children: [
-                    const Icon(Icons.confirmation_number, size: 13,
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Icon(Icons.phone_android_rounded, size: 13,
                         color: AppTheme.textHint),
                     const SizedBox(width: 6),
-                    Text('Réf : ${payment.transactionReference}',
-                        style: const TextStyle(fontFamily: 'Poppins',
-                            fontSize: 11, color: AppTheme.textHint)),
+                    Expanded(
+                      child: Text(payment.transactionReference!,
+                          style: const TextStyle(fontFamily: 'Poppins',
+                              fontSize: 11, color: AppTheme.textSecondary,
+                              height: 1.35)),
+                    ),
                   ]),
                 ],
               ],
@@ -753,8 +756,7 @@ class _PaymentTileState extends State<_PaymentTile> {
                 color: AppTheme.accentColor),
           _infoRow(Icons.phone, payment.phoneNumber),
           if (payment.transactionReference != null)
-            _infoRow(Icons.confirmation_number,
-                'Réf: ${payment.transactionReference!}'),
+            _infoRow(Icons.phone_android_rounded, payment.transactionReference!),
           _infoRow(Icons.schedule,
               '${payment.createdAt.day.toString().padLeft(2, '0')}/'
               '${payment.createdAt.month.toString().padLeft(2, '0')}/'

@@ -203,7 +203,7 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
         currency: pack['currency'] ?? 'USD',
         status: 'awaiting_manual',
         transactionReference:
-            'Tél. dépôt : ${_refCtrl.text.trim()} — Montant envoyé : ${_sentAmountCtrl.text.trim()} ${pack['currency'] ?? 'USD'}',
+            '${_refCtrl.text.trim()} • ${_sentAmountCtrl.text.trim()} ${pack['currency'] ?? 'USD'} envoyés',
         createdAt: DateTime.now(),
         productType: productType,
         creditsQty: qty,
@@ -390,17 +390,18 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _howStep('1️⃣', 'Choisissez le pack qui vous convient.'),
-                    _howStep('2️⃣',
+                    _howStep('1', 'Choisissez le pack qui vous convient.'),
+                    _howStep('2',
                         'Envoyez le montant via M-Pesa ou Airtel Money '
                         '(depuis votre téléphone, en dehors de l\'app) '
                         'au numéro affiché ci-dessous.'),
-                    _howStep('3️⃣',
+                    _howStep('3',
                         'Revenez dans l\'app et indiquez le numéro qui a '
                         'effectué le dépôt ainsi que le montant envoyé.'),
-                    _howStep('✅',
+                    _howStep('4',
                         'Notre équipe vérifie le dépôt et vos crédits sont '
-                        'ajoutés — vous recevez une notification !'),
+                        'ajoutés : vous recevez une notification !',
+                        isLast: true),
                   ],
                 ),
               ),
@@ -783,10 +784,25 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   // 🆕 Ligne d'étape du « Comment ça marche ? »
-  Widget _howStep(String emoji, String text) => Padding(
+  Widget _howStep(String number, String text, {bool isLast = false}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(emoji, style: const TextStyle(fontSize: 12)),
+          Container(
+            width: 16, height: 16,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: (isLast ? AppTheme.successColor : AppTheme.accentColor)
+                  .withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: isLast
+                ? const Icon(Icons.check_rounded,
+                    size: 11, color: AppTheme.successColor)
+                : Text(number,
+                    style: const TextStyle(fontFamily: 'Poppins',
+                        fontSize: 9.5, fontWeight: FontWeight.w700,
+                        color: AppTheme.accentColor)),
+          ),
           const SizedBox(width: 7),
           Expanded(
             child: Text(text,

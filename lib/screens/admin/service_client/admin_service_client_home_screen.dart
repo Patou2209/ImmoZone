@@ -1054,8 +1054,8 @@ class _PaymentActionTileState extends State<_PaymentActionTile> {
                 _dlgRow(Icons.toll_rounded,
                     '\$${widget.payment.amount.toStringAsFixed(2)} USD'),
                 if (widget.payment.transactionReference != null)
-                  _dlgRow(Icons.confirmation_number,
-                      'Réf : ${widget.payment.transactionReference}'),
+                  _dlgRow(Icons.phone_android_rounded,
+                      widget.payment.transactionReference!),
               ],
             ),
           ),
@@ -1237,8 +1237,7 @@ class _PaymentActionTileState extends State<_PaymentActionTile> {
                 '${p.createdAt.hour.toString().padLeft(2, '0')}:'
                 '${p.createdAt.minute.toString().padLeft(2, '0')}'),
             if (p.transactionReference != null)
-              _infoRow(Icons.confirmation_number,
-                  'Réf : ${p.transactionReference!}'),
+              _infoRow(Icons.phone_android_rounded, p.transactionReference!),
 
             const Divider(height: 20),
 

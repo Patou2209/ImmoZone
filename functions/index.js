@@ -266,7 +266,7 @@ async function creditUserAfterPayment(paymentId) {
       id: notifId,
       userId: payment.userId,
       type: 'success',
-      title: '✅ Compte crédité',
+      title: 'Compte crédité',
       body: `${creditsQty} crédit(s) ajouté(s) à votre compte.\n` +
             `Montant payé : ${payment.amount} ${payment.currency || 'USD'} via Orange Money. Merci !`,
       isRead: false,
@@ -526,7 +526,7 @@ exports.orangeMoneyWebhook = onRequest(
               await admin.messaging().send({
                 token: fcmToken,
                 notification: {
-                  title: '✅ Paiement confirmé — ImmoZone',
+                  title: 'Paiement confirmé — ImmoZone',
                   body: `${payment.creditsQty} crédit(s) ajouté(s) à votre compte`,
                 },
                 data: { paymentId: payRef.id, status: 'confirmed' },
@@ -558,7 +558,7 @@ exports.orangeMoneyWebhook = onRequest(
               await admin.messaging().send({
                 token: fcmToken,
                 notification: {
-                  title: '❌ Paiement échoué — ImmoZone',
+                  title: 'Paiement échoué — ImmoZone',
                   body: 'Votre paiement Orange Money n\'a pas abouti. Réessayez.',
                 },
                 data: { paymentId: payRef.id, status: 'failed' },
@@ -948,8 +948,8 @@ exports.refundOrangePayment = onRequest(
             await db.collection('notifications').doc(notifId).set({
               id: notifId,
               userId: payment.userId,
-              type: 'info',
-              title: '💸 Remboursement effectué',
+              type: 'remboursement',
+              title: 'Remboursement effectué',
               body: `Votre achat de ${refundAmount} ${creditBody.currency} a été remboursé au ${msisdn}. ` +
                     `${totalRevokedPay} crédit(s) ont été retiré(s) de votre compte.`,
               isRead: false,
@@ -1216,8 +1216,8 @@ exports.directOrangeCredit = onRequest(
             await db.collection('notifications').doc(notifId).set({
               id: notifId,
               userId: matched.data.userId,
-              type: 'info',
-              title: '💸 Remboursement effectué',
+              type: 'remboursement',
+              title: 'Remboursement effectué',
               body: `Votre achat de ${creditAmount} ${env.currency} a été remboursé au ${msisdn}. ` +
                     `${totalCreditsRevoked} crédit(s) ont été retiré(s) de votre compte.`,
               isRead: false,
@@ -1365,7 +1365,7 @@ async function processRefundNotification(refundId, transactionStatus, { omTransa
           await admin.messaging().send({
             token: fcmToken,
             notification: {
-              title: '💸 Remboursement effectué — ImmoZone',
+              title: 'Remboursement effectué — ImmoZone',
               body: `${refund.amount} ${refund.currency} remboursé(s) sur votre compte Orange Money`,
             },
             data: { refundId, paymentId: refund.paymentId || '', status: 'refunded' },

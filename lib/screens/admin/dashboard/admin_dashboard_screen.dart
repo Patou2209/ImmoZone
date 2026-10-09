@@ -137,8 +137,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
         wasApprove
-            ? '✅ Paiement validé — crédits accordés à $userName'
-            : '❌ Paiement rejeté',
+            ? 'Paiement validé — crédits accordés à $userName'
+            : 'Paiement rejeté',
         style: const TextStyle(fontFamily: 'Poppins'),
       ),
       backgroundColor: wasApprove ? AppTheme.successColor : AppTheme.errorColor,
@@ -1564,25 +1564,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
             ]),
             const SizedBox(height: 8),
-            // Opérateur + référence
+            // Opérateur
             Row(children: [
               Icon(Icons.payment_rounded, size: 13, color: AppTheme.textHint),
               const SizedBox(width: 5),
               Text(pay.operatorLabel,
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
                       color: AppTheme.textSecondary)),
-              if (pay.transactionReference != null) ...[
-                const SizedBox(width: 10),
-                Icon(Icons.confirmation_number_outlined, size: 13, color: AppTheme.textHint),
+            ]),
+            // Numéro du déposant + montant envoyé (ligne complète, sans gras)
+            if (pay.transactionReference != null) ...[
+              const SizedBox(height: 4),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Icon(Icons.phone_android_rounded, size: 13, color: AppTheme.textHint),
                 const SizedBox(width: 5),
                 Expanded(
-                  child: Text('Réf: ${pay.transactionReference}',
-                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
-                          fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  child: Text(pay.transactionReference!,
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 11.5,
+                          color: AppTheme.textPrimary, height: 1.35)),
                 ),
-              ],
-            ]),
+              ]),
+            ],
           ]),
         ),
 

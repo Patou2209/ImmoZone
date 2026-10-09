@@ -238,8 +238,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
           await _ds.addNotification(AppNotification(
             id: 'notif_credit_${_currentPaymentId!}',
             userId: _ds.currentUserId,
-            type: 'paiement',
-            title: '✅ Compte crédité',
+            type: 'success',
+            title: 'Compte crédité',
             body:
                 '${widget.creditsQty} crédit${widget.creditsQty > 1 ? 's' : ''} ajouté${widget.creditsQty > 1 ? 's' : ''} à votre compte.\n'
                 'Montant payé : $amt USD via Orange Money. Merci !',
