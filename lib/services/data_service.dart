@@ -2383,12 +2383,20 @@ class DataService {
             bonusMsg = '\n+ $bonusFreeAds annonce(s) gratuite(s) offerte(s) !';
           }
 
+          // 🆕 Mentionner la référence fournie par le user et le montant payé
+          final ref = payment.transactionReference;
+          final refMsg = (ref != null && ref.trim().isNotEmpty)
+              ? '\nRéf. transaction : ${ref.trim()}'
+              : '';
+          final amountMsg =
+              '\nMontant payé : ${payment.amount.toStringAsFixed(payment.amount.truncateToDouble() == payment.amount ? 0 : 2)} ${payment.currency}';
+
           await addNotification(AppNotification(
             id: 'notif_pay_${paymentId}_${DateTime.now().millisecondsSinceEpoch}',
             userId: payment.userId,
             type: 'paiement',
             title: 'Recharge confirmée ✓',
-            body: 'Vous avez reçu $totalCredits crédit${totalCredits > 1 ? 's' : ''}, valable 30 jours.$bonusMsg',
+            body: 'Vous avez reçu $totalCredits crédit${totalCredits > 1 ? 's' : ''}, valable 30 jours.$bonusMsg$amountMsg$refMsg',
             createdAt: DateTime.now(),
           ));
 
@@ -2459,9 +2467,59 @@ class DataService {
 
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     if (resp.statusCode == 200 && data['success'] == true) {
+      // 🆕 Notifier l'acheteur : crédits révoqués + remboursement.
+      // Id idempotent partagé avec la Cloud Function (notif_refund_<refundId>)
+      // → aucun doublon quand la CF à jour sera déployée.
+      await _notifyRefundToBuyer(
+        paymentId: paymentId,
+        refundId: data['refundId'] as String?,
+        creditsRevoked: (data['creditsRevoked'] as num?)?.toInt() ?? 0,
+        amount: (data['amount'] as num?)?.toDouble(),
+        currency: data['currency'] as String? ?? 'USD',
+        refundPhoneNumber: refundPhoneNumber,
+      );
       return data['message'] as String? ?? 'Remboursement initié';
     }
     throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');
+  }
+
+  /// 🆕 Notification in-app à l'acheteur après révocation/remboursement.
+  /// Retrouve le userId depuis le document payment (le remboursement est
+  /// déclenché par l'admin, pas par l'acheteur).
+  Future<void> _notifyRefundToBuyer({
+    required String paymentId,
+    required String? refundId,
+    required int creditsRevoked,
+    required double? amount,
+    required String currency,
+    required String refundPhoneNumber,
+  }) async {
+    try {
+      final paySnap = await _paymentsCol.doc(paymentId).get();
+      if (!paySnap.exists) return;
+      final payData = paySnap.data() as Map<String, dynamic>;
+      final buyerId = payData['userId'] as String? ?? '';
+      if (buyerId.isEmpty) return;
+
+      final amtStr = amount != null
+          ? (amount.truncateToDouble() == amount
+              ? amount.toStringAsFixed(0)
+              : amount.toStringAsFixed(2))
+          : '${payData['amount'] ?? ''}';
+
+      await addNotification(AppNotification(
+        id: 'notif_refund_${refundId ?? paymentId}',
+        userId: buyerId,
+        type: 'paiement',
+        title: '💸 Remboursement effectué',
+        body: 'Votre achat de $amtStr $currency a été remboursé au '
+            '$refundPhoneNumber.\n'
+            '$creditsRevoked crédit${creditsRevoked > 1 ? 's ont été révoqués' : ' a été révoqué'} de votre compte.',
+        createdAt: DateTime.now(),
+      ));
+    } catch (e) {
+      if (kDebugMode) debugPrint('[_notifyRefundToBuyer] $e');
+    }
   }
 
   /// Remboursement Orange Money SÉCURISÉ (dashboard admin) : envoie [amount]
@@ -2495,6 +2553,18 @@ class DataService {
 
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     if (resp.statusCode == 200 && data['success'] == true) {
+      // 🆕 Notifier l'acheteur (même mécanique idempotente que refundOrangePayment)
+      final matchedPaymentId = data['paymentId'] as String?;
+      if (matchedPaymentId != null && matchedPaymentId.isNotEmpty) {
+        await _notifyRefundToBuyer(
+          paymentId: matchedPaymentId,
+          refundId: data['refundId'] as String?,
+          creditsRevoked: (data['creditsRevoked'] as num?)?.toInt() ?? 0,
+          amount: (data['amount'] as num?)?.toDouble() ?? amount,
+          currency: data['currency'] as String? ?? 'USD',
+          refundPhoneNumber: phoneNumber,
+        );
+      }
       return data['message'] as String? ?? 'Remboursement envoyé';
     }
     throw Exception(data['error'] ?? 'Remboursement échoué (HTTP ${resp.statusCode})');

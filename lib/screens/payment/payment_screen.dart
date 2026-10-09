@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_utils.dart';
 import '../../core/utils/error_helper.dart';
 import '../../models/payment_model.dart';
+import '../../models/app_notification_model.dart';
 import '../../services/data_service.dart';
 import 'transaction_success_screen.dart';
 import 'transaction_failed_screen.dart';
@@ -226,6 +227,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (status == 'SUCCESSFUL') {
         _pollingTimer?.cancel();
         setState(() => _orangeWaitingUssd = false);
+        // 🆕 Notification in-app « Compte crédité » (Orange Money).
+        // MÊME id idempotent que la Cloud Function (notif_credit_<paymentId>)
+        // → aucun doublon si le webhook écrit aussi la sienne.
+        // Mentionne le montant payé ET le nombre de crédits reçus.
+        try {
+          final amt = widget.amount.truncateToDouble() == widget.amount
+              ? widget.amount.toStringAsFixed(0)
+              : widget.amount.toStringAsFixed(2);
+          await _ds.addNotification(AppNotification(
+            id: 'notif_credit_${_currentPaymentId!}',
+            userId: _ds.currentUserId,
+            type: 'paiement',
+            title: '✅ Compte crédité',
+            body:
+                '${widget.creditsQty} crédit${widget.creditsQty > 1 ? 's' : ''} ajouté${widget.creditsQty > 1 ? 's' : ''} à votre compte.\n'
+                'Montant payé : $amt USD via Orange Money. Merci !',
+            createdAt: DateTime.now(),
+          ));
+        } catch (_) {/* non bloquant */}
         _navigateToSuccess();
       } else if (status == 'FAILED' || status == 'CANCELLED') {
         _pollingTimer?.cancel();

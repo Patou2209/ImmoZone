@@ -267,7 +267,8 @@ async function creditUserAfterPayment(paymentId) {
       userId: payment.userId,
       type: 'success',
       title: '✅ Compte crédité',
-      body: `${creditsQty} crédit(s) ajouté(s) à votre compte suite à votre paiement Orange Money. Merci !`,
+      body: `${creditsQty} crédit(s) ajouté(s) à votre compte.\n` +
+            `Montant payé : ${payment.amount} ${payment.currency || 'USD'} via Orange Money. Merci !`,
       isRead: false,
       createdAt: new Date().toISOString(),
     });

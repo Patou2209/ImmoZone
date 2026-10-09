@@ -1152,7 +1152,7 @@ class _HomeTabState extends State<_HomeTab>
       'Bureau'                   : 'Bureaux',
       'Propriété commerciale'    : 'Propriétés commerciales',
       'Propriété industrielle'   : 'Propriétés industrielles',
-      'Salle de fêtes'           : 'Salles de fête',
+      'Salle de fêtes'           : 'Salles des fêtes',
       'Salle polyvalente'        : 'Salles polyvalentes',
       'Espace funéraire'         : 'Espaces funéraires',
       'Concession'               : 'Concessions',
@@ -1161,7 +1161,7 @@ class _HomeTabState extends State<_HomeTab>
       // Anciennes graphies (sécurité)
       'Propriété Commerciale'    : 'Propriétés commerciales',
       'Propriété Industrielle'   : 'Propriétés industrielles',
-      'Salle de Fêtes'           : 'Salles de fête',
+      'Salle de Fêtes'           : 'Salles des fêtes',
       'Espace Funéraire'         : 'Espaces funéraires',
       'Salle Polyvalente'        : 'Salles polyvalentes',
     };
