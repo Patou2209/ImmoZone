@@ -1,7 +1,14 @@
 class AppConstants {
   // App Info
   static const String appName = 'ImmoZone';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.5.5';
+  // ⚠️ À incrémenter en même temps que le versionCode de pubspec.yaml !
+  // Sert au pop-up « Mise à jour disponible » : si l'admin définit un
+  // update_build supérieur, le pop-up s'affiche à chaque lancement
+  // jusqu'à ce que le user installe une version >= update_build.
+  static const int appBuildNumber = 104;
+  static const String playStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.immozone.estate';
 
   // Web base URL (domaine personnalisé — used for share links & WhatsApp messages)
   static const String webBaseUrl = 'https://www.immozone.pro';

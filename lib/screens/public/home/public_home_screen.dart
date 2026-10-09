@@ -39,6 +39,7 @@ import '../search/search_screen.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
 import '../parrainage/user_parrainage_screen.dart';
+import '../../../core/widgets/update_prompt.dart';
 
 class PublicHomeScreen extends StatefulWidget {
   const PublicHomeScreen({super.key});
@@ -74,6 +75,9 @@ class _PublicHomeScreenState extends State<PublicHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUnreadCount();
       _loadWaContact();
+      // 🆕 Pop-up « Mise à jour disponible » (déclenché par l'admin) —
+      // s'affiche à chaque lancement tant que le user n'a pas mis à jour.
+      UpdatePrompt.checkAndShow(context);
       // Si on arrive ici sans passer par SplashScreen (refresh direct sur /public),
       // l'AuthProvider n'a pas encore appelé checkAuth(). On le lance maintenant
       // en arrière-plan — les widgets se mettront à jour via notifyListeners().

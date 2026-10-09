@@ -45,6 +45,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
 
   // ── Mode plateforme ──────────────────────────────────────────────────────────
   bool _isFreeTrial = false;
+  // 🆕 Alerte de mise à jour (pop-up à chaque lancement de l'app)
+  late TextEditingController _updateBuildCtrl;
+  late TextEditingController _updateMsgCtrl;
+  bool _isSavingUpdate = false;
 
   // ── Quota de bienvenue (annonces gratuites pour nouveaux utilisateurs) ──────
   late TextEditingController _freeQuotaCountCtrl;   // nb d’annonces
@@ -99,6 +103,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _promoReasonCtrl = TextEditingController(text: 'Promotion spéciale ImmoZone');
     _freeQuotaCountCtrl = TextEditingController(text: '3');
     _freeQuotaDaysCtrl  = TextEditingController(text: '30');
+    _updateBuildCtrl    = TextEditingController();
+    _updateMsgCtrl      = TextEditingController();
     for (int i = 0; i < 3; i++) {
       _tierMinCtrl.add(TextEditingController());
       _tierMaxCtrl.add(TextEditingController());
@@ -118,6 +124,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _isFreeTrial      = _settings['free_trial_enabled'] == true;
     _freeQuotaCountCtrl.text = '${(_settings['free_quota_count'] as num?)?.toInt() ?? 3}';
     _freeQuotaDaysCtrl.text  = '${(_settings['free_quota_days']  as num?)?.toInt() ?? 30}';
+    final ub = (_settings['update_build'] as num?)?.toInt() ?? 0;
+    _updateBuildCtrl.text = ub > 0 ? '$ub' : '';
+    _updateMsgCtrl.text   = _settings['update_message'] as String? ?? '';
     _isPromoActive    = _ds.isPromoActive;
     _isTiersPromoActive = _ds.isRechargeTiersPromoActive;
     _homeTitleCtrl.text    = _ds.homeTitle;
@@ -165,6 +174,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         _officialMsgCtrl, _waContactCtrl, _phoneContactCtrl, _emailContactCtrl,
         _promoQtyCtrl, _promoReasonCtrl,
         _freeQuotaCountCtrl, _freeQuotaDaysCtrl,
+        _updateBuildCtrl, _updateMsgCtrl,
         ..._tierMinCtrl, ..._tierMaxCtrl, ..._tierPctCtrl]) {
       c.dispose();
     }
@@ -182,6 +192,22 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     });
     setState(() => _isSaving = false);
     _snackOk('✅ Paramètres plateforme sauvegardés');
+  }
+
+  // 🆕 Alerte de mise à jour : l'admin saisit le build requis (ex. 105).
+  // Tous les users dont l'app installée a un build < requis voient le pop-up
+  // à CHAQUE lancement. Dès qu'ils installent la mise à jour, il disparaît.
+  Future<void> _saveUpdateAlert() async {
+    final build = int.tryParse(_updateBuildCtrl.text.trim()) ?? 0;
+    setState(() => _isSavingUpdate = true);
+    await _ds.updateSettings({
+      'update_build': build, // 0 = alerte désactivée
+      'update_message': _updateMsgCtrl.text.trim(),
+    });
+    setState(() => _isSavingUpdate = false);
+    _snackOk(build > 0
+        ? '✅ Alerte de mise à jour activée (build requis : $build)'
+        : '✅ Alerte de mise à jour désactivée');
   }
 
   Future<void> _savePacks() async {
@@ -642,6 +668,75 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 9),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ])),
+        const SizedBox(height: 20),
+
+        // ── 🆕 ALERTE DE MISE À JOUR ──────────────────────────────────────────
+        _sectionHeader('Alerte de mise à jour'),
+        const SizedBox(height: 10),
+        _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text(
+            'Déclenchez un pop-up « Mise à jour disponible » qui s\'affichera '
+            'à CHAQUE lancement de l\'app pour tous les utilisateurs dont la '
+            'version installée est inférieure au build requis. Le pop-up '
+            'disparaît automatiquement dès qu\'ils installent la mise à jour.\n'
+            'Version actuelle de ce build : '
+            '${AppConstants.appVersion} (build ${AppConstants.appBuildNumber}).',
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                color: AppTheme.textSecondary, height: 1.5),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _updateBuildCtrl,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'Build minimal requis (ex : 105) — 0 ou vide = désactivé',
+              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                  color: AppTheme.textHint),
+              prefixIcon: const Icon(Icons.system_update_rounded,
+                  color: AppTheme.textHint, size: 20),
+              filled: true, fillColor: const Color(0xFFF5F7FA),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _updateMsgCtrl,
+            maxLines: 2,
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+            decoration: InputDecoration(
+              labelText: 'Message personnalisé (optionnel)',
+              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                  color: AppTheme.textHint),
+              hintText: 'Ex : Nouvelle version avec notifications améliorées !',
+              hintStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                  color: AppTheme.textHint),
+              filled: true, fillColor: const Color(0xFFF5F7FA),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSavingUpdate ? null : _saveUpdateAlert,
+              icon: _isSavingUpdate
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.campaign_rounded, color: Colors.white, size: 18),
+              label: const Text('Enregistrer l\'alerte de mise à jour',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentColor,
+                padding: const EdgeInsets.symmetric(vertical: 11),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),

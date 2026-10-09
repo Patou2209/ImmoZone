@@ -20,6 +20,7 @@
 
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/phone_utils.dart';
 import '../../models/payment_model.dart';
 import '../../services/data_service.dart';
 import '../../screens/payment/payment_screen.dart';
@@ -81,7 +82,11 @@ class _RechargeFormContent extends StatefulWidget {
 class _RechargeFormContentState extends State<_RechargeFormContent> {
   Map<String, dynamic>? _selectedPack;
   Map<String, dynamic>? _selectedMethod;
-  final _refCtrl = TextEditingController();
+  // 🆕 Flux manuel : le user fournit le NUMÉRO qui a effectué le dépôt
+  // et le MONTANT envoyé (remplace l'ancienne référence de transaction).
+  final _refCtrl = TextEditingController(text: '+243 ');
+  final _sentAmountCtrl = TextEditingController();
+  bool _howItWorksOpen = false; // chevron « Comment ça marche ? »
 
   List<Map<String, dynamic>> _packs   = [];
   List<Map<String, dynamic>> _methods = [];
@@ -128,6 +133,7 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
   @override
   void dispose() {
     _refCtrl.dispose();
+    _sentAmountCtrl.dispose();
     super.dispose();
   }
 
@@ -166,8 +172,17 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
     }
     // Orange Money → jamais de flux manuel : redirige vers le flux automatique
     if (_isOrange(_selectedMethod)) { _payWithOrange(); return; }
-    if (_refCtrl.text.trim().isEmpty) {
-      _snack('Veuillez saisir la référence de votre paiement.'); return;
+    // 🆕 Validation : numéro de téléphone du dépôt + montant envoyé
+    final depositPhone = PhoneUtils.normalizeMsisdn(_refCtrl.text);
+    if (depositPhone.isEmpty || depositPhone.length < 9) {
+      _snack('Veuillez saisir le numéro de téléphone qui a effectué le dépôt.');
+      return;
+    }
+    final sentAmount = double.tryParse(
+        _sentAmountCtrl.text.trim().replaceAll(',', '.')) ?? 0;
+    if (sentAmount <= 0) {
+      _snack('Veuillez saisir le montant que vous avez envoyé.');
+      return;
     }
     setState(() => _submitting = true);
     try {
@@ -187,7 +202,8 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
         amount: price,
         currency: pack['currency'] ?? 'USD',
         status: 'awaiting_manual',
-        transactionReference: _refCtrl.text.trim(),
+        transactionReference:
+            'Tél. dépôt : ${_refCtrl.text.trim()} — Montant envoyé : ${_sentAmountCtrl.text.trim()} ${pack['currency'] ?? 'USD'}',
         createdAt: DateTime.now(),
         productType: productType,
         creditsQty: qty,
@@ -302,7 +318,8 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
                 ? 'Orange Money : paiement automatique — vous recevrez une '
                   'demande de confirmation sur votre téléphone (code PIN).'
                 : 'M-Pesa / Airtel : envoyez le montant au numéro correspondant, '
-                  'puis saisissez votre référence de transaction ci-dessous.',
+                  'puis indiquez ci-dessous le numéro qui a effectué le dépôt '
+                  'et le montant envoyé.',
             style: const TextStyle(fontSize: 12, fontFamily: 'Poppins',
                 color: AppTheme.textSecondary, height: 1.5),
           ),
@@ -332,7 +349,63 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
               ),
               const Expanded(child: Divider()),
             ]),
-            const SizedBox(height: 8),
+            // 🆕 « Comment ça marche ? » — chevron dépliable (flux manuel)
+            InkWell(
+              onTap: () => setState(() => _howItWorksOpen = !_howItWorksOpen),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Comment ça marche ?',
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.accentColor.withValues(alpha: 0.9))),
+                      const SizedBox(width: 3),
+                      Icon(
+                        _howItWorksOpen
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: AppTheme.accentColor.withValues(alpha: 0.9),
+                      ),
+                    ]),
+              ),
+            ),
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 220),
+              crossFadeState: _howItWorksOpen
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: const SizedBox.shrink(),
+              secondChild: Container(
+                margin: const EdgeInsets.only(bottom: 8, top: 2),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: AppTheme.accentColor.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _howStep('1️⃣', 'Choisissez le pack qui vous convient.'),
+                    _howStep('2️⃣',
+                        'Envoyez le montant via M-Pesa ou Airtel Money '
+                        '(depuis votre téléphone, en dehors de l\'app) '
+                        'au numéro affiché ci-dessous.'),
+                    _howStep('3️⃣',
+                        'Revenez dans l\'app et indiquez le numéro qui a '
+                        'effectué le dépôt ainsi que le montant envoyé.'),
+                    _howStep('✅',
+                        'Notre équipe vérifie le dépôt et vos crédits sont '
+                        'ajoutés — vous recevez une notification !'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
           ],
           ..._methods.where((m) => !_isOrange(m)).map((m) => _methodTile(m)),
         ],
@@ -393,16 +466,46 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
           ),
           const SizedBox(height: 20),
         ] else ...[
-        _stepBadge('3', 'Saisissez votre référence de paiement'),
+        _stepBadge('3', 'Numéro de téléphone du dépôt'),
         const SizedBox(height: 10),
+        // 🆕 Numéro de téléphone qui a effectué le dépôt (+243 pré-rempli)
         TextField(
           controller: _refCtrl,
+          keyboardType: TextInputType.phone,
           style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
           decoration: InputDecoration(
-            hintText: 'Ex: TXN-20241201-XXXXX',
+            labelText: 'Numéro de téléphone',
+            labelStyle: const TextStyle(fontFamily: 'Poppins',
+                fontSize: 13, color: AppTheme.textHint),
+            hintText: 'Ex : +243 0800000...',
             hintStyle: const TextStyle(fontFamily: 'Poppins',
                 fontSize: 13, color: AppTheme.textHint),
-            prefixIcon: const Icon(Icons.receipt_long_outlined,
+            prefixIcon: const Icon(Icons.phone_android_rounded,
+                color: AppTheme.textHint, size: 20),
+            filled: true, fillColor: const Color(0xFFF5F7FA),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.dividerColor)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // 🆕 Montant envoyé
+        TextField(
+          controller: _sentAmountCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+          decoration: InputDecoration(
+            labelText: 'Montant envoyé (USD)',
+            labelStyle: const TextStyle(fontFamily: 'Poppins',
+                fontSize: 13, color: AppTheme.textHint),
+            hintText: 'Ex : 10',
+            hintStyle: const TextStyle(fontFamily: 'Poppins',
+                fontSize: 13, color: AppTheme.textHint),
+            prefixIcon: const Icon(Icons.attach_money_rounded,
                 color: AppTheme.textHint, size: 20),
             filled: true, fillColor: const Color(0xFFF5F7FA),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
@@ -429,10 +532,16 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
                 ? const SizedBox(width: 18, height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.send_rounded, size: 18),
-            label: Text(
-              _submitting ? 'Envoi en cours...' : 'Soumettre ma demande de recharge',
-              style: const TextStyle(fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w700, fontSize: 14),
+            // 🆕 Sans gras + taille réduite + 1 seule ligne (ne se coupe plus
+            // en deux sur les petits écrans)
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                _submitting ? 'Envoi en cours...' : 'Soumettre ma demande de recharge',
+                maxLines: 1,
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500, fontSize: 12.5),
+              ),
             ),
           ),
         ),
@@ -489,7 +598,7 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
             child: Column(children: [
               _waitingRow(Icons.check_circle_outline, AppTheme.successColor,
                   'Paiement soumis',
-                  'Votre référence de transaction a été enregistrée.'),
+                  'Votre numéro de dépôt et le montant ont été enregistrés.'),
               const SizedBox(height: 12),
               _waitingRow(Icons.admin_panel_settings, AppTheme.warningColor,
                   'Validation admin en cours',
@@ -673,6 +782,20 @@ class _RechargeFormContentState extends State<_RechargeFormContent> {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+  // 🆕 Ligne d'étape du « Comment ça marche ? »
+  Widget _howStep(String emoji, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(emoji, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(text,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: AppTheme.textSecondary, height: 1.45)),
+          ),
+        ]),
+      );
+
   Widget _stepBadge(String number, String label) {
     return Row(children: [
       Container(
