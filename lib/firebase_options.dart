@@ -38,12 +38,10 @@ class DefaultFirebaseOptions {
   );
 
   // ── iOS Firebase config ──────────────────────────────────────────────────
-  // ⚠️ TODO : remplacer apiKey / appId par les vraies valeurs du fichier
-  //    GoogleService-Info.plist (clés API_KEY et GOOGLE_APP_ID) téléchargé
-  //    depuis Firebase Console → app iOS com.immozone.estate
+  // Valeurs issues de GoogleService-Info.plist (app iOS com.immozone.estate)
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'A_REMPLACER_API_KEY_IOS',
-    appId: 'A_REMPLACER_GOOGLE_APP_ID_IOS',
+    apiKey: 'AIzaSyDCnK0kSir4UwjPbE2sv7qVBE_ysoaS5kI',
+    appId: '1:836828432238:ios:c9cd9188332b445e46637f',
     messagingSenderId: '836828432238',
     projectId: 'immozone-d9a68',
     storageBucket: 'immozone-d9a68.firebasestorage.app',
