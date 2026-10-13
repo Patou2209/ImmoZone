@@ -42,9 +42,17 @@ void main() async {
     // L'app doit être installée depuis le Play Store pour obtenir un verdict
     // Play Integrity valide. Pour un APK sideloadé (dev), utiliser
     // AndroidProvider.debug + debug token dans le manifest.
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: AndroidProvider.playIntegrity,
-    );
+    // iOS : debug provider sur simulateur/dev (DeviceCheck indisponible sur
+    // simulateur), App Attest + fallback DeviceCheck en release.
+    // try/catch : un échec d'App Check ne doit JAMAIS empêcher le démarrage.
+    try {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.playIntegrity,
+        appleProvider: kDebugMode
+            ? AppleProvider.debug
+            : AppleProvider.appAttestWithDeviceCheckFallback,
+      );
+    } catch (_) {}
   }
 
   if (kIsWeb) {
