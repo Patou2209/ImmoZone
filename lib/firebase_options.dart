@@ -8,6 +8,8 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
+      case TargetPlatform.iOS:
+        return ios;
       default:
         return android;
     }
@@ -33,5 +35,18 @@ class DefaultFirebaseOptions {
     messagingSenderId: '836828432238',
     projectId: 'immozone-d9a68',
     storageBucket: 'immozone-d9a68.firebasestorage.app',
+  );
+
+  // ── iOS Firebase config ──────────────────────────────────────────────────
+  // ⚠️ TODO : remplacer apiKey / appId par les vraies valeurs du fichier
+  //    GoogleService-Info.plist (clés API_KEY et GOOGLE_APP_ID) téléchargé
+  //    depuis Firebase Console → app iOS com.immozone.estate
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'A_REMPLACER_API_KEY_IOS',
+    appId: 'A_REMPLACER_GOOGLE_APP_ID_IOS',
+    messagingSenderId: '836828432238',
+    projectId: 'immozone-d9a68',
+    storageBucket: 'immozone-d9a68.firebasestorage.app',
+    iosBundleId: 'com.immozone.estate',
   );
 }
