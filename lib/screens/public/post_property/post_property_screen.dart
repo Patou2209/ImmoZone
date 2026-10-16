@@ -4257,8 +4257,10 @@ class _PostPropertyAppBar extends StatelessWidget implements PreferredSizeWidget
   });
 
   @override
-  // AppBar normal (56) + bande indicateur d'étapes (50) + séparateur (1)
-  Size get preferredSize => const Size.fromHeight(56 + 50 + 1);
+  // AppBar normal (56) + bande indicateur d'étapes (58) + séparateur (1)
+  // 58 = pastille 28 + espace 3 + label ~13 + padding bas 12 + marge 2
+  // (50 débordait de 6px sur iPhone — métriques de police iOS)
+  Size get preferredSize => const Size.fromHeight(56 + 58 + 1);
 
   @override
   Widget build(BuildContext context) {

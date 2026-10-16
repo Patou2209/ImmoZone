@@ -752,7 +752,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   crossAxisCount: crossCount,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
-                  childAspectRatio: 400 / 450,
+                  mainAxisExtent: 460, // hauteur EXACTE de PropertyCard (fini les overflows écrans étroits)
                 ),
                 itemCount: boosted.length,
                 itemBuilder: (ctx, i) {
@@ -845,7 +845,7 @@ class _SearchScreenState extends State<SearchScreen> {
               crossAxisCount: cols,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 400 / 450,
+              mainAxisExtent: 460, // hauteur EXACTE de PropertyCard (fini les overflows écrans étroits)
             ),
             itemCount: mixedItems.length,
             itemBuilder: (gridCtx, i) {
