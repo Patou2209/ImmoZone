@@ -2507,7 +2507,7 @@ class _HomeTabState extends State<_HomeTab>
               crossAxisCount: crossAxisCount,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              mainAxisExtent: 460, // hauteur EXACTE de PropertyCard (fini les overflows écrans étroits)
+              mainAxisExtent: 430, // hauteur EXACTE de PropertyCard — synchroniser avec _cardHeight !
             ),
             itemCount: items.length,
             itemBuilder: (context, index) {
@@ -2578,7 +2578,7 @@ class _HomeTabState extends State<_HomeTab>
               crossAxisCount: cols,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              mainAxisExtent: 460, // hauteur EXACTE de PropertyCard (fini les overflows écrans étroits)
+              mainAxisExtent: 430, // hauteur EXACTE de PropertyCard — synchroniser avec _cardHeight !
             ),
             itemCount: mixedItems.length,
             itemBuilder: (gridCtx, i) {

@@ -312,7 +312,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
                           crossAxisCount: cols,
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          mainAxisExtent: 460, // hauteur EXACTE de PropertyCard (fini les overflows écrans étroits)
+                          mainAxisExtent: 430, // hauteur EXACTE de PropertyCard — synchroniser avec _cardHeight !
                         ),
                         itemCount: _listings.length,
                         itemBuilder: (context, index) {

@@ -60,12 +60,15 @@ class PropertyCard extends StatelessWidget {
 
   // Card dimensions
   static const double _cardWidth   = 400;
-  static const double _cardHeight  = 460;
+  // ⚠️ Si _cardHeight change, synchroniser mainAxisExtent dans les 5 grilles
+  // (public_home_screen ×2, search_screen ×2, annonceur_profile_screen ×1).
+  static const double _cardHeight  = 430;
   static const double _cardRadius  = 18;
-  // Répartition image/description : 62/38 → plus d'air pour les chips
-  // caractéristiques (Ch./SDB) qui étaient coupées sur certains téléphones.
-  static const double _imageRatio  = 0.62;
-  static const double _descRatio   = 0.38;
+  // Répartition image/description : 66/34. L'image garde la même taille
+  // absolue qu'avant (~284px) mais la zone texte est compactée (~146px) :
+  // il y avait ~47px de blanc entre les chips Ch./SDB et la ligne Garantie.
+  static const double _imageRatio  = 0.66;
+  static const double _descRatio   = 0.34;
 
   // ── Avatar annonceur : photo base64 ou initiale ──────────────────────────
   // [size] est déterminé dans build() via MediaQuery : 60px si ≤768px, 80px sinon.
@@ -166,7 +169,7 @@ class PropertyCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
-                  // ── Image zone (65% de la hauteur) ──────────────────────
+                  // ── Image zone (66% de la hauteur) ──────────────────────
                   Stack(children: [
                     // Photo principale
                     ClipRRect(
@@ -366,7 +369,7 @@ class PropertyCard extends StatelessWidget {
                     ),
                   ]),
 
-                  // ── Description (38% de la hauteur) ─────────────────────
+                  // ── Description (34% de la hauteur) ─────────────────────
                   SizedBox(
                     height: _cardHeight * _descRatio,
                     child: Padding(
