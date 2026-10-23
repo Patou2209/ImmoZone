@@ -392,7 +392,7 @@ class PropertyProvider extends ChangeNotifier {
     await loadAllProperties();
   }
 
-  Future<Map<String, dynamic>> getStats() async {
-    return await _dataService.getAdminStats();
+  Future<Map<String, dynamic>> getStats({bool forceRefresh = false}) async {
+    return await _dataService.getAdminStats(forceRefresh: forceRefresh);
   }
 }

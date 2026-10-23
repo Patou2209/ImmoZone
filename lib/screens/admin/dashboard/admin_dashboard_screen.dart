@@ -78,9 +78,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_stats.isEmpty) setState(() => _isLoading = true);
 
     final essentials = await Future.wait([
-      provider.getStats(),               // 0
-      provider.getPendingProperties(),   // 1
-      _ds.getPendingManualPayments(),    // 2
+      // forceRefresh : après une action admin (validation paiement/annonce),
+      // _load() est rappelé et doit contourner le cache 15 s des stats.
+      // Au premier chargement le cache est vide → aucun coût supplémentaire
+      // (et les requêtes simultanées sont dédupliquées via _adminStatsInflight).
+      provider.getStats(forceRefresh: true), // 0
+      provider.getPendingProperties(),       // 1
+      _ds.getPendingManualPayments(),        // 2
     ]);
     if (!mounted) return;
     setState(() {
@@ -92,10 +96,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
 
     // Phase 2 — KPI secondaires (non bloquants)
+    // ⚡ PERF : getUsersLight/getPropertiesLight = métadonnées SANS les
+    // avatars/photos base64 (projection REST). Les KPI n'utilisent que
+    // role/createdAt/city/commune (users) et status/ownerId/dates (props)
+    // → ~50 KB téléchargés au lieu de ~15 Mo (docs complets).
     final secondary = await Future.wait([
       _ds.getPayments(),                 // 0 — paiements confirmés pour KPI
-      _ds.getUsers(),                    // 1 — users pour KPI 2
-      _ds.getProperties(),               // 2 — properties pour KPI 2
+      _ds.getUsersLight(),               // 1 — users (léger) pour KPI 2
+      _ds.getPropertiesLight(),          // 2 — properties (léger) pour KPI 2
       _ds.getContactLogs(),              // 3 — logs de contact pour KPI 3
       _ds.getConfirmedRefunds(),         // 4 — remboursements pour Recette KPI
     ]);

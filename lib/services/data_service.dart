@@ -594,12 +594,28 @@ class DataService {
     'whatsApp': u.whatsApp,
   };
 
-  /// Force-refresh du token Firebase Auth avant les lectures de collection admin.
-  /// Évite les erreurs PERMISSION_DENIED dues à un token expiré ou non propagé.
+  /// S'assure qu'un token Firebase Auth valide est disponible avant les
+  /// lectures de collection admin (évite PERMISSION_DENIED sur token expiré).
+  /// ⚡ PERF : getIdToken() SANS force-refresh — le SDK renvoie le token en
+  /// cache s'il est encore valide et ne fait un aller réseau QUE s'il a
+  /// expiré. L'ancien getIdToken(true) forçait un round-trip réseau de
+  /// 300-800 ms vers securetoken.googleapis.com AVANT CHAQUE requête.
+  /// Filet de sécurité : un force-refresh est quand même fait au maximum
+  /// toutes les 10 minutes (claims non propagés / edge cases).
+  DateTime? _lastTokenForceRefresh;
   Future<void> _ensureFreshToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) await user.getIdToken(true);
+      if (user == null) return;
+      final now = DateTime.now();
+      if (_lastTokenForceRefresh == null ||
+          now.difference(_lastTokenForceRefresh!) >
+              const Duration(minutes: 10)) {
+        _lastTokenForceRefresh = now;
+        await user.getIdToken(true);
+      } else {
+        await user.getIdToken();
+      }
     } catch (_) {}
   }
 
@@ -1999,83 +2015,224 @@ class DataService {
     }
   }
 
-  Future<Map<String, dynamic>> getAdminStats() async {
-    final props = await getProperties();
-    final users = await getUsers();
-    final msgs = await getMessages();
-    final payments = await getPayments();
-    final reports = await getPendingReports();
+  // ─── LECTURES « LÉGÈRES » (PERF) ────────────────────────────────────────────
+  // ⚡ PROBLÈME : les documents properties contiennent les photos en base64
+  // (~400-950 KB/doc) et les users contiennent l'avatar base64. Firestore SDK
+  // ne supporte PAS la projection de champs → chaque lecture de collection
+  // téléchargeait TOUT (20 annonces ≈ 15 Mo ≈ 60 s sur 4G). Le dashboard
+  // admin n'a besoin QUE des métadonnées (status, dates, rôles…).
+  // SOLUTION : l'API REST Firestore (runQuery + select) renvoie UNIQUEMENT
+  // les champs demandés → ~20-50 KB au lieu de ~15 Mo (-99,7 %).
+  // SÉCURITÉ : mêmes règles Firestore (token Auth), et FALLBACK automatique
+  // vers les lectures SDK complètes si le REST échoue → zéro régression.
 
-    // Lire la date de reset CA (si définie, ne compter que les paiements après)
-    final settings = await _getSettings();
-    final resetDateStr = settings['revenue_reset_date'] as String?;
-    final resetDate = resetDateStr != null
-        ? DateTime.tryParse(resetDateStr)
-        : null;
-
-    final confirmedPayments = payments.where((p) => p.isConfirmed);
-    final revenuePayments = resetDate != null
-        ? confirmedPayments.where((p) => p.createdAt.isAfter(resetDate))
-        : confirmedPayments;
-
-    final grossRevenue = revenuePayments.fold(0.0, (sum, p) => sum + p.amount);
-
-    // ── Déduire les remboursements confirmés du CA ────────────────────────
-    // Inclut les remboursements directs (type 'direct', sans paiement lié)
-    // ET les remboursements liés à un paiement (le paiement reste 'confirmed'
-    // dans le CA brut, donc on soustrait le montant remboursé).
-    double totalRefunded = 0.0;
-    try {
-      final refundsSnap = await _refundsCol.get();
-      for (final doc in refundsSnap.docs) {
-        final r = doc.data() as Map<String, dynamic>;
-        if (r['status'] != 'confirmed') continue;
-        // Respecter la date de reset CA (même logique que les paiements)
-        if (resetDate != null) {
-          final created = DateTime.tryParse(r['createdAt'] as String? ?? '');
-          if (created == null || !created.isAfter(resetDate)) continue;
-        }
-        totalRefunded += ((r['amount'] as num?) ?? 0).toDouble();
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('getAdminStats refunds error: $e');
+  /// Décode une valeur typée du format REST Firestore → valeur Dart simple.
+  dynamic _decodeRestValue(Map<String, dynamic> v) {
+    if (v.containsKey('stringValue')) return v['stringValue'];
+    if (v.containsKey('booleanValue')) return v['booleanValue'];
+    if (v.containsKey('integerValue')) {
+      return int.tryParse('${v['integerValue']}') ?? 0;
     }
+    if (v.containsKey('doubleValue')) {
+      return (v['doubleValue'] as num).toDouble();
+    }
+    if (v.containsKey('timestampValue')) return v['timestampValue'];
+    if (v.containsKey('nullValue')) return null;
+    if (v.containsKey('arrayValue')) {
+      final vals = (v['arrayValue']?['values'] as List?) ?? const [];
+      return vals
+          .map((e) => _decodeRestValue(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    }
+    if (v.containsKey('mapValue')) {
+      final f = (v['mapValue']?['fields'] as Map?) ?? const {};
+      return f.map((k, val) => MapEntry(
+          k as String, _decodeRestValue(Map<String, dynamic>.from(val as Map))));
+    }
+    return null;
+  }
 
-    final revenue = grossRevenue - totalRefunded;
+  /// Lit une collection en ne téléchargeant QUE les champs [fields]
+  /// (projection via l'API REST runQuery). Retourne null en cas d'échec
+  /// → l'appelant retombe sur la lecture SDK complète.
+  Future<List<Map<String, dynamic>>?> _fetchCollectionLight(
+      String collectionId, List<String> fields) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+      final token = await user.getIdToken();
+      if (token == null || token.isEmpty) return null;
+      final pid = _db.app.options.projectId;
+      final uri = Uri.parse(
+          'https://firestore.googleapis.com/v1/projects/$pid/databases/(default)/documents:runQuery');
+      final resp = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'structuredQuery': {
+                'from': [{'collectionId': collectionId}],
+                'select': {
+                  'fields': [for (final f in fields) {'fieldPath': f}],
+                },
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (resp.statusCode != 200) return null;
+      final decoded = jsonDecode(resp.body);
+      if (decoded is! List) return null;
+      final out = <Map<String, dynamic>>[];
+      for (final entry in decoded) {
+        final doc = (entry as Map)['document'];
+        if (doc == null) continue; // entrée readTime sans document
+        final name = doc['name'] as String? ?? '';
+        final fieldsMap = (doc['fields'] as Map?) ?? const {};
+        final m = <String, dynamic>{};
+        fieldsMap.forEach((k, v) {
+          m[k as String] = _decodeRestValue(Map<String, dynamic>.from(v as Map));
+        });
+        // Injecter l'ID document si le champ 'id' n'est pas stocké dans le doc
+        if ((m['id'] as String?)?.isNotEmpty != true && name.isNotEmpty) {
+          m['id'] = name.split('/').last;
+        }
+        out.add(m);
+      }
+      return out;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[_fetchCollectionLight($collectionId)] $e');
+      return null;
+    }
+  }
 
-    // ── Annonces RÉELLEMENT actives : status 'Actif', non expirées,
-    //    non vendues/louées — cohérent avec ce que voit le public.
-    final trulyActive = props.where((p) =>
-        p.status == 'Actif' && !p.isExpired && !p.isSold && !p.isRented).toList();
+  /// Annonces SANS les photos base64 (métadonnées uniquement) — pour les
+  /// stats/KPI admin. ~1 KB/annonce au lieu de ~750 KB.
+  /// `images` absent → PropertyModel.images = [] (jamais affichées ici).
+  Future<List<PropertyModel>> getPropertiesLight() async {
+    const fields = [
+      'id', 'title', 'type', 'transactionType', 'status',
+      'isSold', 'isRented', 'createdAt', 'updatedAt', 'expiresAt',
+      'isFeatured', 'boostEnd', 'boostLevel', 'ownerId',
+      'price', 'currency', 'city', 'commune', 'views',
+    ];
+    final maps = await _fetchCollectionLight('properties', fields);
+    if (maps == null) return getProperties(); // fallback SDK complet
+    return maps.map(PropertyModel.fromMap).toList();
+  }
 
-    return {
-      'totalProperties': props.length,
-      'activeProperties': trulyActive.length,
-      'pendingProperties': props.where((p) => p.status == 'En attente').length,
-      'soldProperties': props.where((p) => p.isSold || p.isRented).length,
-      'suspendedProperties': props.where((p) => p.status == 'Suspendu').length,
-      'expiredProperties': props.where((p) =>
-          p.status == 'Expire' || p.status == 'Expiré' ||
-          (p.status == 'Actif' && p.isExpired)).length,
-      'rejectedProperties': props.where((p) =>
-          p.status == 'Rejeté' || p.status == 'Rejete').length,
-      'totalUsers': users.where((u) => u.role != 'admin').length,
-      'annonceurs': users.where((u) => u.role == 'annonceur').length,
-      'demandeurs': users.where((u) => u.role == 'demandeur').length,
-      'totalMessages': msgs.length,
-      // Vente/Location : comptées UNIQUEMENT sur les annonces actives
-      // (cohérence avec la carte 'Annonces actives' : vente + location = actives)
-      'vente': trulyActive.where((p) => p.transactionType == 'Vente').length,
-      'location': trulyActive.where((p) => p.transactionType == 'Location').length,
-      'totalRevenue': revenue,
-      'grossRevenue': grossRevenue,
-      'totalRefunded': totalRefunded,
-      'revenueResetDate': resetDateStr,
-      'pendingPayments': payments.where((p) => p.status == 'awaiting_manual').length,
-      'pendingReports': reports.length,
-      'boostedProperties': props.where((p) => p.isBoostActive).length,
-      'freeTrial': isFreeTrial,
-    };
+  /// Utilisateurs SANS avatar base64 (ni mot de passe — bonus sécurité) —
+  /// pour les stats/KPI admin.
+  Future<List<UserModel>> getUsersLight() async {
+    const fields = [
+      'id', 'name', 'email', 'phone', 'role', 'category',
+      'city', 'commune', 'country', 'province',
+      'isActive', 'isVerified', 'createdAt', 'lastLogin', 'totalProperties',
+    ];
+    final maps = await _fetchCollectionLight('users', fields);
+    if (maps == null) return getUsers(); // fallback SDK complet
+    return maps.map(UserModel.fromMap).toList();
+  }
+
+  /// Nombre de messages via agrégation count() — AUCUN document téléchargé.
+  Future<int> getMessagesCount() async {
+    try {
+      final agg = await _messagesCol.count().get();
+      return agg.count ?? 0;
+    } catch (_) {
+      try {
+        return (await _messagesCol.get()).docs.length;
+      } catch (_) {
+        return 0;
+      }
+    }
+  }
+
+  /// Nombre de signalements en attente via agrégation count().
+  Future<int> getPendingReportsCount() async {
+    try {
+      final agg =
+          await _reportsCol.where('status', isEqualTo: 'pending').count().get();
+      return agg.count ?? 0;
+    } catch (_) {
+      try {
+        return (await getPendingReports()).length;
+      } catch (_) {
+        return 0;
+      }
+    }
+  }
+
+  /// Remboursements bruts (docs légers) — pour _computeAdminStats.
+  Future<List<Map<String, dynamic>>> _getRefundsRaw() async {
+    try {
+      final snap = await _refundsCol.get();
+      return snap.docs
+          .map((d) => Map<String, dynamic>.from(d.data() as Map))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[_getRefundsRaw] $e');
+      return [];
+    }
+  }
+
+  // ── Cache court des stats admin (dédoublonne dashboard + stream) ─────────
+  Map<String, dynamic>? _adminStatsCache;
+  DateTime? _adminStatsCacheAt;
+  Future<Map<String, dynamic>>? _adminStatsInflight;
+  static const Duration _adminStatsTtl = Duration(seconds: 15);
+
+  /// Stats admin — ⚡ réécrit pour la performance :
+  ///   • AVANT : getProperties + getUsers + getMessages + getPayments +
+  ///     getPendingReports en SÉRIE, documents COMPLETS (photos base64
+  ///     incluses) → ~15 Mo téléchargés, jusqu'à 60 s sur 4G.
+  ///   • APRÈS : lectures légères (projection REST sans images/avatars),
+  ///     count() agrégés pour messages/signalements, le tout en PARALLÈLE
+  ///     → ~50 KB, ~1-2 s. Calcul via _computeAdminStats (logique STRICTEMENT
+  ///     identique à l'ancienne implémentation, partagée avec le stream).
+  /// [forceRefresh] contourne le cache 15 s (pull-to-refresh / après action).
+  Future<Map<String, dynamic>> getAdminStats({bool forceRefresh = false}) async {
+    final now = DateTime.now();
+    if (!forceRefresh &&
+        _adminStatsCache != null &&
+        _adminStatsCacheAt != null &&
+        now.difference(_adminStatsCacheAt!) < _adminStatsTtl) {
+      return Map<String, dynamic>.from(_adminStatsCache!);
+    }
+    final inflight = _adminStatsInflight;
+    if (inflight != null) return inflight;
+    final future = () async {
+      try {
+        await _ensureFreshToken();
+        final results = await Future.wait<dynamic>([
+          getPropertiesLight(),      // 0
+          getUsersLight(),           // 1
+          getMessagesCount(),        // 2
+          getPayments(),             // 3 — docs petits (pas d'images)
+          getPendingReportsCount(),  // 4
+          _getRefundsRaw(),          // 5
+          _getSettings(),            // 6
+        ]);
+        final stats = _computeAdminStats(
+          props: results[0] as List<PropertyModel>,
+          users: results[1] as List<UserModel>,
+          messagesCount: results[2] as int,
+          payments: results[3] as List<PaymentModel>,
+          pendingReportsCount: results[4] as int,
+          refunds: results[5] as List<Map<String, dynamic>>,
+          settings: results[6] as Map<String, dynamic>,
+        );
+        _adminStatsCache = stats;
+        _adminStatsCacheAt = DateTime.now();
+        return stats;
+      } finally {
+        _adminStatsInflight = null;
+      }
+    }();
+    _adminStatsInflight = future;
+    return future;
   }
 
   // ─── STATS ADMIN EN TEMPS RÉEL ───────────────────────────────────────────────
@@ -2148,84 +2305,67 @@ class DataService {
     };
   }
 
-  /// Stream TEMPS RÉEL des stats admin — combine les snapshots des
-  /// collections properties / users / messages / payments / reports /
-  /// refunds / settings et ré-émet la map complète à chaque changement.
+  /// Stream des stats admin — ⚡ réécrit pour la performance.
+  ///   • AVANT : 7 listeners snapshots() sur les collections COMPLÈTES
+  ///     (properties avec photos base64, users avec avatars…). Chaque
+  ///     ouverture de dashboard re-téléchargeait ~15 Mo, et CHAQUE
+  ///     modification d'un document (ex: views +1 à chaque visite d'annonce)
+  ///     re-poussait le document entier (~750 KB) vers le dashboard ouvert.
+  ///   • APRÈS : émission initiale immédiate via getAdminStats() (lectures
+  ///     légères ~50 KB), puis ré-émission :
+  ///       - en QUASI temps réel sur les événements qui comptent pour
+  ///         l'admin : 2 listeners snapshots() CIBLÉS et FILTRÉS (annonces
+  ///         'En attente' et paiements 'awaiting_manual' — collections quasi
+  ///         vides en pratique, donc quelques KB) ;
+  ///       - et un polling léger toutes les 60 s pour le reste (CA, users…).
   Stream<Map<String, dynamic>> adminStatsStream() {
     final controller = StreamController<Map<String, dynamic>>();
+    Timer? pollTimer;
+    final subs = <StreamSubscription>[];
+    bool refreshing = false;
 
-    List<PropertyModel> props = [];
-    List<UserModel> users = [];
-    int messagesCount = 0;
-    List<PaymentModel> payments = [];
-    int pendingReports = 0;
-    List<Map<String, dynamic>> refunds = [];
-    Map<String, dynamic> settings = _defaultSettings();
-    // Émettre seulement quand les sources principales ont livré au moins
-    // une fois (évite un premier rendu à 0 partout).
-    final ready = <String>{};
-    const requiredSources = {'props', 'users', 'payments'};
-
-    void emit(String source) {
-      ready.add(source);
-      if (!requiredSources.every(ready.contains)) return;
-      if (controller.isClosed) return;
-      controller.add(_computeAdminStats(
-        props: props,
-        users: users,
-        messagesCount: messagesCount,
-        payments: payments,
-        pendingReportsCount: pendingReports,
-        refunds: refunds,
-        settings: settings,
-      ));
+    Future<void> refresh({bool force = false}) async {
+      if (controller.isClosed || refreshing) return;
+      refreshing = true;
+      try {
+        final stats = await getAdminStats(forceRefresh: force);
+        if (!controller.isClosed) controller.add(stats);
+      } catch (_) {
+        // silencieux — prochaine tentative au tick suivant
+      } finally {
+        refreshing = false;
+      }
     }
 
-    final subs = <StreamSubscription>[
-      _propertiesCol.snapshots().listen((snap) {
-        props = snap.docs
-            .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
-            .toList();
-        emit('props');
-      }, onError: (_) => emit('props')),
-      _usersCol.snapshots().listen((snap) {
-        users = snap.docs
-            .map((d) => UserModel.fromMap(d.data() as Map<String, dynamic>))
-            .toList();
-        emit('users');
-      }, onError: (_) => emit('users')),
-      _messagesCol.snapshots().listen((snap) {
-        messagesCount = snap.docs.length;
-        emit('messages');
-      }, onError: (_) {}),
-      _paymentsCol.snapshots().listen((snap) {
-        payments = snap.docs
-            .map((d) => PaymentModel.fromMap(d.data() as Map<String, dynamic>))
-            .toList();
-        emit('payments');
-      }, onError: (_) => emit('payments')),
-      _reportsCol
-          .where('status', isEqualTo: 'pending')
-          .snapshots()
-          .listen((snap) {
-        pendingReports = snap.docs.length;
-        emit('reports');
-      }, onError: (_) {}),
-      _refundsCol.snapshots().listen((snap) {
-        refunds = snap.docs
-            .map((d) => Map<String, dynamic>.from(d.data() as Map))
-            .toList();
-        emit('refunds');
-      }, onError: (_) {}),
-      _settingsDoc.snapshots().listen((snap) {
-        if (snap.exists) {
-          settings = Map<String, dynamic>.from(snap.data() as Map);
-        }
-        emit('settings');
-      }, onError: (_) {}),
-    ];
+    // 1. Émission initiale immédiate (cache 15 s partagé avec _load()
+    //    du dashboard → pas de double téléchargement à l'ouverture).
+    refresh();
+
+    // 2. Temps réel CIBLÉ : requêtes filtrées sur les files d'attente admin
+    //    (snapshots de quelques documents, pas de photos lourdes en pratique).
+    bool primedPending = false, primedPayments = false;
+    subs.add(_propertiesCol
+        .where('status', isEqualTo: 'En attente')
+        .snapshots()
+        .listen((_) {
+      if (!primedPending) { primedPending = true; return; } // snapshot initial
+      refresh(force: true);
+    }, onError: (_) {}));
+    subs.add(_paymentsCol
+        .where('status', isEqualTo: 'awaiting_manual')
+        .snapshots()
+        .listen((_) {
+      if (!primedPayments) { primedPayments = true; return; }
+      refresh(force: true);
+    }, onError: (_) {}));
+
+    // 3. Polling léger pour les autres indicateurs (CA, users, messages…).
+    pollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      refresh(force: true);
+    });
 
     controller.onCancel = () async {
+      pollTimer?.cancel();
       for (final s in subs) {
         await s.cancel();
       }
