@@ -56,17 +56,42 @@ class StorageService {
     return ref.getDownloadURL().timeout(const Duration(seconds: 20));
   }
 
+  /// Vérifie qu'un upload est bien présent dans Storage avec la taille
+  /// attendue (étape VÉRIFIER de la migration : on ne nettoie le base64
+  /// qu'après cette confirmation).
+  Future<bool> verifyUpload(String url, int expectedSize) async {
+    try {
+      final meta = await _storage
+          .refFromURL(url)
+          .getMetadata()
+          .timeout(const Duration(seconds: 20));
+      return meta.size == expectedSize;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[StorageService.verifyUpload] $e');
+      return false;
+    }
+  }
+
   /// Supprime toutes les photos Storage d'une annonce (best-effort —
   /// silencieux si le dossier n'existe pas, ex: annonce 100 % base64).
   Future<void> deletePropertyPhotos(String propertyId) async {
     try {
-      final list = await _storage
-          .ref('properties/$propertyId')
-          .listAll()
-          .timeout(const Duration(seconds: 20));
+      final root = _storage.ref('properties/$propertyId');
+      final list = await root.listAll().timeout(const Duration(seconds: 20));
       for (final item in list.items) {
         try {
           await item.delete();
+        } catch (_) {}
+      }
+      // Sous-dossiers (migrated/, edit_*/ …) — 1 niveau suffit.
+      for (final prefix in list.prefixes) {
+        try {
+          final sub = await prefix.listAll().timeout(const Duration(seconds: 20));
+          for (final item in sub.items) {
+            try {
+              await item.delete();
+            } catch (_) {}
+          }
         } catch (_) {}
       }
     } catch (e) {
