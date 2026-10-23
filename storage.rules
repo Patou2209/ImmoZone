@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// ⚡ QW5 — Règles Firebase Storage pour les photos d'annonces ImmoZone.
+//
+// À PUBLIER via la console Firebase :
+//   https://console.firebase.google.com/project/immozone-d9a68/storage/rules
+// (copier-coller ce fichier, puis « Publier »)
+//
+// Principe :
+//   - LECTURE PUBLIQUE sur properties/** : les photos d'annonces sont
+//     publiques par nature (affichées à tous les visiteurs de l'app) et
+//     servies via le CDN Google avec cache 30 jours.
+//   - ÉCRITURE réservée aux utilisateurs AUTHENTIFIÉS (email/password ou
+//     custom token téléphone — pas d'anonyme dans l'app), avec garde-fous :
+//     images uniquement, max 5 Mo par fichier.
+//   - Tout le reste du bucket : verrouillé.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Photos d'annonces : properties/{propertyId}/photo_X.jpg
+    // + sous-dossiers de migration/édition : properties/{id}/migrated/...,
+    //   properties/{id}/edit_{ts}/...
+    match /properties/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      // Suppression (nettoyage par l'app lors de deleteProperty) :
+      allow delete: if request.auth != null;
+    }
+
+    // Par défaut : rien d'autre n'est accessible.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
