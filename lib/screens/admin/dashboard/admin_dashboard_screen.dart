@@ -3094,7 +3094,7 @@ class _PendingPropertyCard extends StatelessWidget {
           ClipRRect(
             borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
             child: PropertyImage(
-                src: property.mainImage, width: 90, height: 90,
+                src: property.listImage, width: 90, height: 90,
                 borderRadius: const BorderRadius.horizontal(left: Radius.circular(14)),
                 placeholder: Container(width: 90, height: 90,
                     color: AppTheme.primaryLight.withValues(alpha: 0.2),

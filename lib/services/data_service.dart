@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/property_model.dart';
+import 'storage_service.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
 import '../models/quota_model.dart';
@@ -1002,6 +1003,11 @@ class DataService {
       }
     } catch (_) {}
     await _propertiesCol.doc(id).delete();
+    // Nettoyage best-effort des photos Storage (évite les orphelins).
+    // Ne bloque jamais la suppression si Storage échoue/indisponible.
+    try {
+      await StorageService().deletePropertyPhotos(id);
+    } catch (_) {}
     invalidatePropertiesCache();
   }
 

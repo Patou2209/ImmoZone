@@ -31,6 +31,7 @@ dependencies:
   firebase_auth: 5.3.1
   cloud_firestore: 5.4.3
   firebase_app_check: 0.3.1+4
+  firebase_storage: 12.3.2
 
   # Local Storage (gardé pour favoris/prefs locales)
   shared_preferences: 2.5.3
@@ -39,6 +40,7 @@ dependencies:
   http: 1.5.0
 
   # Utils
+  image: ^4.2.0   # génération des miniatures (thumbnail) côté client
   intl: ^0.20.2
   image_picker: 1.1.2
   url_launcher: 6.3.1

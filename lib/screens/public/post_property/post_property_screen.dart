@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb, compute;
+import 'package:flutter/foundation.dart' show kIsWeb, compute, kDebugMode;
 import '../../../providers/auth_provider.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
@@ -13,6 +13,7 @@ import '../../../models/payment_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
+import '../../../services/storage_service.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
 import '../../payment/payment_screen.dart';
 
@@ -713,46 +714,94 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             transactionType: _selectedTransaction);
       }
 
-      // ── Convertir les fichiers locaux en base64 ──────────────────────────────
-      // Les chemins locaux (/data/user/0/...) ne sont accessibles que sur l'appareil
-      // de l'annonceur. On encode en base64 pour que tous les appareils voient les photos.
-      // Limite Firestore : 1 Mo par document. imageQuality:40 ≈ 80–150 KB/photo → 5×150=750KB OK.
-      // ── Encoder les photos : principale en [0], secondaires en [1..3] ────────
-      final images = <String>[];
-      const int maxDocBytes = 900000; // 900 KB marge de sécurité sous 1 MB
-      int totalBytes = 0;
+      // ── ⚡ QW5 : photos vers Firebase Storage (URLs dans Firestore) ──────────
+      // AVANT : photos base64 DANS le document (~750 KB/doc) → chaque liste
+      // téléchargeait tout (20 annonces ≈ 15 Mo ≈ 60 s sur 4G).
+      // APRÈS : upload Storage (CDN Google) + miniature ~15 KB (QW4) pour les
+      // listes → document ~20 KB. FALLBACK : si Storage échoue (réseau,
+      // règles), on retombe sur l'encodage base64 historique — la publication
+      // n'échoue jamais à cause de Storage, et PropertyImage affiche les 2.
+      final propertyId = 'prop_${DateTime.now().millisecondsSinceEpoch}';
 
+      // 1. Collecter les bytes de toutes les photos (principale en [0])
+      final photoBytes = <Uint8List>[];
+      final photoTypes = <String>[]; // image/jpeg | image/png
       if (kIsWeb) {
-        // ── Web : utiliser les bytes lus lors de la sélection ─────────────────
         final allWebBytes = <Uint8List>[
           if (_webMainPhotoBytes != null) _webMainPhotoBytes!,
           ..._webSecondaryBytes,
         ];
         for (int i = 0; i < allWebBytes.length; i++) {
-          if (totalBytes >= maxDocBytes) break;
-          final bytes = allWebBytes[i];
-          if (totalBytes + bytes.length > maxDocBytes) break;
           final xfile = i == 0 ? _mainPhoto : _secondaryPhotos[i - 1];
-          final ext = (xfile?.name.toLowerCase().endsWith('.png') ?? false) ? 'png' : 'jpeg';
-          images.add('data:image/$ext;base64,${base64Encode(bytes)}');
-          totalBytes += bytes.length;
+          final isPng = xfile?.name.toLowerCase().endsWith('.png') ?? false;
+          photoBytes.add(allWebBytes[i]);
+          photoTypes.add(isPng ? 'image/png' : 'image/jpeg');
         }
       } else {
-        // FIX CRASH : l'ancien code lisait + encodait jusqu'a 10 photos en
-        // base64 sur le thread UI -> pic memoire + gel -> Android tuait l'app
-        // ("se ferme systematiquement"). compute() deporte lecture + encodage
-        // dans un isolate separe ; la memoire intermediaire est liberee a la
-        // fin de l'isolate et l'UI reste fluide.
         final allPhotos = [
           if (_mainPhoto != null) _mainPhoto!,
           ..._secondaryPhotos,
         ];
-        final encoded = await compute(encodePhotosToDataUris, <String, dynamic>{
-          'paths': allPhotos.map((x) => x.path).toList(),
-          'names': allPhotos.map((x) => x.name).toList(),
-          'maxBytes': maxDocBytes,
-        });
-        images.addAll(encoded);
+        for (final xfile in allPhotos) {
+          try {
+            photoBytes.add(await xfile.readAsBytes());
+            photoTypes.add(xfile.name.toLowerCase().endsWith('.png')
+                ? 'image/png'
+                : 'image/jpeg');
+          } catch (_) {} // photo illisible ignorée (comportement historique)
+        }
+      }
+
+      // 2. Miniature pour les listes (isolate, ne bloque pas l'UI)
+      String? thumbnail;
+      if (photoBytes.isNotEmpty) {
+        thumbnail = await StorageService.makeThumbnail(photoBytes.first);
+      }
+
+      // 3. Upload Storage ; fallback base64 global si le PREMIER upload échoue
+      final images = <String>[];
+      bool storageOk = true;
+      final storage = StorageService();
+      for (int i = 0; i < photoBytes.length; i++) {
+        try {
+          final url = await storage.uploadPropertyPhoto(
+            propertyId: propertyId,
+            index: i,
+            bytes: photoBytes[i],
+            contentType: photoTypes[i],
+          );
+          images.add(url);
+        } catch (e) {
+          if (kDebugMode) debugPrint('[publish] Storage upload #$i failed: $e');
+          if (i == 0) { storageOk = false; }
+          break; // éviter des annonces mi-Storage mi-base64 incohérentes
+        }
+      }
+      if (!storageOk || (photoBytes.isNotEmpty && images.isEmpty)) {
+        // ── FALLBACK HISTORIQUE : base64 dans le document ────────────────────
+        images.clear();
+        const int maxDocBytes = 900000; // 900 KB marge sous la limite 1 MB
+        int totalBytes = 0;
+        if (kIsWeb) {
+          for (int i = 0; i < photoBytes.length; i++) {
+            if (totalBytes + photoBytes[i].length > maxDocBytes) break;
+            final ext = photoTypes[i] == 'image/png' ? 'png' : 'jpeg';
+            images.add('data:image/$ext;base64,${base64Encode(photoBytes[i])}');
+            totalBytes += photoBytes[i].length;
+          }
+        } else {
+          // compute() : encodage hors du thread UI (fix crash historique)
+          final allPhotos = [
+            if (_mainPhoto != null) _mainPhoto!,
+            ..._secondaryPhotos,
+          ];
+          final encoded = await compute(encodePhotosToDataUris, <String, dynamic>{
+            'paths': allPhotos.map((x) => x.path).toList(),
+            'names': allPhotos.map((x) => x.name).toList(),
+            'maxBytes': maxDocBytes,
+          });
+          images.addAll(encoded);
+        }
       }
       // URLs réseau (mode test / sample) conservées telles quelles
       images.addAll(_imageUrls);
@@ -766,7 +815,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           : (user.phone ?? '');
 
       final property = PropertyModel(
-        id: 'prop_${DateTime.now().millisecondsSinceEpoch}',
+        id: propertyId,
         title: _establishmentNameCtrl.text.trim().isNotEmpty
             ? _establishmentNameCtrl.text.trim()
             : (_selectedType == 'Chambre d\'hôtel' && _avenueCtrl.text.trim().isNotEmpty
@@ -823,6 +872,7 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
           return 'mensuel';
         }(),
         images: finalImages,
+        thumbnail: thumbnail, // ⚡ QW4 : miniature ~15 KB pour les listes
         ownerId: user.id,
         ownerName: ownerName,
         ownerPhone: ownerWhatsApp,

@@ -26,6 +26,10 @@ class PropertyModel {
   final List<String> amenities;
   final List<String> images;
   final int mainImageIndex; // index de la photo principale
+  /// ⚡ QW4 : miniature légère (~10-25 KB, base64 data-URI 360px) affichée
+  /// dans les LISTES (accueil, recherche, admin). Les photos pleine taille
+  /// (URLs Firebase Storage) ne sont chargées que sur l'écran détail.
+  final String? thumbnail;
   final String ownerId;
   final String ownerName;
   final String ownerPhone;
@@ -93,6 +97,7 @@ class PropertyModel {
     this.amenities = const [],
     this.images = const [],
     this.mainImageIndex = 0,
+    this.thumbnail,
     required this.ownerId,
     required this.ownerName,
     required this.ownerPhone,
@@ -154,6 +159,7 @@ class PropertyModel {
     int? floors, bool? hasParking, bool? hasWater, bool? hasElectricity,
     bool? hasAscenseur, bool? hasCuisineEquipee,
     List<String>? amenities, List<String>? images, int? mainImageIndex,
+    String? thumbnail,
     String? ownerId, String? ownerName, String? ownerPhone,
     String? ownerEmail, String? ownerWhatsApp, String? ownerCategory,
     String? ownerAvatar, String? status,
@@ -182,6 +188,7 @@ class PropertyModel {
     hasCuisineEquipee: hasCuisineEquipee ?? this.hasCuisineEquipee,
     amenities: amenities ?? this.amenities, images: images ?? this.images,
     mainImageIndex: mainImageIndex ?? this.mainImageIndex,
+    thumbnail: thumbnail ?? this.thumbnail,
     ownerId: ownerId ?? this.ownerId, ownerName: ownerName ?? this.ownerName,
     ownerPhone: ownerPhone ?? this.ownerPhone, ownerEmail: ownerEmail ?? this.ownerEmail,
     ownerWhatsApp: ownerWhatsApp ?? this.ownerWhatsApp,
@@ -222,6 +229,7 @@ class PropertyModel {
     'hasWater': hasWater, 'hasElectricity': hasElectricity,
     'hasAscenseur': hasAscenseur, 'hasCuisineEquipee': hasCuisineEquipee,
     'amenities': amenities, 'images': images, 'mainImageIndex': mainImageIndex,
+    'thumbnail': thumbnail,
     'ownerId': ownerId, 'ownerName': ownerName, 'ownerPhone': ownerPhone,
     'ownerEmail': ownerEmail, 'ownerWhatsApp': ownerWhatsApp,
     'ownerCategory': ownerCategory,
@@ -277,6 +285,7 @@ class PropertyModel {
     amenities: List<String>.from(m['amenities'] ?? []),
     images: List<String>.from(m['images'] ?? []),
     mainImageIndex: m['mainImageIndex'] ?? 0,
+    thumbnail: m['thumbnail'],
     ownerId: m['ownerId'] ?? '',
     // Title Case : uniformise l'affichage du nom de l'annonceur partout
     ownerName: TextFormatter.toTitleCase(m['ownerName'] ?? ''),
@@ -332,6 +341,15 @@ class PropertyModel {
     if (images.isEmpty) return 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800';
     final idx = mainImageIndex.clamp(0, images.length - 1);
     return images[idx];
+  }
+
+  /// ⚡ QW4 : image à afficher dans les LISTES (cartes accueil/recherche/admin).
+  /// Priorité au thumbnail léger (~15 KB) ; fallback sur mainImage pour les
+  /// annonces d'avant la migration (base64 plein format) → rétrocompatible.
+  String get listImage {
+    final t = thumbnail;
+    if (t != null && t.isNotEmpty) return t;
+    return mainImage;
   }
 
   String get statusBadge {

@@ -176,7 +176,9 @@ class PropertyCard extends StatelessWidget {
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(_cardRadius)),
                       child: PropertyImage(
-                        src: property.mainImage,
+                        // ⚡ QW4 : listImage = thumbnail ~15 KB si dispo,
+                        // sinon mainImage (annonces d'avant migration).
+                        src: property.listImage,
                         height: _cardHeight * _imageRatio,
                         width: double.infinity,
                         fit: BoxFit.cover,

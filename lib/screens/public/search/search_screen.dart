@@ -551,7 +551,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: Stack(
                     children: [
                       PropertyImage(
-                        src: p.mainImage,
+                        src: p.listImage,
                         width: 100,
                         height: 110,
                         fit: BoxFit.cover,
