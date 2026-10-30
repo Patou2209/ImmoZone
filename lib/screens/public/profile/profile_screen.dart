@@ -1092,22 +1092,25 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
         ),
-        const SizedBox(height: 10),
-        // 🍎 Exigence Apple 5.1.1(v) : suppression de compte accessible in-app
-        Center(
-          child: TextButton.icon(
-            onPressed: _confirmDeleteAccount,
-            icon: const Icon(Icons.delete_forever_outlined,
-                color: AppTheme.textHint, size: 18),
-            label: const Text('Supprimer mon compte',
-                style: TextStyle(
-                    color: AppTheme.textHint,
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    decoration: TextDecoration.underline)),
+        const SizedBox(height: 12),
+        // 🍎 Exigence Apple 5.1.1(v) : suppression de compte accessible in-app.
+        // Bouton pleine largeur, clairement visible (exigé par la review Apple).
+        OutlinedButton.icon(
+          onPressed: _confirmDeleteAccount,
+          icon: const Icon(Icons.delete_forever_outlined,
+              color: Color(0xFFB71C1C), size: 20),
+          label: const Text('Supprimer mon compte',
+              style: TextStyle(
+                  color: Color(0xFFB71C1C),
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600)),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFB71C1C)),
+            backgroundColor: const Color(0xFFB71C1C).withValues(alpha: 0.05),
+            padding: const EdgeInsets.symmetric(vertical: 9),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
       ],
     );
   }
