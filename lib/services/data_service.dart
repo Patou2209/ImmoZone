@@ -734,6 +734,34 @@ class DataService {
     throw Exception(data['error'] ?? 'La suppression du compte a échoué. Réessayez.');
   }
 
+  /// 🍎 AUTO-SUPPRESSION du compte de l'utilisateur CONNECTÉ (exigence
+  /// Apple 5.1.1(v) : toute app avec création de compte doit permettre sa
+  /// suppression). Authentifiée par ID token — la CF vérifie que le uid du
+  /// token correspond bien au compte supprimé.
+  Future<String> deleteOwnAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('Session expirée. Reconnectez-vous puis réessayez.');
+    }
+    final token = await user.getIdToken();
+    final resp = await http
+        .post(
+          Uri.parse(
+              'https://us-central1-immozone-d9a68.cloudfunctions.net/deleteUserAccount'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'userId': user.uid, 'selfDelete': true}),
+        )
+        .timeout(const Duration(seconds: 45));
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    if (resp.statusCode == 200 && data['success'] == true) {
+      return 'Votre compte et vos données ont été supprimés définitivement.';
+    }
+    throw Exception(data['error'] ?? 'La suppression a échoué. Réessayez.');
+  }
+
   // ─── PROPERTIES ─────────────────────────────────────────────────────────────
 
   Map<String, dynamic> _propertyToFirestore(PropertyModel p) => {
