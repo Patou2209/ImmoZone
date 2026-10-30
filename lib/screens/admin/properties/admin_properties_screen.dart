@@ -318,7 +318,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                   child: Row(children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: _buildPropertyImage(prop.mainImage, 52),
+                      child: _buildPropertyImage(prop.listImage, 52),
                     ),
                     const SizedBox(width: 10),
                     Expanded(child: Column(
@@ -540,7 +540,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: _buildPropertyImage(prop.mainImage, 72),
+                    child: _buildPropertyImage(prop.listImage, 72),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -807,7 +807,7 @@ class _AdminPropertyTile extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: _buildPropertyImageStatic(property.mainImage, 80),
+                child: _buildPropertyImageStatic(property.listImage, 80),
               ),
               const SizedBox(width: 12),
               Expanded(

@@ -2085,19 +2085,43 @@ exports.deleteUserAccount = onRequest(
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
     try {
-      const { userId, adminId } = req.body || {};
-      if (!userId || !adminId) {
-        return res.status(400).json({ error: 'Paramètres requis: userId, adminId' });
+      const { userId, adminId, selfDelete } = req.body || {};
+      if (!userId) {
+        return res.status(400).json({ error: 'Paramètre requis: userId' });
       }
 
-      // 🔒 Garde-fou : l'appelant doit être un admin
-      const adminDoc = await db.collection('users').doc(adminId).get();
-      if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
-        return res.status(403).json({ error: 'Accès refusé — réservé aux administrateurs' });
-      }
-      // 🔒 Interdire l'auto-suppression et la suppression de l'admin principal
-      if (userId === adminId) {
-        return res.status(403).json({ error: 'Impossible de supprimer votre propre compte.' });
+      let isSelf = false;
+      if (selfDelete === true) {
+        // 🍎 AUTO-SUPPRESSION (exigence Apple 5.1.1(v) / Google Play) :
+        // l'utilisateur supprime SON PROPRE compte. Authentification stricte
+        // par ID token Firebase — le uid du token DOIT être celui du compte.
+        const authHeader = req.headers.authorization || '';
+        const m = authHeader.match(/^Bearer (.+)$/);
+        if (!m) {
+          return res.status(401).json({ error: 'Authentification requise.' });
+        }
+        try {
+          const decoded = await admin.auth().verifyIdToken(m[1]);
+          if (decoded.uid !== userId) {
+            return res.status(403).json({ error: 'Vous ne pouvez supprimer que votre propre compte.' });
+          }
+          isSelf = true;
+        } catch (e) {
+          return res.status(401).json({ error: 'Session invalide. Reconnectez-vous puis réessayez.' });
+        }
+      } else {
+        if (!adminId) {
+          return res.status(400).json({ error: 'Paramètres requis: userId, adminId' });
+        }
+        // 🔒 Garde-fou : l'appelant doit être un admin
+        const adminDoc = await db.collection('users').doc(adminId).get();
+        if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+          return res.status(403).json({ error: 'Accès refusé — réservé aux administrateurs' });
+        }
+        // 🔒 Interdire l'auto-suppression admin via ce chemin
+        if (userId === adminId) {
+          return res.status(403).json({ error: 'Impossible de supprimer votre propre compte.' });
+        }
       }
       const targetDoc = await db.collection('users').doc(userId).get();
       const targetData = targetDoc.exists ? targetDoc.data() : null;

@@ -4,12 +4,13 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import '../../../core/utils/error_helper.dart';
 import '../../../providers/property_provider.dart';
 import '../../../models/property_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../services/storage_service.dart';
 
 class EditPropertyScreen extends StatefulWidget {
   final PropertyModel property;
@@ -178,7 +179,25 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
 
   bool get _isLocation => _selectedTransaction == 'Location';
 
-  // ── Sauvegarde ─────────────────────────────────────────────────────────────
+  /// FALLBACK HISTORIQUE : encode les nouvelles photos en base64 dans le
+  /// document (limite 900 KB) — utilisé uniquement si l'upload Storage échoue.
+  /// Retourne [fallback] (anciennes images) si aucune photo n'a pu être encodée.
+  Future<List<String>> _encodeNewPhotosBase64(
+      List<Uint8List> photoBytes, List<String> photoTypes,
+      {required List<String> fallback}) async {
+    final newImages = <String>[];
+    int totalBytes = 0;
+    const int maxDocBytes = 900000;
+    for (int i = 0; i < photoBytes.length; i++) {
+      if (totalBytes + photoBytes[i].length > maxDocBytes) break;
+      final ext = photoTypes[i] == 'image/png' ? 'png' : 'jpeg';
+      newImages.add('data:image/$ext;base64,${base64Encode(photoBytes[i])}');
+      totalBytes += photoBytes[i].length;
+    }
+    return newImages.isNotEmpty ? newImages : fallback;
+  }
+
+  // ── Sauvegarde ─────────────────────────────────────────────────────────
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -186,14 +205,14 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
       final p = widget.property;
 
       // ── Encoder les nouvelles photos si modifiées ─────────────────────────
+      // ── ⚡ QW5 : nouvelles photos → Firebase Storage (fallback base64) ────
       List<String> finalImages = p.images; // conserver les anciennes par défaut
+      String? newThumbnail = p.thumbnail;  // conserver la miniature par défaut
       if (_photosChanged) {
-        final newImages = <String>[];
-        int totalBytes = 0;
-        const int maxDocBytes = 900000;
-
+        // 1. Collecter les bytes des nouvelles photos (principale en [0])
+        final photoBytes = <Uint8List>[];
+        final photoTypes = <String>[];
         if (kIsWeb) {
-          // ── Web : utiliser les bytes lus lors de la sélection ───────────
           final allWebBytes = <Uint8List>[
             if (_webMainBytes != null) _webMainBytes!,
             ..._webSecondaryBytes,
@@ -203,39 +222,59 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
             ..._newSecondaryPhotos,
           ];
           for (int i = 0; i < allWebBytes.length; i++) {
-            if (totalBytes >= maxDocBytes) break;
-            final bytes = allWebBytes[i];
-            if (totalBytes + bytes.length > maxDocBytes) break;
             final xfile = i < allXFiles.length ? allXFiles[i] : null;
-            final ext = (xfile?.name.toLowerCase().endsWith('.png') ?? false) ? 'png' : 'jpeg';
-            newImages.add('data:image/$ext;base64,${base64Encode(bytes)}');
-            totalBytes += bytes.length;
-          }
-          // Si aucune nouvelle photo web sélectionnée, garder les anciennes
-          if (newImages.isEmpty) {
-            finalImages = p.images;
-          } else {
-            finalImages = newImages;
+            final isPng = xfile?.name.toLowerCase().endsWith('.png') ?? false;
+            photoBytes.add(allWebBytes[i]);
+            photoTypes.add(isPng ? 'image/png' : 'image/jpeg');
           }
         } else {
-          // ── Mobile/Desktop : lire depuis le chemin fichier ─────────────
           final allNew = [
             if (_newMainPhoto != null) _newMainPhoto!,
             ..._newSecondaryPhotos,
           ];
-          if (allNew.isNotEmpty) {
-            for (final xfile in allNew) {
-              if (totalBytes >= maxDocBytes) break;
-              try {
-                final bytes = await File(xfile.path).readAsBytes();
-                if (totalBytes + bytes.length > maxDocBytes) break;
-                final b64 = base64Encode(bytes);
-                final ext = xfile.name.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
-                newImages.add('data:image/$ext;base64,$b64');
-                totalBytes += bytes.length;
-              } catch (_) {}
+          for (final xfile in allNew) {
+            try {
+              photoBytes.add(await File(xfile.path).readAsBytes());
+              photoTypes.add(xfile.name.toLowerCase().endsWith('.png')
+                  ? 'image/png'
+                  : 'image/jpeg');
+            } catch (_) {}
+          }
+        }
+
+        if (photoBytes.isNotEmpty) {
+          // 2. Nouvelle miniature pour les listes (QW4)
+          newThumbnail =
+              await StorageService.makeThumbnail(photoBytes.first) ??
+                  newThumbnail;
+
+          // 3. Upload Storage — sous un préfixe horodaté pour ne pas écraser
+          //    les anciennes photos avant la réussite complète (atomicité).
+          final newStorageImages = <String>[];
+          bool storageOk = true;
+          final storage = StorageService();
+          final editId = '${p.id}/edit_${DateTime.now().millisecondsSinceEpoch}';
+          for (int i = 0; i < photoBytes.length; i++) {
+            try {
+              final url = await storage.uploadPropertyPhoto(
+                propertyId: editId,
+                index: i,
+                bytes: photoBytes[i],
+                contentType: photoTypes[i],
+              );
+              newStorageImages.add(url);
+            } catch (e) {
+              if (kDebugMode) debugPrint('[edit] Storage upload #$i failed: $e');
+              if (i == 0) storageOk = false;
+              break;
             }
-            if (newImages.isNotEmpty) finalImages = newImages;
+          }
+          if (storageOk && newStorageImages.isNotEmpty) {
+            finalImages = newStorageImages;
+          } else {
+            // FALLBACK HISTORIQUE base64 ci-dessous (code d'origine conservé)
+            finalImages = await _encodeNewPhotosBase64(photoBytes, photoTypes,
+                fallback: p.images);
           }
         }
       }
@@ -273,6 +312,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         // Preserve unchanged fields
         amenities:       p.amenities,
         images:          finalImages,
+        thumbnail:       newThumbnail, // ⚡ QW4 : miniature pour les listes
         mainImageIndex:  0,
         ownerId:         p.ownerId,
         ownerName:       p.ownerName,

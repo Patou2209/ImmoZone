@@ -1092,8 +1092,119 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
         ),
+        const SizedBox(height: 10),
+        // 🍎 Exigence Apple 5.1.1(v) : suppression de compte accessible in-app
+        Center(
+          child: TextButton.icon(
+            onPressed: _confirmDeleteAccount,
+            icon: const Icon(Icons.delete_forever_outlined,
+                color: AppTheme.textHint, size: 18),
+            label: const Text('Supprimer mon compte',
+                style: TextStyle(
+                    color: AppTheme.textHint,
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    decoration: TextDecoration.underline)),
+          ),
+        ),
+        const SizedBox(height: 8),
       ],
     );
+  }
+
+  /// 🍎 Suppression définitive du compte (exigence Apple / Google Play).
+  /// Double confirmation, puis appel de la Cloud Function authentifiée.
+  Future<void> _confirmDeleteAccount() async {
+    final auth = context.read<AuthProvider>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Supprimer votre compte ?',
+            style: TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+        content: const Text(
+          'Cette action est DÉFINITIVE et irréversible :\n\n'
+          '• Votre profil et vos informations personnelles seront supprimés\n'
+          '• Vos crédits restants seront perdus\n'
+          '• Vos annonces seront retirées de la plateforme\n'
+          '• Vous ne pourrez plus vous reconnecter avec ce compte\n\n'
+          'Voulez-vous vraiment continuer ?',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler',
+                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer définitivement',
+                style: TextStyle(fontFamily: 'Poppins', color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Deuxième confirmation (action irréversible)
+    final confirmed2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Dernière confirmation',
+            style: TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+        content: const Text(
+          'Appuyez sur « Oui, supprimer » pour effacer définitivement votre compte.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non', style: TextStyle(fontFamily: 'Poppins')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Oui, supprimer',
+                style: TextStyle(fontFamily: 'Poppins', color: Colors.red,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed2 != true || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final msg = await _ds.deleteOwnAccount();
+      if (!mounted) return;
+      Navigator.of(context).pop(); // ferme le loader
+      await auth.logout();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.green,
+      ));
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // ferme le loader
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ErrorHelper.friendly(e),
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   Widget _infoRow(IconData icon, String label, String value) {

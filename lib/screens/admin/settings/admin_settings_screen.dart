@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/utils/error_helper.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/data_service.dart';
+import '../../../services/migration_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../contacts/admin_contacts_screen.dart';
 import '../zones/admin_zones_screen.dart';
@@ -742,6 +743,75 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             ),
           ),
         ])),
+        const SizedBox(height: 20),
+
+        // == MIGRATION PHOTOS -> FIREBASE STORAGE (one-shot QW5) ==
+        _sectionHeader('Migration photos → Firebase Storage'),
+        const SizedBox(height: 10),
+        _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: AppTheme.accentColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.accentColor.withValues(alpha: 0.3)),
+            ),
+            child: const Row(children: [
+              Icon(Icons.cloud_upload_outlined, color: AppTheme.accentColor, size: 16),
+              SizedBox(width: 8),
+              Expanded(child: Text(
+                'Déplace les photos des annonces existantes (base64 dans la base de données) '
+                'vers Firebase Storage. Chaque photo est copiée PUIS vérifiée avant tout '
+                'nettoyage — en cas d\'échec, l\'annonce reste intacte. Opération à lancer '
+                'UNE SEULE fois (la relancer est sans danger : les annonces déjà migrées '
+                'sont ignorées). Nécessite une bonne connexion (WiFi recommandé).',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                    color: AppTheme.accentColor, height: 1.4),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          if (_migrationLog.isNotEmpty) ...[
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxHeight: 180),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2E),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: SingleChildScrollView(
+                reverse: true,
+                child: Text(
+                  _migrationLog.join('\n'),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 10,
+                      color: Colors.white70, height: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isMigrating ? null : _runPhotoMigration,
+              icon: _isMigrating
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 18),
+              label: Text(
+                _isMigrating ? 'Migration en cours… ne pas fermer l\'app' : 'Lancer la migration des photos',
+                style: const TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isMigrating ? Colors.grey : AppTheme.primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ])),
         const SizedBox(height: 24),
 
         // ── BOUTON SAUVEGARDER ────────────────────────────────────────────────
@@ -749,6 +819,71 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         const SizedBox(height: 40),
       ]),
     );
+  }
+
+  // == MIGRATION PHOTOS -> STORAGE (one-shot QW5) ==
+  bool _isMigrating = false;
+  final List<String> _migrationLog = [];
+
+  Future<void> _runPhotoMigration() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Lancer la migration ?',
+            style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+        content: const Text(
+          'Les photos des annonces existantes seront copiées vers Firebase Storage, '
+          'vérifiées, puis les documents seront allégés.\n\n'
+          '✅ Aucune photo ne peut être perdue : en cas d\'échec sur une annonce, '
+          'elle reste exactement comme avant.\n\n'
+          'Assurez-vous d\'être sur une bonne connexion (WiFi).',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins'))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+            child: const Text('Lancer', style: TextStyle(fontFamily: 'Poppins', color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isMigrating = true;
+      _migrationLog
+        ..clear()
+        ..add('\u{1F680} Démarrage de la migration…');
+    });
+
+    try {
+      final result = await MigrationService().migratePropertiesToStorage(
+        onProgress: (msg, current, total) {
+          if (!mounted) return;
+          setState(() => _migrationLog.add('[$current/$total] $msg'));
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _migrationLog.add('');
+        _migrationLog.add('\u{1F3C1} TERMINÉ — $result');
+        for (final e in result.errors) {
+          _migrationLog.add('⚠️ $e');
+        }
+      });
+      _snackOk('Migration terminée : ${result.migrated} migrée(s), '
+          '${result.alreadyClean} déjà propre(s), ${result.failed} échec(s).');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _migrationLog.add('❌ Erreur globale : $e'));
+      _snackErr('Erreur migration : ${ErrorHelper.friendly(e)}');
+    } finally {
+      if (mounted) setState(() => _isMigrating = false);
+    }
   }
 
   // ── MÉTHODES PROMOTION ─────────────────────────────────────────────────────

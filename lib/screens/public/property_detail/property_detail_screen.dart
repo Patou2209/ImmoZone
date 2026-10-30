@@ -14,6 +14,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
 import '../../../core/utils/web_url_helper.dart';
 import '../annonceur/annonceur_profile_screen.dart';
+import '../../../models/report_model.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
   final PropertyModel property;
@@ -378,6 +379,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
             icon: const Icon(Icons.share_rounded, color: AppTheme.textSecondary),
             onPressed: () => _shareProperty(p),
             tooltip: 'Partager',
+          ),
+          // 🍎 Exigence Apple (UGC) : mécanisme de signalement de contenu
+          IconButton(
+            icon: const Icon(Icons.flag_outlined, color: AppTheme.textSecondary),
+            onPressed: () => _reportProperty(p),
+            tooltip: 'Signaler cette annonce',
           ),
         ],
       ),
@@ -1280,6 +1287,123 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
   /// Native share sheet — partage le lien web de l'annonce avec titre et référence
   Future<void> _shareProperty(PropertyModel p) => ShareHelper.shareProperty(p);
+
+  /// 🍎 Exigence Apple (contenu généré par les utilisateurs) : permettre le
+  /// signalement d'une annonce inappropriée. Le signalement arrive dans la
+  /// collection `reports`, traitée par l'équipe de modération (dashboard admin).
+  Future<void> _reportProperty(PropertyModel p) async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Connectez-vous pour signaler une annonce.',
+            style: TextStyle(fontFamily: 'Poppins')),
+      ));
+      return;
+    }
+
+    const reasons = <String, String>{
+      'arnaque': 'Arnaque / Fraude',
+      'fausse_annonce': 'Fausse annonce',
+      'photo_inappropriee': 'Photo inappropriée',
+      'prix_errone': 'Prix erroné',
+      'doublon': 'Annonce en doublon',
+      'autre': 'Autre motif',
+    };
+    String selected = 'arnaque';
+    final descCtrl = TextEditingController();
+
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Signaler cette annonce',
+              style: TextStyle(
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Pourquoi signalez-vous cette annonce ?',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                const SizedBox(height: 8),
+                ...reasons.entries.map((e) => RadioListTile<String>(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(e.value,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins', fontSize: 13)),
+                      value: e.key,
+                      groupValue: selected,
+                      onChanged: (v) => setD(() => selected = v!),
+                    )),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 2,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Détails (optionnel)',
+                    hintStyle: const TextStyle(
+                        fontFamily: 'Poppins', fontSize: 12),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.all(10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Annuler',
+                  style: TextStyle(fontFamily: 'Poppins')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor),
+              child: const Text('Envoyer le signalement',
+                  style: TextStyle(
+                      fontFamily: 'Poppins', color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (sent != true || !mounted) return;
+
+    try {
+      await _ds.addReport(ReportModel(
+        id: 'report_${p.id}_${DateTime.now().millisecondsSinceEpoch}',
+        propertyId: p.id,
+        propertyTitle: p.title,
+        reporterId: user.id,
+        reporterName: user.name,
+        reason: selected,
+        description:
+            descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+        createdAt: DateTime.now(),
+      ));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Signalement envoyé. Notre équipe de modération va l\'examiner.',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.green,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Échec de l\'envoi. Réessayez.',
+            style: const TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
 
   /// Fullscreen zoom viewer — image centrée, nav prev/next, zoom pinch, compteur
   void _openImageFullscreen(BuildContext context, List<String> images, int initialIndex) {
