@@ -1119,6 +1119,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   /// Double confirmation, puis appel de la Cloud Function authentifiée.
   Future<void> _confirmDeleteAccount() async {
     final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    if (user == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1152,25 +1154,46 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
     if (confirmed != true || !mounted) return;
 
-    // Deuxième confirmation (action irréversible)
-    final confirmed2 = await showDialog<bool>(
+    // Deuxième confirmation : saisie du mot de passe (ré-authentification —
+    // les comptes téléphone+mot de passe n'ont pas de session Firebase Auth).
+    final pwdController = TextEditingController();
+    final password = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Dernière confirmation',
             style: TextStyle(
                 fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 16)),
-        content: const Text(
-          'Appuyez sur « Oui, supprimer » pour effacer définitivement votre compte.',
-          style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Entrez votre mot de passe pour confirmer la suppression définitive de votre compte.',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: pwdController,
+              obscureText: true,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Mot de passe',
+                labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Non', style: TextStyle(fontFamily: 'Poppins')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler', style: TextStyle(fontFamily: 'Poppins')),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(ctx, pwdController.text.trim()),
             child: const Text('Oui, supprimer',
                 style: TextStyle(fontFamily: 'Poppins', color: Colors.red,
                     fontWeight: FontWeight.w700)),
@@ -1178,7 +1201,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         ],
       ),
     );
-    if (confirmed2 != true || !mounted) return;
+    if (password == null || password.isEmpty || !mounted) return;
 
     showDialog(
       context: context,
@@ -1186,7 +1209,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       builder: (_) => const Center(child: CircularProgressIndicator()),
     );
     try {
-      final msg = await _ds.deleteOwnAccount();
+      final msg =
+          await _ds.deleteOwnAccount(userId: user.id, password: password);
       if (!mounted) return;
       Navigator.of(context).pop(); // ferme le loader
       await auth.logout();

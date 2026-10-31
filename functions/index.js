@@ -2093,22 +2093,39 @@ exports.deleteUserAccount = onRequest(
       let isSelf = false;
       if (selfDelete === true) {
         // 🍎 AUTO-SUPPRESSION (exigence Apple 5.1.1(v) / Google Play) :
-        // l'utilisateur supprime SON PROPRE compte. Authentification stricte
-        // par ID token Firebase — le uid du token DOIT être celui du compte.
+        // l'utilisateur supprime SON PROPRE compte. Deux modes d'authentification :
+        //   1) ID token Firebase (Bearer) — utilisateurs avec session Firebase Auth
+        //      (ex. inscrits via OTP dans la même session).
+        //   2) Mot de passe du compte, vérifié contre Firestore — cohérent avec
+        //      le login téléphone+mot de passe de l'app (pas de session Firebase
+        //      Auth pour les utilisateurs normaux).
+        let verified = false;
         const authHeader = req.headers.authorization || '';
         const m = authHeader.match(/^Bearer (.+)$/);
-        if (!m) {
-          return res.status(401).json({ error: 'Authentification requise.' });
-        }
-        try {
-          const decoded = await admin.auth().verifyIdToken(m[1]);
-          if (decoded.uid !== userId) {
-            return res.status(403).json({ error: 'Vous ne pouvez supprimer que votre propre compte.' });
+        if (m) {
+          try {
+            const decoded = await admin.auth().verifyIdToken(m[1]);
+            if (decoded.uid === userId) verified = true;
+          } catch (e) {
+            // Token invalide/expiré → on tentera la vérification par mot de passe
           }
-          isSelf = true;
-        } catch (e) {
-          return res.status(401).json({ error: 'Session invalide. Reconnectez-vous puis réessayez.' });
         }
+        if (!verified) {
+          const { password } = req.body || {};
+          if (!password) {
+            return res.status(401).json({ error: 'Authentification requise.' });
+          }
+          const selfDoc = await db.collection('users').doc(userId).get();
+          if (!selfDoc.exists) {
+            return res.status(404).json({ error: 'Compte introuvable.' });
+          }
+          const stored = selfDoc.data().password;
+          if (!stored || stored !== password) {
+            return res.status(401).json({ error: 'Mot de passe incorrect.' });
+          }
+          verified = true;
+        }
+        isSelf = true;
       } else {
         if (!adminId) {
           return res.status(400).json({ error: 'Paramètres requis: userId, adminId' });

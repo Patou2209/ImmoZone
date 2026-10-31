@@ -317,7 +317,7 @@ class _SplashScreenState extends State<SplashScreen> {
       // navigation — indispensable quand il y aura 10 000+ annonces.
       final propsFuture = propProvider.loadPropertiesProgressive();
       await Future.wait([
-        Future.delayed(const Duration(seconds: 4)), // minimum incompressible
+        Future.delayed(const Duration(seconds: 3)), // minimum incompressible
         Future.any([
           Future.wait([
             auth.checkAuth(),

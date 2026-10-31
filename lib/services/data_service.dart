@@ -738,21 +738,32 @@ class DataService {
   /// Apple 5.1.1(v) : toute app avec création de compte doit permettre sa
   /// suppression). Authentifiée par ID token — la CF vérifie que le uid du
   /// token correspond bien au compte supprimé.
-  Future<String> deleteOwnAccount() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      throw Exception('Session expirée. Reconnectez-vous puis réessayez.');
-    }
-    final token = await user.getIdToken();
+  Future<String> deleteOwnAccount({
+    required String userId,
+    required String password,
+  }) async {
+    // Les utilisateurs normaux n'ont PAS de session Firebase Auth (login
+    // téléphone+mot de passe vérifié dans Firestore). On ré-authentifie donc
+    // par mot de passe, vérifié côté Cloud Function. Si une session Firebase
+    // Auth existe (ex. inscription OTP récente), on joint aussi l'ID token.
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    try {
+      final fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser != null && fbUser.uid == userId) {
+        final token = await fbUser.getIdToken();
+        if (token != null) headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (_) {}
     final resp = await http
         .post(
           Uri.parse(
               'https://us-central1-immozone-d9a68.cloudfunctions.net/deleteUserAccount'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode({'userId': user.uid, 'selfDelete': true}),
+          headers: headers,
+          body: jsonEncode({
+            'userId': userId,
+            'selfDelete': true,
+            'password': password,
+          }),
         )
         .timeout(const Duration(seconds: 45));
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
