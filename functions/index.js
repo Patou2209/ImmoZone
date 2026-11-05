@@ -1609,6 +1609,15 @@ exports.expireProperties = onSchedule(
     } catch (purgeErr) {
       console.error('[expireProperties] Purge 72h exception:', purgeErr);
     }
+
+    // ⚡ FIX audit v3 (défaut 6) : recalcul HORAIRE des stats publiques —
+    // garantit que la fenêtre 72h (historique) ne dérive pas quand aucune
+    // écriture ne déclenche syncPublicStats (nuits calmes).
+    try {
+      await recomputePublicStats();
+    } catch (statsErr) {
+      console.error('[expireProperties] Recompute stats exception:', statsErr);
+    }
   }
 );
 
@@ -2262,11 +2271,24 @@ exports.deleteUserAccount = onRequest(
 //   • le job horaire expireProperties (filet de sécurité / dérive 72h).
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Champs qui influencent les stats publiques — utilisés par le trigger
+// (comparaison before/after) ET par le recompute (.select() → lectures légères,
+// les photos base64/documents lourds ne sont PAS téléchargés).
+const STATS_RELEVANT_KEYS = [
+  'status', 'type', 'transactionType', 'isSold', 'isRented',
+  'expiresAt', 'updatedAt', 'isFeatured', 'boostEnd',
+];
+
 /** Recalcule TOUTES les stats publiques et les écrit dans config/public_stats. */
 async function recomputePublicStats() {
   const now = new Date();
   const nowIso = now.toISOString();
-  const snap = await db.collection('properties').get();
+  // ⚡ FIX audit v3 (défaut 1) : .select() ne rapatrie QUE les champs utiles
+  // (quelques octets/doc au lieu des photos base64) — le coût en lectures
+  // facturées reste 1/doc mais la bande passante et la latence s'effondrent.
+  const snap = await db.collection('properties')
+    .select(...STATS_RELEVANT_KEYS)
+    .get();
 
   const isBoostActive = (d) =>
     d.isFeatured === true && d.boostEnd && d.boostEnd > nowIso;
@@ -2337,23 +2359,42 @@ async function recomputePublicStats() {
   return stats;
 }
 
-// Garde anti-rafale : plusieurs écritures properties en < 10 s → 1 seul recalcul
+// Garde anti-rafale : plusieurs écritures properties en < 5 s → 1 seul recalcul.
+// _statsDirty garantit qu'une écriture arrivée PENDANT un recalcul en déclenche
+// un nouveau (l'ancien `return` sec perdait la dernière écriture).
 let _statsRecomputeTimer = null;
+let _statsDirty = false;
 exports.syncPublicStats = onDocumentWritten(
   { document: 'properties/{propertyId}', region: 'us-central1' },
-  async () => {
-    // Débounce léger : attendre 5 s pour agréger les écritures en rafale
-    // (approbation admin de plusieurs annonces, batch expireProperties…)
-    if (_statsRecomputeTimer) return; // un recalcul est déjà programmé dans cette instance
-    _statsRecomputeTimer = new Promise((resolve) => setTimeout(resolve, 5000));
-    try {
-      await _statsRecomputeTimer;
-      await recomputePublicStats();
-    } catch (err) {
-      console.error('[syncPublicStats] Exception:', err);
-    } finally {
-      _statsRecomputeTimer = null;
+  async (event) => {
+    // ⚡ FIX audit v3 (défaut 1) : IGNORER les écritures sans effet sur les
+    // stats — notamment l'incrément de `views` à CHAQUE visite de fiche, qui
+    // déclenchait un recalcul complet (N lectures) par consultation.
+    const b = event.data && event.data.before && event.data.before.exists
+      ? event.data.before.data() : null;
+    const a = event.data && event.data.after && event.data.after.exists
+      ? event.data.after.data() : null;
+    if (b && a && STATS_RELEVANT_KEYS.every((k) => b[k] === a[k])) {
+      return; // ex. views+1, lastLogin… → aucun impact stats
     }
+
+    _statsDirty = true;
+    if (_statsRecomputeTimer) return; // un recalcul est déjà programmé
+    _statsRecomputeTimer = (async () => {
+      try {
+        // Débounce : agréger les écritures en rafale (batch admin, purge…)
+        while (_statsDirty) {
+          _statsDirty = false;
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          await recomputePublicStats();
+        }
+      } catch (err) {
+        console.error('[syncPublicStats] Exception:', err);
+      } finally {
+        _statsRecomputeTimer = null;
+      }
+    })();
+    await _statsRecomputeTimer;
   }
 );
 
@@ -2364,6 +2405,7 @@ exports.syncPublicStats = onDocumentWritten(
 // users/{uid} → le mot de passe et les données privées (téléphone, email,
 // crédits, fcmToken…) ne transitent plus jamais vers les autres utilisateurs.
 // ═══════════════════════════════════════════════════════════════════════════════
+const PROFILE_MIRROR_KEYS = ['name', 'avatar', 'createdAt', 'category', 'description'];
 exports.syncPublicProfile = onDocumentWritten(
   { document: 'users/{userId}', region: 'us-central1' },
   async (event) => {
@@ -2376,6 +2418,15 @@ exports.syncPublicProfile = onDocumentWritten(
         return;
       }
       const d = after.data();
+      // ⚡ FIX audit v3 (défaut 5) : ignorer les écritures qui ne touchent
+      // AUCUN champ miroir — ex. lastLogin à chaque connexion, fcmToken,
+      // crédits… L'ancien code réécrivait le profil (avatar base64 compris)
+      // à chaque login.
+      const before = event.data.before && event.data.before.exists
+        ? event.data.before.data() : null;
+      if (before && PROFILE_MIRROR_KEYS.every((k) => before[k] === d[k])) {
+        return;
+      }
       // Ne JAMAIS copier : password, phone, email, credits, fcmToken, role…
       const profile = {
         name: d.name || '',
@@ -2404,6 +2455,19 @@ exports.backfillPublicData = onRequest(
       return res.status(403).json({ error: 'Clé invalide' });
     }
     try {
+      // ⚡ FIX audit v3 (défaut 2) : fonction ONE-SHOT — après un premier
+      // succès, toute ré-exécution est refusée (flag config/backfill_done).
+      // ?force=immozone-rerun permet une relance volontaire exceptionnelle.
+      const lockRef = db.collection('config').doc('backfill_done');
+      const lock = await lockRef.get();
+      if (lock.exists && req.query.force !== 'immozone-rerun') {
+        return res.status(403).json({
+          error: 'Backfill déjà exécuté le ' + (lock.data().at || '?') +
+                 '. Fonction verrouillée (one-shot).',
+        });
+      }
+
+      // ── 1. Miroirs public_profiles ─────────────────────────────────────
       const usersSnap = await db.collection('users').get();
       let written = 0;
       // Batches de 400 (limite Firestore 500 opérations)
@@ -2424,10 +2488,35 @@ exports.backfillPublicData = onRequest(
         if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
       }
       if (ops > 0) await batch.commit();
+
+      // ── 2. Rattrapage audit C3 : thumbnail manquante ───────────────────
+      // Les annonces publiées entre la 1.5.6 et la 1.6.0 n'ont jamais eu de
+      // thumbnail écrite (sérialiseur incomplet). Réparation : thumbnail =
+      // première image (URLs Storage depuis la migration photos).
+      let thumbsFixed = 0;
+      const propsSnap = await db.collection('properties').get();
+      let tBatch = db.batch();
+      let tOps = 0;
+      propsSnap.forEach((doc) => {
+        const d = doc.data();
+        const hasThumb = typeof d.thumbnail === 'string' && d.thumbnail.length > 0;
+        const images = Array.isArray(d.images) ? d.images : [];
+        if (!hasThumb && images.length > 0 && typeof images[0] === 'string') {
+          tBatch.update(doc.ref, { thumbnail: images[0] });
+          thumbsFixed++;
+          tOps++;
+          if (tOps >= 400) { tBatch.commit(); tBatch = db.batch(); tOps = 0; }
+        }
+      });
+      if (tOps > 0) await tBatch.commit();
+
+      // ── 3. Stats initiales + pose du verrou ────────────────────────────
       const stats = await recomputePublicStats();
+      await lockRef.set({ at: new Date().toISOString(), profilesWritten: written, thumbsFixed });
       return res.json({
         success: true,
         profilesWritten: written,
+        thumbnailsFixed: thumbsFixed,
         statsTotalActif: stats.totalActif,
       });
     } catch (err) {

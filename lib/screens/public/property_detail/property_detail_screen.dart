@@ -171,14 +171,17 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     }
   }
 
-  // ── Charge l'avatar de l'annonceur depuis Firestore ──────────────────────
+  // ── Charge l'avatar de l'annonceur ────────────────────────────────────────
+  // ⚡ FIX audit v3 : via getPublicProfile (même lecture partagée/cachée que
+  // _loadOwnerSince) — plus AUCUNE lecture du document users/ complet.
   Future<void> _loadOwnerAvatar() async {
     final ownerId = widget.property.ownerId;
     if (ownerId.isEmpty) return;
     try {
-      final user = await _ds.getUserById(ownerId);
-      if (mounted && user?.avatar != null && user!.avatar!.isNotEmpty) {
-        setState(() => _ownerAvatar = user.avatar);
+      final profile = await _ds.getPublicProfile(ownerId);
+      final avatar = profile?['avatar'] as String?;
+      if (mounted && avatar != null && avatar.isNotEmpty) {
+        setState(() => _ownerAvatar = avatar);
       }
     } catch (_) {}
   }

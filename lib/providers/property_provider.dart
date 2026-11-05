@@ -106,18 +106,26 @@ class PropertyProvider extends ChangeNotifier {
   }
 
   Future<void> _loadFullInBackground() async {
-    // ⚠️ FIX premier démarrage : juste après l'installation, la toute
-    // première requête Firestore peut échouer ou revenir vide (token App
-    // Check / réseau pas encore prêts). Avant, on concluait « aucune
-    // annonce » définitivement → écran vide jusqu'au refresh manuel.
-    // Désormais : jusqu'à 3 tentatives (backoff 2s/4s) avant de conclure,
-    // et le spinner reste affiché (isLoading=true) pendant les retries.
+    // ⚡ PAGINATION SERVEUR (Lot C anticipé) : phase 2 = PREMIÈRE PAGE
+    // (60 docs max, triés createdAt DESC) au lieu de toute la collection.
+    // Les pages suivantes arrivent à la demande via loadMoreProperties()
+    // (bouton « Voir plus » de l'accueil).
+    // ⚠️ FIX premier démarrage conservé : jusqu'à 3 tentatives (backoff)
+    // avant de conclure « aucune annonce » ; dernière tentative = fallback
+    // fetch complet (couvre aussi d'éventuels docs legacy sans createdAt,
+    // exclus d'un orderBy).
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final all = await _dataService.getActiveProperties(
-            forceRefresh: attempt > 0);
-        if (all.isNotEmpty) {
-          _properties = all;
+        List<PropertyModel> visible;
+        if (attempt < 2) {
+          final page = await _dataService.fetchPropertiesPage(reset: true);
+          visible = _dataService.filterPublicVisible(page);
+        } else {
+          // Fallback final : ancien chemin (collection complète)
+          visible = await _dataService.getActiveProperties(forceRefresh: true);
+        }
+        if (visible.isNotEmpty) {
+          _properties = await _dataService.enrichWithAvatars(visible);
           _applyFilters();
           _isLoading = false;
           notifyListeners();
@@ -135,23 +143,59 @@ class PropertyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── PAGINATION « Voir plus » ────────────────────────────────────
+  bool _loadingMore = false;
+  bool get isLoadingMore => _loadingMore;
+
+  /// True s'il reste des annonces à charger côté serveur.
+  bool get hasMoreFromServer => _dataService.hasMoreProperties;
+
+  /// Charge la page suivante et la FUSIONNE (dédup par id) dans la liste.
+  Future<void> loadMoreProperties() async {
+    if (_loadingMore || !_dataService.hasMoreProperties) return;
+    _loadingMore = true;
+    notifyListeners();
+    try {
+      final page = await _dataService.fetchPropertiesPage();
+      if (page.isNotEmpty) {
+        final visible = _dataService.filterPublicVisible(page);
+        final enriched = await _dataService.enrichWithAvatars(visible);
+        final ids = _properties.map((p) => p.id).toSet();
+        _properties = [
+          ..._properties,
+          ...enriched.where((p) => !ids.contains(p.id)),
+        ];
+        _applyFilters();
+      }
+    } catch (_) {}
+    _loadingMore = false;
+    notifyListeners();
+  }
+
   Future<void> loadProperties({bool forceRefresh = false}) async {
-    _isLoading = true;
     _historiqueMode = false;
+    // ⚡ PAGINATION : si le flux progressif (splash) a déjà rempli la liste
+    // et qu'on ne force pas, NE RIEN re-télécharger — 0 lecture Firestore.
+    if (!forceRefresh && _properties.isNotEmpty) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+    _isLoading = true;
     // Pas de notifyListeners() ici — on n'annonce PAS le début du chargement
     // pour éviter un premier rendu "vide" qui cause le tremblement visuel.
-    // On notifie UNE SEULE FOIS quand les données sont prêtes.
-    // PERF : grâce au cache dédupliqué de DataService, si le splash a déjà
-    // lancé le fetch, cet appel se résout instantanément (même requête).
     try {
-      var list =
-          await _dataService.getActiveProperties(forceRefresh: forceRefresh);
+      // Première page serveur (60 docs max) au lieu de toute la collection
+      var page = await _dataService.fetchPropertiesPage(reset: true);
+      var list = _dataService.filterPublicVisible(page);
       // ⚠️ FIX premier démarrage : résultat vide = possible échec réseau
-      // transitoire (token App Check pas prêt juste après l'installation).
-      // Une retenue forcée avant de conclure « aucune annonce ».
+      // transitoire → une relance, puis fallback fetch complet (couvre
+      // aussi les docs legacy sans createdAt, exclus d'un orderBy).
       if (list.isEmpty) {
         await Future.delayed(const Duration(seconds: 2));
         list = await _dataService.getActiveProperties(forceRefresh: true);
+      } else {
+        list = await _dataService.enrichWithAvatars(list);
       }
       // Ne JAMAIS écraser du contenu déjà affiché (phase 1 du progressif)
       // par une liste vide issue d'un échec.

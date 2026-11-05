@@ -1263,7 +1263,10 @@ class _HomeTabState extends State<_HomeTab>
     final effectiveDisplay = _displayCount < minDisplay ? minDisplay : _displayCount;
 
     final displayed = filtered.take(effectiveDisplay).toList();
-    final hasMore = filtered.length > effectiveDisplay;
+    // ⚡ PAGINATION SERVEUR : le bouton « Voir plus » apparaît aussi quand la
+    // liste locale est épuisée mais qu'il reste des pages côté Firestore.
+    final hasMore = filtered.length > effectiveDisplay ||
+        provider.hasMoreFromServer;
 
     // Annonces boostées filtrées selon le contexte courant
     final boosted = provider.getBoostedProperties(
@@ -2704,21 +2707,39 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   // ── VOIR PLUS ─────────────────────────────────────────────────────────────
+  // ⚡ PAGINATION SERVEUR : affiche d'abord les annonces déjà en mémoire ;
+  // quand la réserve locale est presque épuisée, charge la page Firestore
+  // suivante en parallèle (fusion dédupliquée dans le provider).
   Widget _buildVoirPlus(int total, int currentDisplay) {
+    final provider = context.read<PropertyProvider>();
+    final loadingMore = context.watch<PropertyProvider>().isLoadingMore;
     final remaining = total - currentDisplay;
+    final label = remaining > 0
+        ? 'Voir plus ($remaining annonce${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}${provider.hasMoreFromServer ? '+' : ''})'
+        : 'Voir plus d\'annonces';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: OutlinedButton(
-        onPressed: () => setState(() => _displayCount = currentDisplay + 8),
+        onPressed: loadingMore ? null : () {
+          setState(() => _displayCount = currentDisplay + 8);
+          // Réserve locale bientôt épuisée → précharger la page suivante
+          if (total - (currentDisplay + 8) < 8 && provider.hasMoreFromServer) {
+            provider.loadMoreProperties();
+          }
+        },
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(double.infinity, 46),
           side: const BorderSide(color: AppTheme.accentColor, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.expand_more_rounded, color: AppTheme.accentColor, size: 20),
+          if (loadingMore)
+            const SizedBox(width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentColor))
+          else
+            const Icon(Icons.expand_more_rounded, color: AppTheme.accentColor, size: 20),
           const SizedBox(width: 8),
-          Text('Voir plus ($remaining annonce${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''})',
+          Text(loadingMore ? 'Chargement…' : label,
               style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
                   fontSize: 13, color: AppTheme.accentColor)),
         ]),

@@ -936,6 +936,61 @@ class DataService {
     }
   }
 
+  // ─── PAGINATION SERVEUR (Lot C anticipé) ───────────────────────────────────
+  // Le flux public principal ne télécharge plus TOUTE la collection :
+  // pages de [propertiesPageSize] docs triées createdAt DESC, curseur
+  // startAfterDocument. Les chemins admin/historique gardent le fetch complet.
+  static const int propertiesPageSize = 60;
+  DocumentSnapshot? _pageCursor;
+  bool _hasMorePages = true;
+
+  /// True s'il reste potentiellement des annonces à charger côté serveur.
+  bool get hasMoreProperties => _hasMorePages;
+
+  /// Charge la page suivante (ou la première si [reset]) d'annonces brutes,
+  /// triées createdAt DESC. Retourne [] en fin de collection ou sur erreur.
+  Future<List<PropertyModel>> fetchPropertiesPage({bool reset = false}) async {
+    if (reset) {
+      _pageCursor = null;
+      _hasMorePages = true;
+    }
+    if (!_hasMorePages) return [];
+    try {
+      await _ensureFreshToken();
+      Query q = _propertiesCol
+          .orderBy('createdAt', descending: true)
+          .limit(propertiesPageSize);
+      if (_pageCursor != null) q = q.startAfterDocument(_pageCursor!);
+      final snap = await q.get();
+      if (snap.docs.isNotEmpty) _pageCursor = snap.docs.last;
+      _hasMorePages = snap.docs.length >= propertiesPageSize;
+      return snap.docs
+          .map((d) => PropertyModel.fromMap(d.data() as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.fetchPropertiesPage] Erreur: $e');
+      // Ne pas fermer la pagination sur une erreur transitoire : le prochain
+      // appel retentera la même page (curseur inchangé).
+      return [];
+    }
+  }
+
+  /// Filtre de visibilité PUBLIQUE (même logique que getActiveProperties) :
+  /// actives non expirées (boostées d'abord) + vendues/occupées < 72 h.
+  List<PropertyModel> filterPublicVisible(List<PropertyModel> all) {
+    final now = DateTime.now();
+    final boosted = all.where((p) =>
+        p.status == 'Actif' && !p.isExpired && p.isBoostActive && !p.isSold && !p.isRented).toList();
+    final normal = all.where((p) =>
+        p.status == 'Actif' && !p.isExpired && !p.isBoostActive && !p.isSold && !p.isRented).toList();
+    final soldOccupied = all.where((p) {
+      if (!(p.isSold || p.isRented)) return false;
+      if (p.updatedAt == null) return false;
+      return now.difference(p.updatedAt!).inHours < AppConstants.soldAutoDeleteHours;
+    }).toList();
+    return [...boosted, ...normal, ...soldOccupied];
+  }
+
   /// ── DÉMARRAGE PROGRESSIF ──────────────────────────────────────────────────
   /// Charge UNIQUEMENT la catégorie par défaut de l'accueil (Maison / Villa)
   /// pour afficher l'écran en quelques centaines de ms, même avec 10 000+
@@ -1287,32 +1342,22 @@ class DataService {
   }
 
   /// Incrémente atomiquement le compteur de vues d'une annonce.
-  /// Retourne le nouveau total de vues, ou null en cas d'échec.
-  Future<int?> incrementPropertyViews(String propertyId) async {
+  /// ⚡ FIX audit v3 : AUCUNE relecture du document — FieldValue.increment
+  /// suffit, l'écran affiche déjà la valeur optimiste (+1). 0 lecture.
+  Future<void> incrementPropertyViews(String propertyId) async {
     try {
-      // update() atomique — crée le champ s'il n'existe pas encore
+      // update() atomique — échoue si le doc n'existe pas
       await _propertiesCol.doc(propertyId).update({
         'views': FieldValue.increment(1),
       });
-      // Relire la valeur réelle après incrément
-      final snap = await _propertiesCol.doc(propertyId).get();
-      if (snap.exists) {
-        final data = snap.data() as Map<String, dynamic>?;
-        return (data?['views'] as num?)?.toInt();
-      }
-      return null;
     } catch (e) {
       if (kDebugMode) debugPrint('[Views] increment failed for $propertyId: $e');
-      // Tentative de création du champ via set merge si update a échoué
+      // set merge en secours (crée le champ si update a échoué)
       try {
-        final snap = await _propertiesCol.doc(propertyId).get();
-        if (snap.exists) {
-          final current = ((snap.data() as Map<String, dynamic>?)?['views'] as num?)?.toInt() ?? 0;
-          await _propertiesCol.doc(propertyId).set({'views': current + 1}, SetOptions(merge: true));
-          return current + 1;
-        }
+        await _propertiesCol
+            .doc(propertyId)
+            .set({'views': FieldValue.increment(1)}, SetOptions(merge: true));
       } catch (_) {}
-      return null;
     }
   }
 
@@ -1747,23 +1792,40 @@ class DataService {
     }
   }
 
+  /// Exécute une requête messages triée createdAt DESC (les N PLUS RÉCENTS).
+  /// ⚠️ FIX audit v3 : limit() sans orderBy renvoyait les plus ANCIENS
+  /// (IDs msg_<ms> → ordre naturel croissant) — au-delà de la limite, les
+  /// messages RÉCENTS disparaissaient. Fallback sans orderBy si l'index
+  /// composite n'est pas encore déployé (transition).
+  Future<QuerySnapshot> _msgQuery(Query base, int limit) async {
+    try {
+      return await base
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+    } catch (_) {
+      // Index composite absent → ancien comportement (mieux que rien)
+      return base.limit(limit).get();
+    }
+  }
+
   Future<List<MessageModel>> getConversation(String u1, String u2) async {
     try {
       // ⚡ FIX audit C4 : requêtes ciblées au lieu de lire TOUTE la collection
       // messages de la plateforme (confidentialité + coût O(total messages)).
-      // 2 requêtes where mono-champ (aucun index composite requis), fusion et
-      // tri côté client sur un volume borné.
+      // Tri serveur createdAt DESC → on garde les 300 plus RÉCENTS de chaque
+      // sens, puis tri chronologique croissant pour l'affichage.
       final snaps = await Future.wait([
-        _messagesCol
-            .where('senderId', isEqualTo: u1)
-            .where('receiverId', isEqualTo: u2)
-            .limit(300)
-            .get(),
-        _messagesCol
-            .where('senderId', isEqualTo: u2)
-            .where('receiverId', isEqualTo: u1)
-            .limit(300)
-            .get(),
+        _msgQuery(
+            _messagesCol
+                .where('senderId', isEqualTo: u1)
+                .where('receiverId', isEqualTo: u2),
+            300),
+        _msgQuery(
+            _messagesCol
+                .where('senderId', isEqualTo: u2)
+                .where('receiverId', isEqualTo: u1),
+            300),
       ]);
       final all = <MessageModel>[
         for (final s in snaps)
@@ -2504,12 +2566,12 @@ class DataService {
 
   Future<List<MessageModel>> getUserMessages(String userId) async {
     try {
-      // ⚡ FIX audit C4 : requêtes ciblées (envoyés + reçus) au lieu de lire
-      // TOUTE la collection messages. 2 where mono-champ, aucun index
-      // composite requis, fusion + dédoublonnage + tri côté client.
+      // ⚡ FIX audit C4 + v3 : requêtes ciblées (envoyés + reçus) TRIÉES
+      // createdAt DESC → on conserve les 500 plus RÉCENTS de chaque sens
+      // (l'ancien limit sans orderBy perdait les récents au-delà de 500).
       final snaps = await Future.wait([
-        _messagesCol.where('senderId', isEqualTo: userId).limit(500).get(),
-        _messagesCol.where('receiverId', isEqualTo: userId).limit(500).get(),
+        _msgQuery(_messagesCol.where('senderId', isEqualTo: userId), 500),
+        _msgQuery(_messagesCol.where('receiverId', isEqualTo: userId), 500),
       ]);
       final seen = <String>{};
       final filtered = <MessageModel>[];
