@@ -831,6 +831,12 @@ class DataService {
     'hasCuisineEquipee': p.hasCuisineEquipee,
     'longueurM': p.longueurM,
     'largeurM': p.largeurM,
+    // 🐛 FIX audit C3 : ces clés étaient calculées par les écrans mais jamais
+    // persistées par le sérialiseur → QW4 (miniature) sans effet sur les
+    // annonces créées/modifiées, et pricePeriod 'journalier' perdu (bug prix).
+    'thumbnail': p.thumbnail,
+    'pricePeriod': p.pricePeriod,
+    'establishmentName': p.establishmentName,
   };
 
   // ── CACHE PROPERTIES (déduplication + TTL court) ─────────────────────
@@ -1703,14 +1709,29 @@ class DataService {
 
   Future<List<MessageModel>> getConversation(String u1, String u2) async {
     try {
-      final snap = await _messagesCol.get();
-      final all = snap.docs
-          .map((d) => MessageModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList();
-      return all.where((m) =>
-          (m.senderId == u1 && m.receiverId == u2) ||
-          (m.senderId == u2 && m.receiverId == u1)).toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      // ⚡ FIX audit C4 : requêtes ciblées au lieu de lire TOUTE la collection
+      // messages de la plateforme (confidentialité + coût O(total messages)).
+      // 2 requêtes where mono-champ (aucun index composite requis), fusion et
+      // tri côté client sur un volume borné.
+      final snaps = await Future.wait([
+        _messagesCol
+            .where('senderId', isEqualTo: u1)
+            .where('receiverId', isEqualTo: u2)
+            .limit(300)
+            .get(),
+        _messagesCol
+            .where('senderId', isEqualTo: u2)
+            .where('receiverId', isEqualTo: u1)
+            .limit(300)
+            .get(),
+      ]);
+      final all = <MessageModel>[
+        for (final s in snaps)
+          ...s.docs.map(
+              (d) => MessageModel.fromMap(d.data() as Map<String, dynamic>)),
+      ];
+      all.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      return all;
     } catch (_) {
       return [];
     }
@@ -2422,12 +2443,21 @@ class DataService {
 
   Future<List<MessageModel>> getUserMessages(String userId) async {
     try {
-      final snap = await _messagesCol.get();
-      final all = snap.docs
-          .map((d) => MessageModel.fromMap(d.data() as Map<String, dynamic>))
-          .toList();
-      final filtered = all.where((m) =>
-          m.senderId == userId || m.receiverId == userId).toList();
+      // ⚡ FIX audit C4 : requêtes ciblées (envoyés + reçus) au lieu de lire
+      // TOUTE la collection messages. 2 where mono-champ, aucun index
+      // composite requis, fusion + dédoublonnage + tri côté client.
+      final snaps = await Future.wait([
+        _messagesCol.where('senderId', isEqualTo: userId).limit(500).get(),
+        _messagesCol.where('receiverId', isEqualTo: userId).limit(500).get(),
+      ]);
+      final seen = <String>{};
+      final filtered = <MessageModel>[];
+      for (final s in snaps) {
+        for (final d in s.docs) {
+          final m = MessageModel.fromMap(d.data() as Map<String, dynamic>);
+          if (seen.add(m.id)) filtered.add(m);
+        }
+      }
       filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return filtered;
     } catch (_) {

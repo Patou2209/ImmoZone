@@ -1017,7 +1017,7 @@ class _HomeTabState extends State<_HomeTab>
   }
 
   // Conservé pour le pull-to-refresh — force un vrai re-fetch Firestore
-  Future<void> _loadData() => _loadAll(force: true);
+
   Future<void> _loadStats() async {
     final s = await _ds.getPublicStats();
     if (mounted) setState(() { _stats = s; _statsLoading = false; });
@@ -1039,6 +1039,15 @@ class _HomeTabState extends State<_HomeTab>
 
   Future<void> _toggleFavorite(String id) async {
     await _ds.toggleFavorite(id);
+    final f = await _ds.getFavorites();
+    if (mounted) setState(() => _favorites = f);
+  }
+
+  /// ⚡ FIX audit C1 : au retour d'une fiche annonce, on ne re-télécharge PLUS
+  /// toute la collection (ancien _loadData → _loadAll(force:true) = N lectures
+  /// Firestore par fiche consultée). On relit uniquement les favoris (stockage
+  /// local, gratuit) — le cache TTL de 45 s couvre le reste.
+  Future<void> _refreshAfterDetail() async {
     final f = await _ds.getFavorites();
     if (mounted) setState(() => _favorites = f);
   }
@@ -2521,7 +2530,7 @@ class _HomeTabState extends State<_HomeTab>
                 onTap: () async {
                   await Navigator.push(context,
                     MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-                  if (mounted) _loadData();
+                  if (mounted) _refreshAfterDetail();
                 },
               );
             },
@@ -2602,7 +2611,7 @@ class _HomeTabState extends State<_HomeTab>
                 onTap: () async {
                   await Navigator.push(gridCtx,
                       MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-                  if (mounted) _loadData();
+                  if (mounted) _refreshAfterDetail();
                 },
               );
             },

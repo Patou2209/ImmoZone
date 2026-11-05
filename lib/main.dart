@@ -304,26 +304,21 @@ class _SplashScreenState extends State<SplashScreen> {
       // phase 2 = toutes les annonces en arrière-plan.
       propProvider.loadPropertiesProgressive().ignore();
     } else {
-      // ── MOBILE : on affiche notre propre splash Flutter (logo + slogan).
-      // Durée GARANTIE de 4 s pour laisser le temps de lire le slogan
-      // (Future.wait = on attend le timer ET le travail), avec plafond 10 s
-      // si le réseau est lent (Future.any = on n'attend pas indéfiniment).
-      // ⚠️ loadPropertiesProgressive() est lancé AVANT l'attente ci-dessous →
-      // le chargement de la catégorie prioritaire (Maison / Villa) se fait
-      // PENDANT les 4 s du splash.
-      // PERF : chargement PROGRESSIF pendant le splash — phase 1 (catégorie
-      // par défaut Maison / Villa, requête légère) donne un accueil immediat ;
-      // phase 2 (collection complète) continue en arrière-plan APRÈS la
-      // navigation — indispensable quand il y aura 10 000+ annonces.
-      final propsFuture = propProvider.loadPropertiesProgressive();
+      // ── MOBILE : splash Flutter (logo + slogan).
+      // ⚡ FIX audit C2 : on ne bloque PLUS la navigation sur le chargement
+      // des annonces (elles arrivent en arrière-plan, l'accueil affiche son
+      // squelette en attendant). On attend UNIQUEMENT :
+      //   1. l'auth (indispensable AVANT de naviguer — sinon la session est
+      //      perdue sur connexion lente, cf. incident Windows/desktop),
+      //      plafonnée à 8 s ;
+      //   2. un minimum de 800 ms pour l'affichage du logo (anti-flash).
+      // Résultat : splash ~0,8-1,5 s au lieu de 3-10 s.
+      propProvider.loadPropertiesProgressive().ignore(); // arrière-plan
       await Future.wait([
-        Future.delayed(const Duration(seconds: 3)), // minimum incompressible
+        Future.delayed(const Duration(milliseconds: 800)), // anti-flash logo
         Future.any([
-          Future.wait([
-            auth.checkAuth(),
-            propsFuture, // terminé dès que possible, plafonné ci-dessous
-          ]),
-          Future.delayed(const Duration(seconds: 10)), // plafond réseau lent
+          auth.checkAuth(), // DOIT finir avant navigation (session)
+          Future.delayed(const Duration(seconds: 8)), // plafond réseau lent
         ]),
       ]);
     }
