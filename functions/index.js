@@ -1,5 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 const https = require('https');
 
@@ -1404,10 +1405,40 @@ exports.expireProperties = onSchedule(
     const nowIso = now.toISOString();
 
     try {
+      // ⚡ LOT B (F11) : au lieu de scanner TOUTES les annonces actives à
+      // chaque heure (24×N lectures/jour), on ne lit QUE :
+      //   1. les actives dont expiresAt est DÉPASSÉ (composite index
+      //      status+expiresAt — voir firestore.indexes.json) ;
+      //   2. les actives avec expiresAt=null (donnée legacy à réparer).
+      // Fallback : si l'index composite n'est pas encore déployé, on retombe
+      // sur l'ancien scan complet (aucune régression fonctionnelle).
       // Les dates sont stockées en chaînes ISO-8601 → comparaison lexicale valide
-      const snap = await db.collection('properties')
-        .where('status', '==', 'Actif')
-        .get();
+      let snap;
+      try {
+        const [expiredSnap, legacySnap] = await Promise.all([
+          db.collection('properties')
+            .where('status', '==', 'Actif')
+            .where('expiresAt', '<=', nowIso)
+            .get(),
+          db.collection('properties')
+            .where('status', '==', 'Actif')
+            .where('expiresAt', '==', null)
+            .get(),
+        ]);
+        // Fusion dédupliquée dans un pseudo-snapshot (interface forEach/size)
+        const docsMap = new Map();
+        expiredSnap.forEach((d) => docsMap.set(d.id, d));
+        legacySnap.forEach((d) => docsMap.set(d.id, d));
+        snap = {
+          size: docsMap.size,
+          forEach: (cb) => docsMap.forEach((d) => cb(d)),
+        };
+      } catch (idxErr) {
+        console.warn('[expireProperties] Index composite indisponible, fallback scan complet:', idxErr.message);
+        snap = await db.collection('properties')
+          .where('status', '==', 'Actif')
+          .get();
+      }
 
       let expiredCount = 0;
       const batch = db.batch();
@@ -1716,6 +1747,10 @@ exports.propertyPreview = onRequest(async (req, res) => {
 
     res.set('Cache-Control', 'public, max-age=300'); // 5 min cache
     res.set('Content-Type', 'text/html; charset=utf-8');
+    // ⚡ LOT B (F11) : cache CDN 10 min (+ stale 1 h) — les partages WhatsApp/
+    // Facebook d'une même annonce ne déclenchent plus 1 lecture Firestore +
+    // 1 exécution CF par visite : le CDN Firebase Hosting sert la copie.
+    res.set('Cache-Control', 'public, max-age=600, s-maxage=600, stale-while-revalidate=3600');
     res.status(200).send(html);
 
   } catch (err) {
@@ -2214,6 +2249,190 @@ exports.deleteUserAccount = onRequest(
     } catch (err) {
       console.error('deleteUserAccount error:', err);
       return res.status(500).json({ error: 'Erreur interne lors de la suppression du compte' });
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ⚡ LOT B (F7) — STATS PUBLIQUES AGRÉGÉES : config/public_stats
+// Un SEUL document maintenu côté serveur, lu en 1 lecture par chaque client,
+// au lieu de télécharger toute la collection properties à chaque ouverture
+// de l'accueil. Recalcul déclenché par :
+//   • trigger onDocumentWritten sur properties/** (temps réel) ;
+//   • le job horaire expireProperties (filet de sécurité / dérive 72h).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Recalcule TOUTES les stats publiques et les écrit dans config/public_stats. */
+async function recomputePublicStats() {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const snap = await db.collection('properties').get();
+
+  const isBoostActive = (d) =>
+    d.isFeatured === true && d.boostEnd && d.boostEnd > nowIso;
+  const isExpired = (d) => d.expiresAt && d.expiresAt < nowIso;
+  const hoursSince = (iso) => (now.getTime() - new Date(iso).getTime()) / 3600000;
+
+  // Disponibilités : annonces actives, non expirées, non vendues/occupées
+  // (miroir EXACT de la logique client getActiveProperties + getPublicStats)
+  const props = [];
+  const recentes = [];
+  snap.forEach((doc) => {
+    const d = doc.data();
+    const sold = d.isSold === true;
+    const rented = d.isRented === true;
+    if (d.status === 'Actif' && !isExpired(d) && !sold && !rented) {
+      props.push(d);
+    }
+    if ((sold || rented) && d.updatedAt && hoursSince(d.updatedAt) < 72) {
+      recentes.push(d);
+    }
+  });
+
+  const t = (d) => d.type || '';
+  const tt = (d) => d.transactionType || '';
+  const low = (d) => t(d).toLowerCase();
+  const count = (list, fn) => list.filter(fn).length;
+
+  const stats = {
+    // ── Disponibilités ──────────────────────────────────────────────────────
+    maisonVente:      count(props, (d) => t(d) === 'Maison / Villa' && tt(d) === 'Vente'),
+    maisonLocation:   count(props, (d) => t(d) === 'Maison / Villa' && tt(d) === 'Location'),
+    appartVente:      count(props, (d) => t(d).includes('Appartement') && tt(d) === 'Vente'),
+    appartLocation:   count(props, (d) => t(d).includes('Appartement') && tt(d) === 'Location'),
+    bureauLocation:   count(props, (d) => t(d) === 'Bureau' && tt(d) === 'Location'),
+    bureauVente:      count(props, (d) => t(d) === 'Bureau' && tt(d) === 'Vente'),
+    propCommerciale:  count(props, (d) => low(d).includes('commerciale')),
+    propIndustrielle: count(props, (d) => low(d).includes('industrielle')),
+    terrainDispo:     count(props, (d) => t(d).includes('Terrain')),
+    concessionDispo:  count(props, (d) => t(d) === 'Concession'),
+    chambreHotel:     count(props, (d) => t(d).includes('hôtel') || t(d).includes('hotel')),
+    salleFetes:       count(props, (d) => low(d).includes('salle de f')),
+    sallePolyvalente: count(props, (d) => t(d) === 'Salle polyvalente'),
+    espaceFuneraire:  count(props, (d) => t(d).includes('Funér') || t(d).includes('Funer')),
+    totalActif:       props.length,
+
+    // ── Historique 72h (vendues/occupées) ───────────────────────────────────
+    hist72_maisonVendue:     count(recentes, (d) => t(d) === 'Maison / Villa' && d.isSold === true),
+    hist72_maisonOccupee:    count(recentes, (d) => t(d) === 'Maison / Villa' && d.isRented === true),
+    hist72_appartVendu:      count(recentes, (d) => t(d).includes('Appartement') && d.isSold === true),
+    hist72_appartOccupe:     count(recentes, (d) => t(d).includes('Appartement') && d.isRented === true),
+    hist72_bureauVendu:      count(recentes, (d) => t(d) === 'Bureau' && d.isSold === true),
+    hist72_bureauOccupe:     count(recentes, (d) => t(d) === 'Bureau' && d.isRented === true),
+    hist72_propCommerciale:  count(recentes, (d) => low(d).includes('commerciale')),
+    hist72_propIndustrielle: count(recentes, (d) => low(d).includes('industrielle')),
+    hist72_terrainVendu:     count(recentes, (d) => t(d).includes('Terrain')),
+    hist72_concessionVendue: count(recentes, (d) => t(d) === 'Concession'),
+    hist72_chambreHotel:     count(recentes, (d) => t(d).includes('hôtel') || t(d).includes('hotel')),
+    hist72_salleFetes:       count(recentes, (d) => low(d).includes('salle de f')),
+    hist72_sallePolyvalente: count(recentes, (d) => t(d) === 'Salle polyvalente'),
+    hist72_espaceFuneraire:  count(recentes, (d) => t(d).includes('Funér') || t(d).includes('Funer')),
+    hist72_total:            recentes.length,
+
+    updatedAt: nowIso,
+  };
+
+  await db.collection('config').doc('public_stats').set(stats);
+  console.log(`[publicStats] ✅ Recalcul — totalActif=${stats.totalActif}, hist72=${stats.hist72_total}`);
+  return stats;
+}
+
+// Garde anti-rafale : plusieurs écritures properties en < 10 s → 1 seul recalcul
+let _statsRecomputeTimer = null;
+exports.syncPublicStats = onDocumentWritten(
+  { document: 'properties/{propertyId}', region: 'us-central1' },
+  async () => {
+    // Débounce léger : attendre 5 s pour agréger les écritures en rafale
+    // (approbation admin de plusieurs annonces, batch expireProperties…)
+    if (_statsRecomputeTimer) return; // un recalcul est déjà programmé dans cette instance
+    _statsRecomputeTimer = new Promise((resolve) => setTimeout(resolve, 5000));
+    try {
+      await _statsRecomputeTimer;
+      await recomputePublicStats();
+    } catch (err) {
+      console.error('[syncPublicStats] Exception:', err);
+    } finally {
+      _statsRecomputeTimer = null;
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ⚡ LOT B (F8) — MIROIR public_profiles/{uid}
+// Copie MINIMALE et PUBLIQUE du profil annonceur (name, avatar, createdAt,
+// category, description). Les clients publics lisent CE document au lieu de
+// users/{uid} → le mot de passe et les données privées (téléphone, email,
+// crédits, fcmToken…) ne transitent plus jamais vers les autres utilisateurs.
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.syncPublicProfile = onDocumentWritten(
+  { document: 'users/{userId}', region: 'us-central1' },
+  async (event) => {
+    const userId = event.params.userId;
+    const after = event.data && event.data.after;
+    try {
+      if (!after || !after.exists) {
+        // Compte supprimé → retirer le miroir
+        await db.collection('public_profiles').doc(userId).delete();
+        return;
+      }
+      const d = after.data();
+      // Ne JAMAIS copier : password, phone, email, credits, fcmToken, role…
+      const profile = {
+        name: d.name || '',
+        avatar: d.avatar || null,
+        createdAt: d.createdAt || null,
+        category: d.category || null,
+        description: d.description || null,
+        updatedAt: new Date().toISOString(),
+      };
+      await db.collection('public_profiles').doc(userId).set(profile);
+    } catch (err) {
+      console.error(`[syncPublicProfile] Exception pour ${userId}:`, err);
+    }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ⚡ LOT B — BACKFILL (à appeler UNE FOIS après déploiement) :
+// GET https://us-central1-immozone-d9a68.cloudfunctions.net/backfillPublicData?key=immozone-backfill-2026
+// Crée public_profiles pour tous les users existants + initialise public_stats.
+// ═══════════════════════════════════════════════════════════════════════════════
+exports.backfillPublicData = onRequest(
+  { region: 'us-central1' },
+  async (req, res) => {
+    if (req.query.key !== 'immozone-backfill-2026') {
+      return res.status(403).json({ error: 'Clé invalide' });
+    }
+    try {
+      const usersSnap = await db.collection('users').get();
+      let written = 0;
+      // Batches de 400 (limite Firestore 500 opérations)
+      let batch = db.batch();
+      let ops = 0;
+      for (const doc of usersSnap.docs) {
+        const d = doc.data();
+        batch.set(db.collection('public_profiles').doc(doc.id), {
+          name: d.name || '',
+          avatar: d.avatar || null,
+          createdAt: d.createdAt || null,
+          category: d.category || null,
+          description: d.description || null,
+          updatedAt: new Date().toISOString(),
+        });
+        written++;
+        ops++;
+        if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+      }
+      if (ops > 0) await batch.commit();
+      const stats = await recomputePublicStats();
+      return res.json({
+        success: true,
+        profilesWritten: written,
+        statsTotalActif: stats.totalActif,
+      });
+    } catch (err) {
+      console.error('[backfillPublicData] Exception:', err);
+      return res.status(500).json({ error: err.message });
     }
   }
 );

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -56,63 +57,40 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     WebUrlHelper.setPropertyUrl(widget.property.id);
   }
 
-  /// Incrémente les vues dans Firestore puis relit la valeur réelle
-  /// Incrémente les vues — optimiste (+1 immédiat) puis confirme via Firestore
+  /// ⚡ LOT B (F10) : incrément des vues FIRE-AND-FORGET — affichage
+  /// optimiste (+1 immédiat), écriture atomique en arrière-plan, SANS
+  /// relecture du document (économise 1 lecture Firestore par visite).
   Future<void> _incrementAndRefreshViews() async {
-    // Affichage optimiste : +1 tout de suite pour UX fluide
     if (mounted) setState(() => _views = _views + 1);
-    // Incrément Firestore (retourne la valeur réelle ou null si échec)
-    final newViews = await _ds.incrementPropertyViews(widget.property.id);
-    if (newViews != null && mounted) {
-      setState(() => _views = newViews);
-    }
+    unawaited(_ds.incrementPropertyViews(widget.property.id));
   }
 
-  // ── Charge l'ancienneté de l'annonceur depuis Firestore ──────────────────
-  // Lit le champ brut 'createdAt' (Timestamp Firestore OU String ISO8601)
-  // directement depuis le document, sans passer par UserModel.fromMap,
-  // pour éviter les problèmes de parsing sur les anciens documents.
+  // ── Charge l'ancienneté de l'annonceur ────────────────────────────────────
+  // ⚡ LOT B (F10) : lecture via getPublicProfile (public_profiles — 1 lecture
+  // partagée et mise en cache avec l'avatar) au lieu du doc users/ complet.
+  // Parse le champ brut 'createdAt' (Timestamp Firestore OU String ISO8601).
   Future<void> _loadOwnerSince() async {
     final ownerId = widget.property.ownerId;
     if (ownerId.isEmpty) return;
 
     DateTime? createdAt;
-
-    // ── Tentative 1 : lecture directe Firestore (champ brut) ─────────────────
     try {
-      final snap = await _ds.usersCollection.doc(ownerId).get();
-      if (snap.exists) {
-        final raw = (snap.data() as Map<String, dynamic>?)?['createdAt'];
-        debugPrint('[ancienneté] ownerId=$ownerId  raw=$raw  type=${raw?.runtimeType}');
-        if (raw != null) {
-          if (raw is DateTime) {
-            createdAt = raw;
-          } else {
-            // Timestamp Firestore (duck-typing)
-            try { createdAt = (raw as dynamic).toDate() as DateTime; } catch (_) {}
-            // String ISO8601
-            if (createdAt == null) {
-              try { createdAt = DateTime.parse(raw.toString()); } catch (_) {}
-            }
+      final profile = await _ds.getPublicProfile(ownerId);
+      final raw = profile?['createdAt'];
+      if (raw != null) {
+        if (raw is DateTime) {
+          createdAt = raw;
+        } else {
+          // Timestamp Firestore (duck-typing)
+          try { createdAt = (raw as dynamic).toDate() as DateTime; } catch (_) {}
+          // String ISO8601
+          if (createdAt == null) {
+            try { createdAt = DateTime.parse(raw.toString()); } catch (_) {}
           }
         }
-      } else {
-        debugPrint('[ancienneté] document inexistant pour ownerId=$ownerId');
       }
     } catch (e) {
-      debugPrint('[ancienneté] erreur lecture Firestore: $e');
-    }
-
-    // ── Tentative 2 : via getUserById (fallback) ──────────────────────────────
-    if (createdAt == null) {
-      try {
-        final owner = await _ds.getUserById(ownerId);
-        // N'utiliser que si la date est significative (pas DateTime.now() de fallback)
-        if (owner != null) {
-          final diff = DateTime.now().difference(owner.createdAt).inDays;
-          if (diff > 0) createdAt = owner.createdAt;
-        }
-      } catch (_) {}
+      debugPrint('[ancienneté] erreur lecture profil public: $e');
     }
 
     if (!mounted) return;

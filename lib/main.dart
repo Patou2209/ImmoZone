@@ -304,18 +304,16 @@ class _SplashScreenState extends State<SplashScreen> {
       // phase 2 = toutes les annonces en arrière-plan.
       propProvider.loadPropertiesProgressive().ignore();
     } else {
-      // ── MOBILE : splash Flutter (logo + slogan).
-      // ⚡ FIX audit C2 : on ne bloque PLUS la navigation sur le chargement
-      // des annonces (elles arrivent en arrière-plan, l'accueil affiche son
-      // squelette en attendant). On attend UNIQUEMENT :
-      //   1. l'auth (indispensable AVANT de naviguer — sinon la session est
-      //      perdue sur connexion lente, cf. incident Windows/desktop),
-      //      plafonnée à 8 s ;
-      //   2. un minimum de 800 ms pour l'affichage du logo (anti-flash).
-      // Résultat : splash ~0,8-1,5 s au lieu de 3-10 s.
-      propProvider.loadPropertiesProgressive().ignore(); // arrière-plan
+      // ── MOBILE : splash Flutter (logo + slogan) — minimum 3 secondes.
+      // Les annonces se chargent PENDANT le splash (non bloquant) : au moment
+      // de naviguer, le cache DataService est déjà chaud → accueil + stats
+      // s'affichent avec de vraies données. On attend :
+      //   1. un minimum de 3 s (demande produit : affichage du logo) ;
+      //   2. l'auth (indispensable AVANT de naviguer — sinon la session est
+      //      perdue sur connexion lente), plafonnée à 8 s.
+      propProvider.loadPropertiesProgressive().ignore(); // pendant le splash
       await Future.wait([
-        Future.delayed(const Duration(milliseconds: 800)), // anti-flash logo
+        Future.delayed(const Duration(seconds: 3)), // minimum splash
         Future.any([
           auth.checkAuth(), // DOIT finir avant navigation (session)
           Future.delayed(const Duration(seconds: 8)), // plafond réseau lent

@@ -1014,13 +1014,40 @@ class _HomeTabState extends State<_HomeTab>
       _statsLoading   = false;
       _adRotationIndex = results[4] as int;
     });
+
+    // ⚡ FIX bug « Disponibilités à 0 » : au premier lancement, les stats
+    // peuvent être calculées AVANT que le réseau/token soit prêt → fallback
+    // sur une liste vide → tableau figé à 0 sans jamais être recalculé
+    // (alors que les annonces, elles, arrivent via le retry du provider).
+    // → re-tenter tant que le total est à 0.
+    _retryStatsIfEmpty();
   }
 
-  // Conservé pour le pull-to-refresh — force un vrai re-fetch Firestore
-
-  Future<void> _loadStats() async {
-    final s = await _ds.getPublicStats();
-    if (mounted) setState(() { _stats = s; _statsLoading = false; });
+  /// Re-tente le chargement des stats (jusqu'à 3 fois, backoff 2/4/6 s) tant
+  /// que totalActif == 0. Avec le document agrégé config/public_stats (Lot B),
+  /// chaque tentative ne coûte qu'UNE lecture Firestore ; en fallback client,
+  /// forceRefresh contourne le cache 45 s qui aurait mémorisé la liste vide.
+  bool _statsRetryRunning = false;
+  Future<void> _retryStatsIfEmpty() async {
+    if (_statsRetryRunning) return;
+    if (((_stats['totalActif'] as num?) ?? 0) > 0) return;
+    _statsRetryRunning = true;
+    try {
+      for (var attempt = 1; attempt <= 3; attempt++) {
+        await Future.delayed(Duration(seconds: 2 * attempt));
+        if (!mounted) return;
+        try {
+          final s = await _ds.getPublicStats(forceRefresh: true);
+          if (!mounted) return;
+          if (((s['totalActif'] as num?) ?? 0) > 0) {
+            setState(() => _stats = s);
+            return;
+          }
+        } catch (_) {}
+      }
+    } finally {
+      _statsRetryRunning = false;
+    }
   }
 
   void _resetFilters({bool clearSearch = true}) {

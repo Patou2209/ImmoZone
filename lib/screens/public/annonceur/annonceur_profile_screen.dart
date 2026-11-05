@@ -5,7 +5,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/property_card.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../models/property_model.dart';
-import '../../../models/user_model.dart';
 import '../../../services/data_service.dart';
 import '../property_detail/property_detail_screen.dart';
 
@@ -28,7 +27,9 @@ class AnnonceurProfileScreen extends StatefulWidget {
 
 class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
   final DataService _ds = DataService();
-  UserModel? _user;
+  // ⚡ LOT B (F8) : profil PUBLIC minimal (public_profiles) — plus aucun
+  // téléchargement du document users/ complet (mot de passe, téléphone…).
+  Map<String, dynamic>? _profile;
   List<PropertyModel> _listings = [];
   bool _loading = true;
 
@@ -41,8 +42,8 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      // Charger le profil de l'annonceur
-      final user = await _ds.getUserById(widget.ownerId);
+      // Charger le profil PUBLIC de l'annonceur (1 lecture, sans données privées)
+      final profile = await _ds.getPublicProfile(widget.ownerId);
       // Charger toutes ses annonces actives
       final allProps = await _ds.getUserProperties(widget.ownerId);
       final activeProps = allProps
@@ -52,7 +53,7 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
       final enriched = await _ds.enrichWithAvatars(activeProps);
       if (mounted) {
         setState(() {
-          _user   = user;
+          _profile  = profile;
           _listings = enriched;
           _loading = false;
         });
@@ -64,9 +65,10 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
 
   // ── Avatar : photo base64 ou initiales ───────────────────────────────────
   Widget _buildAvatar(double radius) {
-    final avatarData = _user?.avatar;
-    final initials = _user?.name.isNotEmpty == true
-        ? _user!.name[0].toUpperCase()
+    final avatarData = _profile?['avatar'] as String?;
+    final profileName = (_profile?['name'] as String?) ?? '';
+    final initials = profileName.isNotEmpty
+        ? profileName[0].toUpperCase()
         : widget.ownerName.isNotEmpty ? widget.ownerName[0].toUpperCase() : '?';
 
     Widget inner;
@@ -189,9 +191,11 @@ class _AnnonceurProfileScreenState extends State<AnnonceurProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = _user?.name ?? widget.ownerName;
-    final category    = _user?.category ?? '';
-    final description = _user?.description ?? '';
+    final displayName = (_profile?['name'] as String?)?.isNotEmpty == true
+        ? _profile!['name'] as String
+        : widget.ownerName;
+    final category    = (_profile?['category'] as String?) ?? '';
+    final description = (_profile?['description'] as String?) ?? '';
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,

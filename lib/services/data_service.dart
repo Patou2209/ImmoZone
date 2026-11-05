@@ -639,9 +639,54 @@ class DataService {
   // ── Cache avatar en mémoire (évite les N+1 queries) ─────────────────────
   final Map<String, String?> _avatarCache = {};
 
+  // ⚡ LOT B (F8) : cache des PROFILS PUBLICS (public_profiles/{uid} —
+  // miroir minimal maintenu par Cloud Function : name, avatar, createdAt).
+  // → plus AUCUNE lecture du doc users/ complet côté public : le mot de
+  // passe et les données privées ne transitent plus vers les clients.
+  final Map<String, Map<String, dynamic>?> _publicProfileCache = {};
+  CollectionReference get _publicProfilesCol =>
+      _db.collection('public_profiles');
+
+  /// Profil public d'un utilisateur (name, avatar, createdAt) — 1 lecture,
+  /// mise en cache. Fallback sur users/{id} si le miroir n'existe pas encore
+  /// (transition avant le premier backfill de la Cloud Function).
+  Future<Map<String, dynamic>?> getPublicProfile(String userId) async {
+    if (userId.isEmpty) return null;
+    if (_publicProfileCache.containsKey(userId)) {
+      return _publicProfileCache[userId];
+    }
+    Map<String, dynamic>? result;
+    try {
+      final snap = await _publicProfilesCol.doc(userId).get();
+      if (snap.exists) {
+        result = Map<String, dynamic>.from(snap.data() as Map<String, dynamic>);
+      }
+    } catch (_) {}
+    // Fallback transition : miroir absent → lecture users (ancien chemin)
+    if (result == null) {
+      try {
+        final snap = await _usersCol.doc(userId).get();
+        if (snap.exists) {
+          final data = snap.data() as Map<String, dynamic>?;
+          result = {
+            'name': data?['name'],
+            'avatar': data?['avatar'],
+            'createdAt': data?['createdAt'],
+            'category': data?['category'],
+            'description': data?['description'],
+          };
+        }
+      } catch (_) {}
+    }
+    _publicProfileCache[userId] = result;
+    if (result != null) _avatarCache[userId] = result['avatar'] as String?;
+    return result;
+  }
+
   /// Enrichit une liste de PropertyModel avec l'avatar de chaque annonceur.
-  /// Utilise un cache en mémoire pour éviter les requêtes Firestore répétées.
-  /// Groupement par ownerId → 1 requête par annonceur unique.
+  /// ⚡ LOT B (F8) : lit public_profiles (miroir sans données sensibles) au
+  /// lieu de users/ — le mot de passe n'est plus téléchargé par les clients.
+  /// Cache mémoire + groupement par ownerId → 1 requête par annonceur unique.
   Future<List<PropertyModel>> enrichWithAvatars(List<PropertyModel> props) async {
     // Collecter les ownerIds uniques qui ne sont pas encore dans le cache
     final missingIds = props
@@ -656,13 +701,8 @@ class DataService {
     try {
       await Future.wait(missingIds.map((id) async {
         try {
-          final snap = await _usersCol.doc(id).get();
-          if (snap.exists) {
-            final data = snap.data() as Map<String, dynamic>?;
-            _avatarCache[id] = data?['avatar'] as String?;
-          } else {
-            _avatarCache[id] = null;
-          }
+          final profile = await getPublicProfile(id);
+          _avatarCache[id] = profile?['avatar'] as String?;
         } catch (_) {
           _avatarCache[id] = null;
         }
@@ -1761,9 +1801,30 @@ class DataService {
 
   // ─── STATS PUBLIQUES ────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> getPublicStats() async {
-    final active = await getActiveProperties();
-    final all    = await getProperties();
+  /// ⚡ LOT B (F7) : les stats sont désormais AGRÉGÉES CÔTÉ SERVEUR dans le
+  /// document config/public_stats (maintenu par la Cloud Function à chaque
+  /// écriture sur properties + recalcul horaire). → 1 SEULE lecture Firestore
+  /// au lieu de télécharger toute la collection.
+  /// Fallback : si le doc n'existe pas encore (CF pas déployée) ou est
+  /// illisible, on recalcule côté client comme avant.
+  Future<Map<String, dynamic>> getPublicStats({bool forceRefresh = false}) async {
+    // ── Voie rapide : document agrégé serveur (1 lecture) ──────────────────
+    try {
+      final snap = await _db.collection('config').doc('public_stats').get();
+      if (snap.exists) {
+        final data = snap.data();
+        // Sanity check : le doc doit contenir la clé pivot totalActif
+        if (data != null && data.containsKey('totalActif')) {
+          return Map<String, dynamic>.from(data)..remove('updatedAt');
+        }
+      }
+    } catch (_) {
+      // Doc inaccessible → fallback calcul client ci-dessous
+    }
+
+    // ── Fallback : calcul côté client (comportement historique) ────────────
+    final active = await getActiveProperties(forceRefresh: forceRefresh);
+    final all    = await getProperties(forceRefresh: forceRefresh);
     final now    = DateTime.now();
 
     // ⚠️ getActiveProperties() inclut volontairement les biens vendus/occupés
