@@ -1592,42 +1592,46 @@ class _HomeTabState extends State<_HomeTab>
                               fontWeight: FontWeight.w600, fontSize: 13)),
                     ]),
                   ),
-                  PopupMenuItem(
-                    value: 'recharger',
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
+                  // Apple 3.1.1 : pas d'achat de crédits sur iOS (mode reader)
+                  if (!AppConstants.iosReaderMode)
+                    PopupMenuItem(
+                      value: 'recharger',
+                      child: Row(children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentColor.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.add_circle_outline_rounded,
+                              size: 20, color: AppTheme.accentColor),
                         ),
-                        child: const Icon(Icons.add_circle_outline_rounded,
-                            size: 20, color: AppTheme.accentColor),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Recharger',
-                          style: TextStyle(fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600, fontSize: 13)),
-                    ]),
-                  ),
-                  PopupMenuItem(
-                    value: 'parrainage',
-                    child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: AppTheme.orangeColor.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
+                        const SizedBox(width: 12),
+                        const Text('Recharger',
+                            style: TextStyle(fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600, fontSize: 13)),
+                      ]),
+                    ),
+                  // Apple 3.1.1 : le parrainage mentionne les recharges → masqué sur iOS
+                  if (!AppConstants.iosReaderMode)
+                    PopupMenuItem(
+                      value: 'parrainage',
+                      child: Row(children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppTheme.orangeColor.withValues(alpha: 0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.card_giftcard_rounded,
+                              size: 20, color: AppTheme.orangeColor),
                         ),
-                        child: const Icon(Icons.card_giftcard_rounded,
-                            size: 20, color: AppTheme.orangeColor),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Parrainage',
-                          style: TextStyle(fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600, fontSize: 13)),
-                    ]),
-                  ),
+                        const SizedBox(width: 12),
+                        const Text('Parrainage',
+                            style: TextStyle(fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w600, fontSize: 13)),
+                      ]),
+                    ),
                   PopupMenuItem(
                     value: 'reglages',
                     child: Row(children: [
@@ -3244,32 +3248,36 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             'Le renouvellement de « ${p.title} » coûte '
             '$required crédit${required > 1 ? 's' : ''} '
             '(${p.commune} · ${p.transactionType} · 30 jours).\n\n'
-            'Solde actuel : $available crédit${available != 1 ? 's' : ''}.\n\n'
-            'Veuillez recharger votre compte pour continuer.',
+            'Solde actuel : $available crédit${available != 1 ? 's' : ''}.'
+            // Apple 3.1.1 : aucune mention de recharge sur iOS (anti-steering)
+            '${AppConstants.iosReaderMode ? '' : '\n\nVeuillez recharger votre compte pour continuer.'}',
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                 color: AppTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dCtx, false),
-              child: const Text('Annuler',
-                  style: TextStyle(fontFamily: 'Poppins',
+              child: Text(
+                  AppConstants.iosReaderMode ? 'Fermer' : 'Annuler',
+                  style: const TextStyle(fontFamily: 'Poppins',
                       color: AppTheme.textSecondary)),
             ),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(dCtx, true),
-              icon: const Icon(Icons.add_circle_outline_rounded,
-                  size: 16, color: Colors.white),
-              label: const Text('Recharger',
-                  style: TextStyle(fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+            // Apple 3.1.1 : pas de bouton Recharger sur iOS
+            if (!AppConstants.iosReaderMode)
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(dCtx, true),
+                icon: const Icon(Icons.add_circle_outline_rounded,
+                    size: 16, color: Colors.white),
+                label: const Text('Recharger',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
               ),
-            ),
           ],
         ),
       );
@@ -3694,28 +3702,30 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         ]),
                       ),
                       // Bouton Recharger (spacing géré par le Wrap)
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(context,
-                            MaterialPageRoute(
-                              builder: (_) => const PublicPacksScreen()));
-                        },
-                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-                        label: const Text('Recharger',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            )),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 2,
+                      // Apple 3.1.1 : masqué sur iOS (mode reader)
+                      if (!AppConstants.iosReaderMode)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(context,
+                              MaterialPageRoute(
+                                builder: (_) => const PublicPacksScreen()));
+                          },
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                          label: const Text('Recharger',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              )),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 2,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 16),

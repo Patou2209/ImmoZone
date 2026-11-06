@@ -706,7 +706,9 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
             _requiredCredits = requiredNow;
             _userAvailableCredits = availableNow;
           });
-          _err('Solde insuffisant : $availableNow crédit${availableNow != 1 ? 's' : ''} disponible${availableNow != 1 ? 's' : ''}, $requiredNow requis. Veuillez recharger.');
+          // Apple 3.1.1 : aucune mention de recharge sur iOS (anti-steering)
+          _err('Solde insuffisant : $availableNow crédit${availableNow != 1 ? 's' : ''} disponible${availableNow != 1 ? 's' : ''}, $requiredNow requis.'
+              '${AppConstants.iosReaderMode ? '' : ' Veuillez recharger.'}');
           return;
         }
         _publicationCharge = await ds.consumePublicationRight(user.id,
@@ -3416,6 +3418,42 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
     }
 
     // Sous-cas 4b : solde insuffisant, formulaire de recharge à afficher
+    // Apple 3.1.1 : sur iOS (mode reader), AUCUN flux d'achat ni mention de
+    // recharge — message neutre sans CTA, l'utilisateur revient en arrière.
+    if (AppConstants.iosReaderMode) {
+      return [
+        headerCard,
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.errorColor.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.account_balance_wallet_outlined,
+                color: AppTheme.errorColor, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Solde insuffisant',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 14,
+                        color: AppTheme.errorColor)),
+                const SizedBox(height: 4),
+                Text(
+                  'Vous avez $_userAvailableCredits crédit${_userAvailableCredits != 1 ? 's' : ''} et il vous faut $_requiredCredits crédit${_requiredCredits != 1 ? 's' : ''} pour cette publication.',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: AppTheme.textSecondary, height: 1.4),
+                ),
+              ],
+            )),
+          ]),
+        ),
+      ];
+    }
     return [
       headerCard,
       const SizedBox(height: 16),
@@ -4396,8 +4434,10 @@ class _PostPropertyAvatarMenu extends StatelessWidget {
       itemBuilder: (_) => [
         _item('dashboard', Icons.dashboard_rounded,
             'Mon tableau de bord', AppTheme.primaryColor),
-        _item('recharger', Icons.add_circle_outline_rounded,
-            'Recharger', AppTheme.accentColor),
+        // Apple 3.1.1 : pas d'achat de crédits sur iOS (mode reader)
+        if (!AppConstants.iosReaderMode)
+          _item('recharger', Icons.add_circle_outline_rounded,
+              'Recharger', AppTheme.accentColor),
         _item('reglages', Icons.settings_rounded,
             'Réglages', Colors.blueGrey),
         const PopupMenuDivider(height: 1),

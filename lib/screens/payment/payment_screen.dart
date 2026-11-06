@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_utils.dart';
 import '../../core/utils/error_helper.dart';
@@ -427,6 +428,34 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // ─────────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    // Apple 3.1.1 : aucun flux de paiement sur iOS (mode reader).
+    // Garde de sécurité si une navigation résiduelle y mène quand même.
+    if (AppConstants.iosReaderMode) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          foregroundColor: AppTheme.textPrimary,
+          elevation: 0,
+          centerTitle: true,
+          title: const Text('Indisponible',
+              style: TextStyle(fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700, fontSize: 17)),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Cette fonctionnalité n’est pas disponible dans cette version de l’application.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                  color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(

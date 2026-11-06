@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../core/widgets/recharge_form_widget.dart';
@@ -36,6 +37,27 @@ class _PublicPacksScreenState extends State<PublicPacksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Apple 3.1.1 : aucun achat de crédits sur iOS (mode reader).
+    // L'écran ne doit jamais être accessible — garde de sécurité si une
+    // navigation résiduelle y mène quand même.
+    if (AppConstants.iosReaderMode) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: const ImmoZoneAppBar(title: 'Indisponible'),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Cette fonctionnalité n’est pas disponible dans cette version de l’application.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                  color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     final subs = _packs.where((p) => p['type'] == 'subscription').toList();
     final pubs = _packs.where((p) => p['type'] != 'subscription').toList();
 

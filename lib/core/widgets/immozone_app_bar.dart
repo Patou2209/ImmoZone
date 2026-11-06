@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../constants/app_constants.dart';
 import '../../models/user_model.dart';
 import '../theme/app_theme.dart';
 import 'immozone_nav_helper.dart';
@@ -155,10 +156,14 @@ class _AvatarPopupMenu extends StatelessWidget {
       itemBuilder: (_) => [
         _item('dashboard', Icons.dashboard_rounded,
             'Mon tableau de bord', AppTheme.primaryColor),
-        _item('recharger', Icons.add_circle_outline_rounded,
-            'Recharger', AppTheme.accentColor),
-        _item('parrainage', Icons.card_giftcard_rounded,
-            'Parrainage', AppTheme.orangeColor),
+        // Apple 3.1.1 : pas d'achat de crédits sur iOS (mode reader)
+        if (!AppConstants.iosReaderMode)
+          _item('recharger', Icons.add_circle_outline_rounded,
+              'Recharger', AppTheme.accentColor),
+        // Apple 3.1.1 : le parrainage mentionne les recharges → masqué sur iOS
+        if (!AppConstants.iosReaderMode)
+          _item('parrainage', Icons.card_giftcard_rounded,
+              'Parrainage', AppTheme.orangeColor),
         _item('reglages', Icons.settings_rounded,
             'Réglages', Colors.blueGrey),
         const PopupMenuDivider(height: 1),

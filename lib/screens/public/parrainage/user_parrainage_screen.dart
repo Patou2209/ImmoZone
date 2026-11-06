@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/immozone_app_bar.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
@@ -129,6 +130,26 @@ class _UserParrainageScreenState extends State<UserParrainageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Apple 3.1.1 : le parrainage est indexé sur la « première recharge » des
+    // filleuls → écran inaccessible sur iOS (mode reader). Garde de sécurité.
+    if (AppConstants.iosReaderMode) {
+      return const Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: ImmoZoneAppBar(title: 'Indisponible'),
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Cette fonctionnalité n’est pas disponible dans cette version de l’application.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                  color: AppTheme.textSecondary),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: ImmoZoneAppBar(

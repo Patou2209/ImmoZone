@@ -19,6 +19,7 @@
 // ============================================================================
 
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_utils.dart';
 import '../../models/payment_model.dart';
@@ -40,6 +41,33 @@ class RechargeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Apple 3.1.1 : aucun formulaire de recharge sur iOS (mode reader).
+    // Garde de sécurité si un appel résiduel ouvre quand même ce dialog.
+    if (AppConstants.iosReaderMode) {
+      return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text(
+              'Cette fonctionnalité n’est pas disponible dans cette version de l’application.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 14,
+                  color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer',
+                  style: TextStyle(fontFamily: 'Poppins',
+                      color: AppTheme.textSecondary)),
+            ),
+          ]),
+        ),
+      );
+    }
+
     final screenH = MediaQuery.of(context).size.height;
     final screenW = MediaQuery.of(context).size.width;
 

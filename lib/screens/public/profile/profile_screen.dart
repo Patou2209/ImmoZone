@@ -841,32 +841,36 @@ class _ProfileScreenState extends State<ProfileScreen>
             'Le renouvellement de « ${p.title} » coûte '
             '$required crédit${required > 1 ? 's' : ''} '
             '(${p.commune} · ${p.transactionType} · 30 jours).\n\n'
-            'Solde actuel : $available crédit${available != 1 ? 's' : ''}.\n\n'
-            'Veuillez recharger votre compte pour continuer.',
+            'Solde actuel : $available crédit${available != 1 ? 's' : ''}.'
+            // Apple 3.1.1 : aucune mention de recharge sur iOS (anti-steering)
+            '${AppConstants.iosReaderMode ? '' : '\n\nVeuillez recharger votre compte pour continuer.'}',
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
                 color: AppTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dCtx, false),
-              child: const Text('Annuler',
-                  style: TextStyle(fontFamily: 'Poppins',
+              child: Text(
+                  AppConstants.iosReaderMode ? 'Fermer' : 'Annuler',
+                  style: const TextStyle(fontFamily: 'Poppins',
                       color: AppTheme.textSecondary)),
             ),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pop(dCtx, true),
-              icon: const Icon(Icons.add_circle_outline_rounded,
-                  size: 16, color: Colors.white),
-              label: const Text('Recharger',
-                  style: TextStyle(fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.accentColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+            // Apple 3.1.1 : pas de bouton Recharger sur iOS
+            if (!AppConstants.iosReaderMode)
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(dCtx, true),
+                icon: const Icon(Icons.add_circle_outline_rounded,
+                    size: 16, color: Colors.white),
+                label: const Text('Recharger',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
               ),
-            ),
           ],
         ),
       );
@@ -1041,6 +1045,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       padding: const EdgeInsets.only(top: 14),
       children: [
         // ── Parrainage ─────────────────────────────────────────────────────
+        // Apple 3.1.1 : le parrainage mentionne les recharges → masqué sur iOS
+        if (!AppConstants.iosReaderMode)
         _settingsTileColored(
           Icons.card_giftcard_rounded,
           AppTheme.orangeColor,
