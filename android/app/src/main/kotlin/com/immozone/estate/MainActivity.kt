@@ -28,24 +28,34 @@ class MainActivity : FlutterActivity() {
     override fun onStart() {
         super.onStart()
         if (Build.VERSION.SDK_INT >= 34) {
-            val cb = Activity.ScreenCaptureCallback {
-                Toast.makeText(
-                    this,
-                    "\uD83D\uDE0A Pour protéger les annonces et vos données, " +
-                        "ImmoZone n'autorise pas les captures d'écran. " +
-                        "Partagez plutôt l'annonce via le bouton Partager !",
-                    Toast.LENGTH_LONG
-                ).show()
+            // try/catch de sécurité : si la permission DETECT_SCREEN_CAPTURE
+            // manque ou qu'un OEM se comporte mal, on NE crashe JAMAIS —
+            // FLAG_SECURE protège déjà, le toast est juste un bonus UX.
+            try {
+                val cb = Activity.ScreenCaptureCallback {
+                    Toast.makeText(
+                        this,
+                        "\uD83D\uDE0A Pour protéger les annonces et vos données, " +
+                            "ImmoZone n'autorise pas les captures d'écran. " +
+                            "Partagez plutôt l'annonce via le bouton Partager !",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                registerScreenCaptureCallback(mainExecutor, cb)
+                captureCallback = cb
+            } catch (_: Exception) {
+                captureCallback = null
             }
-            registerScreenCaptureCallback(mainExecutor, cb)
-            captureCallback = cb
         }
     }
 
     override fun onStop() {
         super.onStop()
         if (Build.VERSION.SDK_INT >= 34) {
-            captureCallback?.let { unregisterScreenCaptureCallback(it) }
+            try {
+                captureCallback?.let { unregisterScreenCaptureCallback(it) }
+            } catch (_: Exception) {
+            }
             captureCallback = null
         }
     }
