@@ -1286,13 +1286,18 @@ class _HomeTabState extends State<_HomeTab>
           _buildTopBar(context),
 
           // ── BODY entierement scrollable (hero + tabs + chips + search + liste)
+          // ⚡ PERF (P1) : CustomScrollView + SliverGrid = construction PARESSEUSE
+          // des cartes. L'ancien GridView(shrinkWrap) dans SingleChildScrollView
+          // construisait TOUTES les cartes (et décodait toutes les miniatures)
+          // d'un coup → thread UI saturé dès 60 annonces.
           Expanded(
             child: RefreshIndicator(
               color: AppTheme.accentColor,
               onRefresh: () => _loadAll(force: true),
-              child: SingleChildScrollView(
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(children: [
+                slivers: [
+                SliverToBoxAdapter(child: Column(children: [
                   // Hero + Tabs + Chips + Search (tout scrolle avec la liste)
                   _buildScrollableHeader(context, filteredCount: filtered.length),
 
@@ -1358,7 +1363,7 @@ class _HomeTabState extends State<_HomeTab>
 
                   const SizedBox(height: 8),
 
-                  // Liste, chargement en cours, ou etat vide
+                  // Chargement en cours ou etat vide (la grille est un sliver séparé)
                   if (displayed.isEmpty && provider.isLoading)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 60),
@@ -1367,10 +1372,15 @@ class _HomeTabState extends State<_HomeTab>
                               color: AppTheme.accentColor)),
                     )
                   else if (displayed.isEmpty)
-                    _buildEmptyWithSimilar([])
-                  else
-                    _buildGridWithAds(context, displayed),
+                    _buildEmptyWithSimilar([]),
+                ])),
 
+                // ⚡ Grille principale = SliverGrid PARESSEUSE : seules les
+                // cartes visibles (+ cacheExtent) sont construites/décodées.
+                if (displayed.isNotEmpty)
+                  _buildSliverGridWithAds(context, displayed),
+
+                SliverToBoxAdapter(child: Column(children: [
                   // Voir plus
                   if (hasMore) _buildVoirPlus(filtered.length, effectiveDisplay),
 
@@ -1378,8 +1388,8 @@ class _HomeTabState extends State<_HomeTab>
                   const SizedBox(height: 12),
                   _buildStatsFooter(),
                   const SizedBox(height: 20),
-                ]),
-              ),
+                ])),
+              ]),
             ),
           ),
         ]),
@@ -2574,7 +2584,12 @@ class _HomeTabState extends State<_HomeTab>
     );
   }
 
-  /// Construit la grille principale unifiée annonces + publicités.
+  /// Construit la grille principale unifiée annonces + publicités en SLIVER.
+  ///
+  /// ⚡ PERF (P1) : SliverGrid dans le CustomScrollView du body = construction
+  /// PARESSEUSE — seules les cartes visibles (+ cacheExtent) sont créées et
+  /// leurs miniatures décodées. L'ancien GridView(shrinkWrap:true) construisait
+  /// TOUT d'un coup.
   ///
   /// Les publicités occupent exactement 1 slot de grille (400×450, gridMode: true),
   /// intercalées parmi les annonces :
@@ -2582,75 +2597,78 @@ class _HomeTabState extends State<_HomeTab>
   ///   • 5+ annonces  → 2 pubs : après l'index 3 + après la dernière
   ///
   /// Rotation : chaque chargement avance _adRotationIndex de +1 ou +2.
-  Widget _buildGridWithAds(BuildContext context, List<PropertyModel> items) {
-    if (_liveAds.isEmpty) return _buildGrid(context, items);
-
-    final n = items.length;
-    final totalAds = _liveAds.length;
-    final twoAds = n >= 5;
-
-    // Sélectionner la ou les pubs de cette session
-    final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
-    final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
-
-    // Avancer l'index pour le prochain chargement et persister
-    _persistAdRotation(twoAds ? 2 : 1);
-
+  Widget _buildSliverGridWithAds(BuildContext context, List<PropertyModel> items) {
     // ── Construire la liste mixte (PropertyModel | AdModel) ─────────────────
-    final List<Object> mixedItems = [];
-    if (twoAds) {
-      mixedItems.addAll(items.sublist(0, 4));
-      mixedItems.add(adFirst);
-      mixedItems.addAll(items.sublist(4));
-      mixedItems.add(adSecond);
+    final List<Object> mixedItems;
+    if (_liveAds.isEmpty) {
+      mixedItems = List<Object>.from(items);
     } else {
-      mixedItems.addAll(items);
-      mixedItems.add(adFirst);
+      final n = items.length;
+      final totalAds = _liveAds.length;
+      final twoAds = n >= 5;
+
+      // Sélectionner la ou les pubs de cette session
+      final AdModel adFirst  = _liveAds[_adRotationIndex % totalAds];
+      final AdModel adSecond = _liveAds[(_adRotationIndex + 1) % totalAds];
+
+      // Avancer l'index pour le prochain chargement et persister
+      _persistAdRotation(twoAds ? 2 : 1);
+
+      mixedItems = [];
+      if (twoAds) {
+        mixedItems.addAll(items.sublist(0, 4));
+        mixedItems.add(adFirst);
+        mixedItems.addAll(items.sublist(4));
+        mixedItems.add(adSecond);
+      } else {
+        mixedItems.addAll(items);
+        mixedItems.add(adFirst);
+      }
     }
 
-    // ── Un seul GridView responsive avec slots mixtes ────────────────────────
-    return Padding(
+    // ── SliverGrid responsive avec slots mixtes ──────────────────────────────
+    // Colonnes calculées sur la largeur écran (pas de LayoutBuilder dans un
+    // sliver) : identique à l'ancien calcul à ~24px de padding près.
+    final cols = ((MediaQuery.of(context).size.width - 24) / 400)
+        .floor()
+        .clamp(1, 99);
+    return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final cols = (constraints.maxWidth / 400).floor().clamp(1, 99);
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: cols,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              mainAxisExtent: 430, // hauteur EXACTE de PropertyCard — synchroniser avec _cardHeight !
-            ),
-            itemCount: mixedItems.length,
-            itemBuilder: (gridCtx, i) {
-              final item = mixedItems[i];
-              if (item is AdModel) {
-                // Slot publicitaire — même taille qu'une annonce
-                return AdBannerCard(
-                  key: ValueKey('ad_${item.id}_$i'),
-                  ad: item,
-                  gridMode: true,
-                );
-              }
-              // Slot annonce normale
-              final p = item as PropertyModel;
-              return PropertyCard(
-                property: p,
-                isFavorite: _favorites.contains(p.id),
-                onFavorite: () => _toggleFavorite(p.id),
-                onShare: () => _shareProperty(p),
-                selectedCountry: _country,
-                onTap: () async {
-                  await Navigator.push(gridCtx,
-                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
-                  if (mounted) _refreshAfterDetail();
-                },
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          mainAxisExtent: 430, // hauteur EXACTE de PropertyCard — synchroniser avec _cardHeight !
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (gridCtx, i) {
+            final item = mixedItems[i];
+            if (item is AdModel) {
+              // Slot publicitaire — même taille qu'une annonce
+              return AdBannerCard(
+                key: ValueKey('ad_${item.id}_$i'),
+                ad: item,
+                gridMode: true,
               );
-            },
-          );
-        },
+            }
+            // Slot annonce normale
+            final p = item as PropertyModel;
+            return PropertyCard(
+              property: p,
+              isFavorite: _favorites.contains(p.id),
+              onFavorite: () => _toggleFavorite(p.id),
+              onShare: () => _shareProperty(p),
+              selectedCountry: _country,
+              onTap: () async {
+                await Navigator.push(gridCtx,
+                    MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: p)));
+                if (mounted) _refreshAfterDetail();
+              },
+            );
+          },
+          childCount: mixedItems.length,
+        ),
       ),
     );
   }

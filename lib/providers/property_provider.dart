@@ -86,6 +86,32 @@ class PropertyProvider extends ChangeNotifier {
   /// Phase 2 : collection complète en ARRIÈRE-PLAN → les autres catégories
   ///   deviennent disponibles quelques secondes plus tard, sans bloquer.
   /// Indispensable pour rester rapide avec 10 000+ annonces.
+  // ── Enrichissement avatars NON BLOQUANT ──────────────────────────────────
+  // ⚡ PERF démarrage : la liste s'affiche IMMÉDIATEMENT (les annonces portent
+  // déjà ownerAvatar dénormalisé) ; enrichWithAvatars (1 lecture/annonceur,
+  // plafonné 4 s) tourne ensuite en arrière-plan et re-notifie.
+  // Compteur de génération = garde anti-course : si la liste a été remplacée
+  // entre-temps (ex. phase 2 arrivée pendant l'enrichissement de la phase 1),
+  // le résultat obsolète est jeté au lieu d'écraser la liste plus récente.
+  int _propsGeneration = 0;
+
+  void _setProperties(List<PropertyModel> list) {
+    _properties = list;
+    _propsGeneration++;
+    _applyFilters();
+  }
+
+  Future<void> _enrichAvatarsInBackground() async {
+    final gen = _propsGeneration;
+    try {
+      final enriched = await _dataService.enrichWithAvatars(_properties);
+      if (gen != _propsGeneration) return; // liste remplacée entre-temps
+      _properties = enriched;
+      _applyFilters();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> loadPropertiesProgressive() async {
     _isLoading = true;
     _historiqueMode = false;
@@ -93,10 +119,10 @@ class PropertyProvider extends ChangeNotifier {
       // Phase 1 — rapide : uniquement Maison / Villa (catégorie par défaut)
       final priority = await _dataService.getPriorityProperties();
       if (priority.isNotEmpty) {
-        _properties = priority;
-        _applyFilters();
+        _setProperties(priority);
         _isLoading = false;
         notifyListeners(); // l'accueil peut s'afficher MAINTENANT
+        unawaited(_enrichAvatarsInBackground());
       }
     } catch (_) {}
     // Phase 2 — ARRIÈRE-PLAN (non attendue par l'appelant) : la future
@@ -125,10 +151,12 @@ class PropertyProvider extends ChangeNotifier {
           visible = await _dataService.getActiveProperties(forceRefresh: true);
         }
         if (visible.isNotEmpty) {
-          _properties = await _dataService.enrichWithAvatars(visible);
-          _applyFilters();
+          // ⚡ Affichage IMMÉDIAT (ownerAvatar dénormalisé déjà présent) ;
+          // avatars rafraîchis en arrière-plan, re-notification ensuite.
+          _setProperties(visible);
           _isLoading = false;
           notifyListeners();
+          unawaited(_enrichAvatarsInBackground());
           return;
         }
       } catch (_) {}
@@ -159,13 +187,14 @@ class PropertyProvider extends ChangeNotifier {
       final page = await _dataService.fetchPropertiesPage();
       if (page.isNotEmpty) {
         final visible = _dataService.filterPublicVisible(page);
-        final enriched = await _dataService.enrichWithAvatars(visible);
         final ids = _properties.map((p) => p.id).toSet();
-        _properties = [
+        // ⚡ Fusion immédiate (ownerAvatar dénormalisé déjà présent) ;
+        // avatars rafraîchis en arrière-plan sur la liste fusionnée.
+        _setProperties([
           ..._properties,
-          ...enriched.where((p) => !ids.contains(p.id)),
-        ];
-        _applyFilters();
+          ...visible.where((p) => !ids.contains(p.id)),
+        ]);
+        unawaited(_enrichAvatarsInBackground());
       }
     } catch (_) {}
     _loadingMore = false;
@@ -194,14 +223,13 @@ class PropertyProvider extends ChangeNotifier {
       if (list.isEmpty) {
         await Future.delayed(const Duration(seconds: 2));
         list = await _dataService.getActiveProperties(forceRefresh: true);
-      } else {
-        list = await _dataService.enrichWithAvatars(list);
       }
       // Ne JAMAIS écraser du contenu déjà affiché (phase 1 du progressif)
       // par une liste vide issue d'un échec.
       if (list.isNotEmpty || _properties.isEmpty) {
-        _properties = list;
-        _applyFilters();
+        // ⚡ Affichage immédiat, avatars rafraîchis en arrière-plan.
+        _setProperties(list);
+        unawaited(_enrichAvatarsInBackground());
       }
     } catch (e) {
       _error = 'Erreur de chargement';

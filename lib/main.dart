@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, Persistence;
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/auth_provider.dart';
@@ -33,43 +34,57 @@ void main() async {
   // ── URL propres sans # pour le deep-linking web (/property/:id) ──────────
   usePathUrlStrategy();
 
+  // ⚡ PERF démarrage (P7) : SharedPreferences se préchauffe en PARALLÈLE de
+  // Firebase (I/O disque vs réseau/plugin — totalement indépendants).
+  // DataService.init() plus bas récupère alors une instance déjà prête.
+  final prefsWarmup = SharedPreferences.getInstance();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  if (!kIsWeb) {
-    // ── App Check : Play Integrity (production Play Store) ──────────────────
-    // L'app doit être installée depuis le Play Store pour obtenir un verdict
-    // Play Integrity valide. Pour un APK sideloadé (dev), utiliser
-    // AndroidProvider.debug + debug token dans le manifest.
-    // iOS : debug provider sur simulateur/dev (DeviceCheck indisponible sur
-    // simulateur), App Attest + fallback DeviceCheck en release.
-    // try/catch : un échec d'App Check ne doit JAMAIS empêcher le démarrage.
-    try {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.playIntegrity,
-        appleProvider: kDebugMode
-            ? AppleProvider.debug
-            : AppleProvider.appAttestWithDeviceCheckFallback,
-      );
-    } catch (_) {}
-  }
-
-  if (kIsWeb) {
-    // ── Web : forcer la persistance LOCAL (survit aux refreshs de page) ──────
-    // Sans cet appel, Firebase Auth utilise SESSION par défaut sur web,
-    // ce qui détruit la session à chaque refresh de page.
-    try {
-      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
-    } catch (_) {}
-  } else {
-    try {
-      await FirebaseAuth.instance.setSettings(
-        forceRecaptchaFlow: false,
-        appVerificationDisabledForTesting: false,
-      );
-    } catch (_) {}
-  }
+  // ⚡ PERF démarrage (P7) : App Check et les réglages Auth sont indépendants
+  // l'un de l'autre → exécution en PARALLÈLE (avant : séquentiel).
+  // Chaque branche garde son try/catch : un échec ne bloque JAMAIS le départ.
+  await Future.wait([
+    if (!kIsWeb)
+      // ── App Check : Play Integrity (production Play Store) ────────────────
+      // L'app doit être installée depuis le Play Store pour obtenir un verdict
+      // Play Integrity valide. Pour un APK sideloadé (dev), utiliser
+      // AndroidProvider.debug + debug token dans le manifest.
+      // iOS : debug provider sur simulateur/dev (DeviceCheck indisponible sur
+      // simulateur), App Attest + fallback DeviceCheck en release.
+      () async {
+        try {
+          await FirebaseAppCheck.instance.activate(
+            androidProvider: AndroidProvider.playIntegrity,
+            appleProvider: kDebugMode
+                ? AppleProvider.debug
+                : AppleProvider.appAttestWithDeviceCheckFallback,
+          );
+        } catch (_) {}
+      }(),
+    if (kIsWeb)
+      // ── Web : forcer la persistance LOCAL (survit aux refreshs de page) ────
+      // Sans cet appel, Firebase Auth utilise SESSION par défaut sur web,
+      // ce qui détruit la session à chaque refresh de page.
+      () async {
+        try {
+          await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+        } catch (_) {}
+      }()
+    else
+      () async {
+        try {
+          await FirebaseAuth.instance.setSettings(
+            forceRecaptchaFlow: false,
+            appVerificationDisabledForTesting: false,
+          );
+        } catch (_) {}
+      }(),
+    // Prefs déjà préchauffées en parallèle de Firebase (voir plus haut).
+    prefsWarmup,
+  ]);
 
   await DataService().init();
 

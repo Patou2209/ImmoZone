@@ -603,15 +603,22 @@ class DataService {
   /// 300-800 ms vers securetoken.googleapis.com AVANT CHAQUE requête.
   /// Filet de sécurité : un force-refresh est quand même fait au maximum
   /// toutes les 10 minutes (claims non propagés / edge cases).
+  /// ⚡ PERF démarrage : le PREMIER appel n'est JAMAIS un force-refresh —
+  /// le SDK vient de restaurer la session avec un token valide ; forcer ici
+  /// ajoutait 300-800 ms bloquants avant la toute première requête Firestore.
   DateTime? _lastTokenForceRefresh;
   Future<void> _ensureFreshToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
       final now = DateTime.now();
-      if (_lastTokenForceRefresh == null ||
-          now.difference(_lastTokenForceRefresh!) >
-              const Duration(minutes: 10)) {
+      if (_lastTokenForceRefresh == null) {
+        // Premier appel du process : token du SDK = déjà frais. On démarre
+        // simplement l'horloge du filet de sécurité 10 min.
+        _lastTokenForceRefresh = now;
+        await user.getIdToken();
+      } else if (now.difference(_lastTokenForceRefresh!) >
+          const Duration(minutes: 10)) {
         _lastTokenForceRefresh = now;
         await user.getIdToken(true);
       } else {
