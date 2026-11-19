@@ -446,7 +446,8 @@ class _AdTile extends StatelessWidget {
         return _thumbFallback();
       }
     }
-    return Image.network(src, fit: BoxFit.cover,
+    return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _thumbFallback());
   }
 

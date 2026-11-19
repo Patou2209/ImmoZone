@@ -129,6 +129,7 @@ class _AdBannerCardState extends State<AdBannerCard> {
       }
     }
     return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         fit: BoxFit.cover,
         width: double.infinity,
         errorBuilder: (_, __, ___) => _imageFallback());

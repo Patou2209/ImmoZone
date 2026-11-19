@@ -2382,7 +2382,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(11),
                         child: hasSampleUrls && _imageUrls.isNotEmpty
-                            ? Image.network(_imageUrls[0], fit: BoxFit.cover,
+                            ? Image.network(_imageUrls[0],
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     const Icon(Icons.broken_image, color: AppTheme.accentColor))
                             : kIsWeb && _webMainPhotoBytes != null
@@ -2537,7 +2538,8 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                         ? Stack(fit: StackFit.expand, children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(9),
-                              child: Image.network(_imageUrls[i + 1], fit: BoxFit.cover,
+                              child: Image.network(_imageUrls[i + 1],
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) =>
                                       const Icon(Icons.broken_image, color: AppTheme.accentColor)),
                             ),

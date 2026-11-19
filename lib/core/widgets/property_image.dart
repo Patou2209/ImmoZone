@@ -181,6 +181,10 @@ class PropertyImage extends StatelessWidget {
         // posé à l'upload — Image.network suffit.
         return _wrap(Image.network(
           src,
+          // CORS : Firebase Storage ne renvoie pas Access-Control-Allow-Origin
+          // sur les GET simples → le décodage canvas échoue sur web. fallback
+          // bascule sur un élément <img> HTML qui ignore la same-origin policy.
+          webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
           width: width,
           height: height,
           fit: fit,

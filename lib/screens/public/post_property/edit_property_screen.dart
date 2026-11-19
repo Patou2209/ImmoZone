@@ -380,7 +380,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
         final b64 = src.split(',').last;
         mainPhotoWidget = Image.memory(base64Decode(b64), fit: BoxFit.cover);
       } else {
-        mainPhotoWidget = Image.network(src, fit: BoxFit.cover,
+        mainPhotoWidget = Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded,
                 color: AppTheme.textHint));
       }
@@ -484,7 +485,8 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                       img = Image.memory(base64Decode(src.split(',').last),
                           fit: BoxFit.cover);
                     } else {
-                      img = Image.network(src, fit: BoxFit.cover,
+                      img = Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => const Icon(
                               Icons.broken_image_rounded, size: 18,
                               color: AppTheme.textHint));

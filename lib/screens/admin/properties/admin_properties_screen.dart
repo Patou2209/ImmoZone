@@ -760,7 +760,8 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen>
       return Image.file(file, width: size, height: size, fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => placeholder);
     }
-    return Image.network(src, width: size, height: size, fit: BoxFit.cover,
+    return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, width: size, height: size, fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => placeholder);
   }
 }
@@ -937,7 +938,8 @@ class _AdminPropertyTile extends StatelessWidget {
       return Image.file(File(src), width: size, height: size, fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => placeholder);
     }
-    return Image.network(src, width: size, height: size, fit: BoxFit.cover,
+    return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback, width: size, height: size, fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => placeholder);
   }
 }

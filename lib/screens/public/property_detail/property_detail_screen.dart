@@ -1748,6 +1748,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       return placeholder;
     }
     return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
@@ -1794,6 +1795,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
       return placeholder;
     }
     return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
@@ -1843,6 +1845,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
 
     return Image.network(
       src,
+      webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
       fit: BoxFit.cover,
       width: double.infinity,
       errorBuilder: (_, __, ___) => placeholder,
@@ -2219,6 +2222,7 @@ class _FullscreenGalleryState extends State<_FullscreenGallery> {
     }
 
     return Image.network(src,
+        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
         fit: BoxFit.contain,
         errorBuilder: (_, __, ___) => placeholder,
         loadingBuilder: (_, child, progress) {
