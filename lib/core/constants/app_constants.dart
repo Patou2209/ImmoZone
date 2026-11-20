@@ -1,14 +1,16 @@
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
-
 class AppConstants {
-  // ── Apple App Store 3.1.1 — mode « reader » sur iOS ───────────────────────
-  // Sur iOS (app native uniquement, pas le web), AUCUN achat de crédits ne
-  // doit être proposé, affiché ou mentionné (pas d'In-App Purchase).
-  // Les crédits restent visibles et consommables normalement.
-  // Android et Web ne sont PAS affectés.
-  static bool get iosReaderMode =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  // ── Apple App Store — gating iOS DÉSACTIVÉ (pivot Option D : IAP) ──────────
+  // Historique : le mode « reader » (true sur iOS natif) masquait tout achat
+  // de crédits suite au 1er rejet 3.1.1. Apple a ensuite refusé le modèle
+  // reader pour les crédits (2e rejet) → décision : se conformer via
+  // In-App Purchase. ÉTAPE 1 : iOS redevient IDENTIQUE à Android (false
+  // partout). ÉTAPE 2 (à venir) : les écrans de recharge iOS basculeront
+  // vers StoreKit/IAP au lieu du mobile money.
+  // ⚠️ NE PAS soumettre à App Review tant que l'IAP n'est pas implémenté :
+  // le paiement mobile money visible sur iOS = rejet 3.1.1 garanti.
+  // Pour réactiver le masquage : remettre
+  //   `!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS`.
+  static bool get iosReaderMode => false;
 
   // App Info
   static const String appName = 'ImmoZone';
