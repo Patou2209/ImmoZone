@@ -39,6 +39,9 @@ dependencies:
   # HTTP & Network
   http: 1.5.0
 
+  # Achats intégrés Apple (StoreKit) — packs de crédits iOS
+  in_app_purchase: 3.2.3
+
   # Utils
   image: ^4.2.0   # génération des miniatures (thumbnail) côté client
   intl: ^0.20.2

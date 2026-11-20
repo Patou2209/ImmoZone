@@ -2525,3 +2525,284 @@ exports.backfillPublicData = onRequest(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLOUD FUNCTION : verifyAppleReceipt — Validation des achats intégrés Apple (IAP)
+//
+// Appelée par l'app iOS (IapService._verifyAndCredit) après un achat StoreKit.
+// Flux :
+//   1. Authentification Firebase (Bearer idToken) → userId fiable.
+//   2. Validation du reçu auprès d'Apple (verifyReceipt, prod → sandbox 21007).
+//   3. Anti-rejeu : collection `apple_transactions` (1 doc par transactionId).
+//   4. Mapping productId → crédits lu CÔTÉ SERVEUR dans config/iap_packs
+//      (jamais depuis le client) avec fallback sur les valeurs par défaut.
+//   5. Création PaymentModel 'confirmed' (operator 'apple_iap') + CreditModel
+//      + notification in-app + commission de parrainage (1ʳᵉ recharge) —
+//      exactement comme le flux Orange Money / confirmPayment.
+//
+// NOTE prix : les produits ASC sont des paliers de PRIX figés ; les crédits
+// livrés sont modifiables par l'admin via config/iap_packs sans re-review.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Valeurs par défaut (parité Android/web) — la vérité modifiable est dans
+// Firestore config/iap_packs.packs { productId: credits | {credits, active} }.
+const IAP_DEFAULT_PACKS = {
+  'com.immozone.estate.credits_3usd':   { credits: 30,   amount: 3 },
+  'com.immozone.estate.credits_5usd':   { credits: 55,   amount: 5 },
+  'com.immozone.estate.credits_10usd':  { credits: 120,  amount: 10 },
+  'com.immozone.estate.credits_20usd':  { credits: 250,  amount: 20 },
+  'com.immozone.estate.credits_50usd':  { credits: 700,  amount: 50 },
+  'com.immozone.estate.credits_100usd': { credits: 1600, amount: 100 },
+};
+
+// ── Appel verifyReceipt Apple (prod d'abord, bascule sandbox sur 21007) ──────
+async function appleVerifyReceipt(receiptData) {
+  const payload = JSON.stringify({ 'receipt-data': receiptData });
+  const call = (hostname) => httpsRequest({
+    hostname,
+    path: '/verifyReceipt',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    bodyStr: payload,
+  });
+  let resp = await call('buy.itunes.apple.com');
+  let body = JSON.parse(resp.body || '{}');
+  // 21007 = reçu sandbox envoyé en prod (TestFlight / App Review) → re-tester
+  if (body.status === 21007) {
+    resp = await call('sandbox.itunes.apple.com');
+    body = JSON.parse(resp.body || '{}');
+  }
+  return body;
+}
+
+// ── Crédits pour un productId (config Firestore, fallback défauts) ───────────
+async function iapCreditsForProduct(productId) {
+  const def = IAP_DEFAULT_PACKS[productId];
+  let credits = def ? def.credits : 0;
+  try {
+    const cfg = await db.collection('config').doc('iap_packs').get();
+    const packs = cfg.exists ? (cfg.data().packs || {}) : {};
+    const entry = packs[productId];
+    if (typeof entry === 'number') credits = entry;
+    else if (entry && typeof entry.credits === 'number') credits = entry.credits;
+  } catch (e) {
+    console.warn('[verifyAppleReceipt] config iap_packs illisible, fallback défauts:', e.message);
+  }
+  return credits;
+}
+
+// ── Commission de parrainage (réplique serveur de applyUserReferralCommission) ─
+async function iapApplyReferralCommission(filleulId, creditsQty, paymentId) {
+  try {
+    const filleulDoc = await db.collection('users').doc(filleulId).get();
+    if (!filleulDoc.exists) return;
+    const filleul = filleulDoc.data();
+    const sponsorCode = filleul.sponsorCode;
+    if (!sponsorCode) return;
+
+    // 1ʳᵉ recharge confirmée uniquement
+    const confirmed = await db.collection('payments')
+      .where('userId', '==', filleulId)
+      .where('status', '==', 'confirmed')
+      .get();
+    if (confirmed.docs.length > 1) return;
+
+    // Retrouver le parrain
+    const parrainSnap = await db.collection('users')
+      .where('myReferralCode', '==', sponsorCode)
+      .limit(1).get();
+    if (parrainSnap.empty) return;
+    const parrainData = parrainSnap.docs[0].data();
+    const parrainId = parrainData.id || parrainSnap.docs[0].id;
+
+    // Idempotence (même convention d'id que le client)
+    const commissionId = `ref_${parrainId}_${paymentId}`;
+    const existing = await db.collection('credits').doc(commissionId).get();
+    if (existing.exists) return;
+
+    await db.collection('credits').doc(commissionId).set({
+      id: commissionId,
+      userId: parrainId,
+      source: 'parrainage_user',
+      orderId: `ref_${paymentId}`,
+      quantity: creditsQty,
+      remaining: creditsQty,
+      createdAt: new Date().toISOString(),
+      expiresAt: null,
+      isActive: true,
+    });
+
+    const filleulName = filleul.name || '';
+    const notifId = `notif_ref_${parrainId}_${paymentId}`;
+    await db.collection('notifications').doc(notifId).set({
+      id: notifId,
+      userId: parrainId,
+      type: 'success',
+      title: 'Commission de parrainage',
+      body: `Vous avez reçu ${creditsQty} crédit${creditsQty > 1 ? 's' : ''} ` +
+            `de commission suite à la 1ère recharge de votre filleul` +
+            `${filleulName ? ' ' + filleulName : ''}. Merci de faire connaître ImmoZone !`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
+    console.log(`[verifyAppleReceipt] Commission parrainage ${creditsQty} cr → ${parrainId}`);
+  } catch (e) {
+    console.warn('[verifyAppleReceipt] parrainage:', e.message);
+  }
+}
+
+exports.verifyAppleReceipt = onRequest(
+  { region: 'us-central1', cors: true },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'POST uniquement' });
+    }
+    try {
+      // ── 1. Authentification Firebase ─────────────────────────────────────
+      const authHeader = req.headers.authorization || '';
+      const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+      if (!idToken) {
+        return res.status(401).json({ success: false, error: 'Authentification requise.' });
+      }
+      let decoded;
+      try {
+        decoded = await admin.auth().verifyIdToken(idToken);
+      } catch (e) {
+        return res.status(401).json({ success: false, error: 'Session invalide. Reconnectez-vous.' });
+      }
+      const userId = decoded.uid;
+
+      // ── 2. Paramètres ─────────────────────────────────────────────────────
+      const { productId, transactionId, receiptData } = req.body || {};
+      if (!productId || !receiptData) {
+        return res.status(400).json({ success: false, error: 'Paramètres manquants.' });
+      }
+      if (!IAP_DEFAULT_PACKS[productId]) {
+        return res.status(400).json({ success: false, error: 'Produit inconnu.' });
+      }
+
+      // ── 3. Validation du reçu auprès d'Apple ─────────────────────────────
+      const appleResp = await appleVerifyReceipt(receiptData);
+      if (appleResp.status !== 0) {
+        console.warn(`[verifyAppleReceipt] Apple status=${appleResp.status} user=${userId}`);
+        return res.status(400).json({
+          success: false,
+          error: `Reçu invalide (code Apple ${appleResp.status}).`,
+        });
+      }
+
+      // Vérifier le bundle id
+      const bundleId = appleResp.receipt && appleResp.receipt.bundle_id;
+      if (bundleId !== 'com.immozone.estate') {
+        console.warn(`[verifyAppleReceipt] bundle inattendu: ${bundleId}`);
+        return res.status(400).json({ success: false, error: 'Reçu invalide (bundle).' });
+      }
+
+      // Trouver la transaction dans le reçu (in_app)
+      const inApp = (appleResp.receipt && appleResp.receipt.in_app) || [];
+      let tx = null;
+      if (transactionId) {
+        tx = inApp.find((t) => t.transaction_id === transactionId && t.product_id === productId);
+      }
+      // Fallback : dernière transaction de ce produit (reçu rejoué sans id)
+      if (!tx) {
+        const candidates = inApp.filter((t) => t.product_id === productId);
+        candidates.sort((a, b) => Number(b.purchase_date_ms || 0) - Number(a.purchase_date_ms || 0));
+        tx = candidates[0] || null;
+      }
+      if (!tx) {
+        return res.status(400).json({
+          success: false,
+          error: 'Transaction introuvable dans le reçu.',
+        });
+      }
+      const txId = tx.transaction_id;
+
+      // ── 4. Anti-rejeu : une transaction Apple = un seul créditage ────────
+      const txRef = db.collection('apple_transactions').doc(txId);
+      const already = await db.runTransaction(async (t) => {
+        const doc = await t.get(txRef);
+        if (doc.exists) return true;
+        t.set(txRef, {
+          transactionId: txId,
+          productId,
+          userId,
+          createdAt: new Date().toISOString(),
+          environment: appleResp.environment || 'Production',
+        });
+        return false;
+      });
+      const credits = await iapCreditsForProduct(productId);
+      if (already) {
+        console.log(`[verifyAppleReceipt] tx ${txId} déjà traitée (rejeu StoreKit)`);
+        return res.json({ success: true, alreadyProcessed: true, credits });
+      }
+
+      if (credits <= 0) {
+        return res.status(400).json({ success: false, error: 'Pack non configuré.' });
+      }
+
+      // ── 5. PaymentModel 'confirmed' + CreditModel + notification ─────────
+      const userDoc = await db.collection('users').doc(userId).get();
+      const userName = userDoc.exists ? (userDoc.data().name || userDoc.data().email || '') : '';
+      const amount = (IAP_DEFAULT_PACKS[productId] || {}).amount || 0;
+      const nowIso = new Date().toISOString();
+      const paymentId = `pay_apple_${txId}`;
+
+      await db.collection('payments').doc(paymentId).set({
+        id: paymentId,
+        userId,
+        userName,
+        orderId: `ord_apple_${txId}`,
+        operator: 'apple_iap',
+        phoneNumber: '',
+        amount,
+        currency: 'USD',
+        status: 'confirmed',
+        transactionReference: `Apple IAP ${productId} • tx ${txId}`,
+        createdAt: nowIso,
+        confirmedAt: nowIso,
+        productType: 'recharge_credits_iap',
+        creditsQty: credits,
+      });
+
+      const creditId = `credit_${paymentId}`;
+      await db.collection('credits').doc(creditId).set({
+        id: creditId,
+        userId,
+        source: 'paiement_apple_iap',
+        orderId: `ord_apple_${txId}`,
+        quantity: credits,
+        remaining: credits,
+        createdAt: nowIso,
+        expiresAt: null,
+        isActive: true,
+      });
+
+      try {
+        const notifId = `notif_credit_${paymentId}`;
+        await db.collection('notifications').doc(notifId).set({
+          id: notifId,
+          userId,
+          type: 'success',
+          title: 'Compte crédité',
+          body: `${credits} crédit(s) ajouté(s) à votre compte.\n` +
+                `Achat App Store de ${amount} USD. Merci !`,
+          isRead: false,
+          createdAt: nowIso,
+        });
+      } catch (nErr) {
+        console.warn('[verifyAppleReceipt] notification:', nErr.message);
+      }
+
+      // ── 6. Parrainage (1ʳᵉ recharge du filleul) ──────────────────────────
+      await iapApplyReferralCommission(userId, credits, paymentId);
+
+      console.log(`[verifyAppleReceipt] ✅ ${credits} crédits → ${userId} (tx ${txId}, ${productId})`);
+      return res.json({ success: true, credits });
+    } catch (err) {
+      console.error('[verifyAppleReceipt] Exception:', err);
+      return res.status(500).json({ success: false, error: 'Erreur serveur. Réessayez.' });
+    }
+  }
+);

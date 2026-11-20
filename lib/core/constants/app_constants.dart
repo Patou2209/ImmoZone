@@ -1,4 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
+  // ── Apple — détection iOS natif (pour le flux d'achat StoreKit/IAP) ─────────
+  // Sur iOS natif : les recharges passent EXCLUSIVEMENT par In-App Purchase
+  // (Apple 3.1.1) — le mobile money n'est JAMAIS affiché.
+  // Android / web : flux mobile money inchangé.
+  static bool get isIosNative =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
   // ── Apple App Store — gating iOS DÉSACTIVÉ (pivot Option D : IAP) ──────────
   // Historique : le mode « reader » (true sur iOS natif) masquait tout achat
   // de crédits suite au 1er rejet 3.1.1. Apple a ensuite refusé le modèle

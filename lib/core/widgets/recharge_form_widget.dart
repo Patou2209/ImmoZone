@@ -21,6 +21,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import 'iap_recharge_widget.dart';
 import '../../core/utils/phone_utils.dart';
 import '../../models/payment_model.dart';
 import '../../services/data_service.dart';
@@ -41,6 +42,28 @@ class RechargeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenH0 = MediaQuery.of(context).size.height;
+    final screenW0 = MediaQuery.of(context).size.width;
+
+    // ── iOS natif : recharge EXCLUSIVEMENT via Apple In-App Purchase ────────
+    // (Apple 3.1.1 : aucun moyen de paiement externe pour du contenu
+    // numérique). Android / web : flux mobile money inchangé ci-dessous.
+    if (AppConstants.isIosNative) {
+      return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: screenW0 > 600 ? (screenW0 - 520) / 2 : 16,
+          vertical: 28,
+        ),
+        child: SizedBox(
+          width: 520,
+          height: screenH0 * 0.88,
+          child: const IapRechargeContent(),
+        ),
+      );
+    }
+
     // Apple 3.1.1 : aucun formulaire de recharge sur iOS (mode reader).
     // Garde de sécurité si un appel résiduel ouvre quand même ce dialog.
     if (AppConstants.iosReaderMode) {

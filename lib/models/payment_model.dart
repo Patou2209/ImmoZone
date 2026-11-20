@@ -64,6 +64,7 @@ class PaymentModel {
       case 'orange_money': return 'Orange Money';
       case 'airtel_money': return 'Airtel Money';
       case 'manual': return 'Paiement Manuel';
+      case 'apple_iap': return 'App Store (Apple)';
       default: return operator;
     }
   }

@@ -33,6 +33,7 @@ class CreditModel {
       case 'promo_admin': return 'Promotion admin';
       case 'parrainage_user': return 'Commission parrainage';
       case 'remboursement_annonce': return 'Restitution annonce annulée';
+      case 'paiement_apple_iap': return 'Achat App Store';
       default: return source;
     }
   }

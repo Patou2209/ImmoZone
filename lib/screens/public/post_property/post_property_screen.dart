@@ -15,6 +15,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../services/data_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../core/widgets/immozone_nav_helper.dart';
+import '../../../core/widgets/recharge_form_widget.dart';
 import '../../payment/payment_screen.dart';
 
 class PostPropertyScreen extends StatefulWidget {
@@ -545,6 +546,24 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
       ),
     ));
     // Au retour : re-vérifier le solde (crédits ajoutés automatiquement si succès)
+    if (mounted) {
+      setState(() => _creditChecked = false);
+      await _checkUserCredits();
+    }
+  }
+
+  // ── iOS natif : recharge via Apple In-App Purchase (Apple 3.1.1) ─────────
+  // Ouvre le RechargeDialog (qui route automatiquement vers StoreKit sur
+  // iOS). Au retour, on re-vérifie le solde : si l'achat a réussi, les
+  // crédits ont été ajoutés côté serveur → CAS 1 (Continuer débloqué).
+  Future<void> _rechargeViaAppStore() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final user = auth.currentUser;
+    if (user == null) return;
+    await showDialog(
+      context: context,
+      builder: (_) => RechargeDialog(user: user, ds: DataService()),
+    );
     if (mounted) {
       setState(() => _creditChecked = false);
       await _checkUserCredits();
@@ -3415,6 +3434,70 @@ class _PostPropertyScreenState extends State<PostPropertyScreen> {
                 'Crédits ajoutés automatiquement',
                 'Dès approbation, vos crédits sont crédités et le bouton "Continuer" se débloque.'),
           ]),
+        ),
+      ];
+    }
+
+    // Sous-cas 4b-iOS : solde insuffisant sur iOS natif → recharge
+    // EXCLUSIVEMENT via Apple In-App Purchase (Apple 3.1.1). Aucun pack
+    // mobile money ni référence de transaction affichés sur iOS.
+    if (AppConstants.isIosNative) {
+      return [
+        headerCard,
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.errorColor.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.3)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.account_balance_wallet_outlined,
+                color: AppTheme.errorColor, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Solde insuffisant',
+                    style: TextStyle(fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700, fontSize: 14,
+                        color: AppTheme.errorColor)),
+                const SizedBox(height: 4),
+                Text(
+                  'Vous avez $_userAvailableCredits crédit${_userAvailableCredits != 1 ? 's' : ''} et il vous faut $_requiredCredits crédit${_requiredCredits != 1 ? 's' : ''} pour cette publication.',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 12,
+                      color: AppTheme.textSecondary, height: 1.4),
+                ),
+              ],
+            )),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _rechargeViaAppStore,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.add_card_rounded, size: 18),
+            label: const Text('Recharger mes crédits',
+                style: TextStyle(fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700, fontSize: 14)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Paiement sécurisé via votre compte Apple. Vos crédits sont '
+          'ajoutés automatiquement.',
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+              color: AppTheme.textHint, height: 1.4),
+          textAlign: TextAlign.center,
         ),
       ];
     }
