@@ -2096,6 +2096,32 @@ class DataService {
     await _prefs?.setString('packs_cache', jsonEncode(packs));
   }
 
+  // ─── PACKS IAP iOS (App Store) ───────────────────────────────────────────────
+  // Mapping productId ASC → crédits livrés, modifiable par l'admin SANS
+  // re-review Apple (les produits ASC sont des paliers de PRIX figés).
+  // Structure Firestore config/iap_packs :
+  //   { packs: { '<productId>': { credits: int, active: bool } } }
+  // Lu côté serveur par verifyAppleReceipt (functions) et côté client par
+  // IapService (affichage).
+
+  DocumentReference get _iapPacksDoc => _db.collection('config').doc('iap_packs');
+
+  Future<Map<String, dynamic>> getIapPacks() async {
+    try {
+      final doc = await _iapPacksDoc.get();
+      final data = doc.data() as Map<String, dynamic>?;
+      final packs = data?['packs'];
+      if (packs is Map) return Map<String, dynamic>.from(packs);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[DataService.getIapPacks] $e');
+    }
+    return {};
+  }
+
+  Future<void> saveIapPacks(Map<String, dynamic> packs) async {
+    await _iapPacksDoc.set({'packs': packs});
+  }
+
   // ─── CONTACTS ADMIN ─────────────────────────────────────────────────────────
 
   List<Map<String, dynamic>> get adminContacts {

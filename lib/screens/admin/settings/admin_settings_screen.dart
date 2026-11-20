@@ -25,6 +25,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   // ── Packs ────────────────────────────────────────────────────────────────────
   List<Map<String, dynamic>> _packs = [];
 
+  // ── Packs IAP iOS (App Store) ────────────────────────────────────────────────────
+  // Les PRIX sont figés dans App Store Connect (nouveau prix = nouveau
+  // produit ASC). Seuls les CRÉDITS livrés sont modifiables ici, SANS
+  // re-review Apple. Lu côté serveur par verifyAppleReceipt (anti-triche).
+  static const List<Map<String, dynamic>> _iapProductDefs = [
+    {'id': 'com.immozone.estate.credits_3usd',   'price': 3,   'defaultCredits': 30},
+    {'id': 'com.immozone.estate.credits_5usd',   'price': 5,   'defaultCredits': 55},
+    {'id': 'com.immozone.estate.credits_10usd',  'price': 10,  'defaultCredits': 120},
+    {'id': 'com.immozone.estate.credits_20usd',  'price': 20,  'defaultCredits': 250},
+    {'id': 'com.immozone.estate.credits_50usd',  'price': 50,  'defaultCredits': 700},
+    {'id': 'com.immozone.estate.credits_100usd', 'price': 100, 'defaultCredits': 1600},
+  ];
+  final Map<String, TextEditingController> _iapCreditsCtrl = {};
+  final Map<String, bool> _iapActive = {};
+
   // ── Moyens de paiement ───────────────────────────────────────────────────────
   List<Map<String, dynamic>> _paymentMethods = [];
 
@@ -138,6 +153,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     _emailContactCtrl.text  = _ds.emailContact;
     _packs          = List<Map<String, dynamic>>.from(_ds.subscriptionPacks);
     _paymentMethods = List<Map<String, dynamic>>.from(_ds.paymentMethods);
+    // Packs IAP iOS : config Firestore (fallback = défauts parité Android/web)
+    final iapPacks = await _ds.getIapPacks();
+    for (final def in _iapProductDefs) {
+      final id = def['id'] as String;
+      final entry = iapPacks[id];
+      int credits = def['defaultCredits'] as int;
+      bool active = true;
+      if (entry is num) credits = entry.toInt();
+      if (entry is Map) {
+        credits = (entry['credits'] as num?)?.toInt() ?? credits;
+        active  = entry['active'] != false;
+      }
+      _iapCreditsCtrl[id] = TextEditingController(text: '$credits');
+      _iapActive[id] = active;
+    }
     final loadedTiers = await _ds.loadRechargeTiers();
     _tiers = List<Map<String, dynamic>>.from(loadedTiers);
     _initTierControllers();
@@ -176,7 +206,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
         _promoQtyCtrl, _promoReasonCtrl,
         _freeQuotaCountCtrl, _freeQuotaDaysCtrl,
         _updateBuildCtrl, _updateMsgCtrl,
-        ..._tierMinCtrl, ..._tierMaxCtrl, ..._tierPctCtrl]) {
+        ..._tierMinCtrl, ..._tierMaxCtrl, ..._tierPctCtrl,
+        ..._iapCreditsCtrl.values]) {
       c.dispose();
     }
     super.dispose();
@@ -213,7 +244,19 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
 
   Future<void> _savePacks() async {
     await _ds.saveSubscriptionPacks(_packs);
-    _snackOk('✅ Packs sauvegardés');
+    // Packs IAP iOS : mapping productId → {credits, active} (config/iap_packs)
+    final iapPacks = <String, dynamic>{};
+    for (final def in _iapProductDefs) {
+      final id = def['id'] as String;
+      final credits = int.tryParse(_iapCreditsCtrl[id]?.text.trim() ?? '') ??
+          (def['defaultCredits'] as int);
+      iapPacks[id] = {
+        'credits': credits.clamp(1, 1000000),
+        'active': _iapActive[id] ?? true,
+      };
+    }
+    await _ds.saveIapPacks(iapPacks);
+    _snackOk('✅ Packs sauvegardés (mobile money + App Store)');
   }
 
   Future<void> _savePaymentMethods() async {
@@ -1418,6 +1461,33 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
+            const SizedBox(height: 28),
+
+            // ── Packs iOS (App Store — In-App Purchase) ──────────────────────
+            _sectionHeader('Packs iOS (App Store)'),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primaryLight.withValues(alpha: 0.35)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.apple, color: AppTheme.textPrimary, size: 18),
+                SizedBox(width: 8),
+                Expanded(child: Text(
+                  'Les PRIX sont figés dans App Store Connect (un nouveau prix = '
+                  'un nouveau produit Apple). Vous pouvez modifier ici le NOMBRE '
+                  'DE CRÉDITS livrés par pack, sans re-validation Apple. '
+                  'Désactiver un pack le masque dans l\'app iOS.',
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                      color: AppTheme.textSecondary, height: 1.4),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            ..._iapProductDefs.map(_iapPackCard),
           ]),
         ),
       ),
@@ -1516,6 +1586,81 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
               );
             }
           },
+        ),
+      ]),
+    );
+  }
+
+  // ── Carte d'un pack IAP iOS (prix figé ASC, crédits éditables) ─────────────
+  Widget _iapPackCard(Map<String, dynamic> def) {
+    final id = def['id'] as String;
+    final price = def['price'] as int;
+    final isActive = _iapActive[id] ?? true;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isActive
+              ? AppTheme.primaryLight.withValues(alpha: 0.5)
+              : AppTheme.dividerColor,
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)],
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppTheme.textPrimary.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.apple, color: AppTheme.textPrimary, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.textPrimary, borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('\$$price USD',
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                      fontWeight: FontWeight.w800, color: Colors.white)),
+            ),
+            const SizedBox(width: 8),
+            const Text('prix figé Apple', style: TextStyle(
+                fontFamily: 'Poppins', fontSize: 10, color: AppTheme.textHint)),
+          ]),
+          const SizedBox(height: 4),
+          Text(id.replaceFirst('com.immozone.estate.', ''),
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 10,
+                  color: AppTheme.textHint)),
+        ])),
+        SizedBox(
+          width: 86,
+          child: TextField(
+            controller: _iapCreditsCtrl[id],
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13,
+                fontWeight: FontWeight.w700),
+            decoration: InputDecoration(
+              labelText: 'Crédits',
+              labelStyle: const TextStyle(fontFamily: 'Poppins', fontSize: 11,
+                  color: AppTheme.textHint),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+        Switch(
+          value: isActive,
+          activeThumbColor: AppTheme.accentColor,
+          onChanged: (v) => setState(() => _iapActive[id] = v),
         ),
       ]),
     );
